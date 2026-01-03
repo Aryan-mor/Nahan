@@ -1,0 +1,100 @@
+import {
+  Avatar,
+  Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+} from '@heroui/react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, MoreVertical, Shield } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { useAppStore } from '../stores/appStore';
+import { ChatInput } from './ChatInput';
+import { MessageBubble } from './MessageBubble';
+
+export function ChatView() {
+  const { activeChat, messages, setActiveChat } = useAppStore();
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  if (!activeChat) return null;
+
+  return (
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className="fixed inset-0 z-50 bg-industrial-950 flex flex-col h-[100dvh]"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b border-industrial-800 bg-industrial-900/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <Button
+            isIconOnly
+            variant="light"
+            onPress={() => setActiveChat(null)}
+            className="text-industrial-300 -ml-2"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Button>
+
+          <div className="flex items-center gap-3">
+            <Avatar
+              name={activeChat.name}
+              className="w-10 h-10 text-sm bg-primary-900 text-primary-200"
+            />
+            <div>
+              <h2 className="font-semibold text-industrial-100 leading-tight">{activeChat.name}</h2>
+              <p className="text-xs text-industrial-400 font-mono">
+                #{activeChat.fingerprint.slice(-8)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Dropdown>
+          <DropdownTrigger>
+            <Button isIconOnly variant="light" className="text-industrial-400">
+              <MoreVertical className="w-5 h-5" />
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu
+            aria-label="Chat options"
+            className="bg-industrial-900 border border-industrial-800 text-industrial-200"
+          >
+            <DropdownItem key="verify" startContent={<Shield className="w-4 h-4" />}>
+              Verify Key
+            </DropdownItem>
+            <DropdownItem key="clear" className="text-danger" color="danger">
+              Clear History
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-industrial-500 space-y-4 opacity-50">
+            <Shield className="w-16 h-16" />
+            <p className="text-center max-w-xs text-sm">
+              Messages are end-to-end encrypted. Only you and {activeChat.name} can read them.
+            </p>
+          </div>
+        ) : (
+          messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input Area */}
+      <ChatInput />
+    </motion.div>
+  );
+}

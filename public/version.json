@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2026-01-03",
+  "changes": [
+    "Initial PWA Release",
+    "Offline-first architecture",
+    "Local encryption with OpenPGP.js",
+    "Secure message storage in IndexedDB"
+  ]
+}
