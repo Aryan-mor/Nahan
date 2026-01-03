@@ -16,8 +16,9 @@ import { MessageBubble } from './MessageBubble';
 
 export function ChatView() {
   const { activeChat, messages, setActiveChat } = useAppStore();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const isRTL = i18n.language === 'fa';
 
   // Auto-scroll to bottom
   useEffect(() => {
