@@ -1,11 +1,11 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { traeBadgePlugin } from 'vite-plugin-trae-solo-badge';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/Nahan/',
   build: {
     sourcemap: 'hidden',
   },
@@ -14,15 +14,6 @@ export default defineConfig({
       babel: {
         plugins: ['react-dev-locator'],
       },
-    }),
-    traeBadgePlugin({
-      variant: 'dark',
-      position: 'bottom-right',
-      prodOnly: true,
-      clickable: true,
-      clickUrl: 'https://www.trae.ai/solo?showJoin=1',
-      autoTheme: true,
-      autoThemeTarget: '#root',
     }),
     tsconfigPaths(),
     VitePWA({
@@ -80,10 +71,11 @@ export default defineConfig({
         ],
       },
       manifest: {
-        id: '/',
+        id: '/Nahan/',
         name: 'Nahan',
         short_name: 'Nahan',
-        start_url: '/',
+        start_url: '/Nahan/',
+        scope: '/Nahan/',
         display: 'standalone',
         theme_color: '#0f172a',
         background_color: '#0f172a',
