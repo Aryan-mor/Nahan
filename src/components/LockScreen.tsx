@@ -74,6 +74,12 @@ export function LockScreen() {
         // Set session passphrase explicitly
         useAppStore.getState().setSessionPassphrase(pin);
         setLocked(false);
+        
+        // Show install prompt if not installed (even if dismissed previously)
+        const { isStandalone, setInstallPromptVisible } = useAppStore.getState();
+        if (!isStandalone) {
+           setInstallPromptVisible(true);
+        }
       } else {
         incrementFailedAttempts();
         const currentFailed = failedAttempts + 1;

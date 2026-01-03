@@ -35,7 +35,7 @@ import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 
 export function Settings() {
-  const { identities, contacts, currentIdentity, initializeApp } = useAppStore();
+  const { identities, contacts, currentIdentity, initializeApp, isStandalone, setInstallPromptVisible } = useAppStore();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const { isOpen: isExportOpen, onOpen: onExportOpen, onOpenChange: onExportOpenChange } = useDisclosure();
 
@@ -137,6 +137,31 @@ export function Settings() {
       transition={{ duration: 0.3 }}
       className="space-y-4 md:space-y-6"
     >
+      {/* Install App Card */}
+      {!isStandalone && (
+        <Card className="bg-gradient-to-r from-blue-900/20 to-industrial-900 border-blue-500/30">
+          <CardBody className="flex flex-row items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Download className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium text-industrial-100">Install Nahan</p>
+                <p className="text-xs text-industrial-400">Get the full experience</p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              color="primary" 
+              onPress={() => setInstallPromptVisible(true)}
+              className="bg-blue-600"
+            >
+              Install
+            </Button>
+          </CardBody>
+        </Card>
+      )}
+
       {/* General Settings */}
       <Card className="bg-industrial-900 border-industrial-800">
         <CardHeader className="flex items-center gap-3 p-4">

@@ -55,6 +55,15 @@ interface AppState {
   processPendingMessages: () => Promise<number>;
   processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string) => Promise<void>;
   setSessionPassphrase: (passphrase: string) => void;
+
+  // PWA
+  deferredPrompt: any;
+  isStandalone: boolean;
+  isInstallPromptVisible: boolean;
+  setDeferredPrompt: (prompt: any) => void;
+  setStandalone: (isStandalone: boolean) => void;
+  setInstallPromptVisible: (visible: boolean) => void;
+  installPWA: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -73,6 +82,11 @@ export const useAppStore = create<AppState>()(
       sessionPassphrase: null,
       activeChat: null,
       messages: [],
+      
+      // PWA Initial State
+      deferredPrompt: null,
+      isStandalone: false,
+      isInstallPromptVisible: false,
 
       initializeApp: async () => {
         set({ isLoading: true });
@@ -378,6 +392,22 @@ export const useAppStore = create<AppState>()(
       },
 
       setSessionPassphrase: (passphrase) => set({ sessionPassphrase: passphrase }),
+
+      // PWA Actions
+      setDeferredPrompt: (prompt) => set({ deferredPrompt: prompt }),
+      setStandalone: (isStandalone) => set({ isStandalone }),
+      setInstallPromptVisible: (visible) => set({ isInstallPromptVisible: visible }),
+      installPWA: async () => {
+        const { deferredPrompt } = get();
+        if (!deferredPrompt) return;
+        
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        if (outcome === 'accepted') {
+          set({ deferredPrompt: null, isInstallPromptVisible: false });
+        }
+      },
     }),
     {
       name: 'nahan-storage',

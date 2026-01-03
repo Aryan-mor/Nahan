@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useAppStore } from '../stores/appStore';
 
 export function usePWA() {
+  const {
+    setDeferredPrompt,
+    setStandalone,
+    setInstallPromptVisible,
+    isStandalone
+  } = useAppStore();
+
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -17,10 +25,6 @@ export function usePWA() {
     },
   });
 
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isInstallPromptVisible, setIsInstallPromptVisible] = useState(false);
-
   useEffect(() => {
     // Check if standalone
     const checkStandalone = () => {
@@ -29,19 +33,39 @@ export function usePWA() {
         (window.navigator as any).standalone ||
         document.referrer.includes('android-app://');
       
-      setIsStandalone(!!isStandaloneMode);
+      setStandalone(!!isStandaloneMode);
     };
 
     checkStandalone();
-    window.addEventListener('resize', checkStandalone); // Sometimes display-mode changes on resize? unlikely but safe.
+    window.addEventListener('resize', checkStandalone);
+
+    // Check iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    if (isIOS) {
+       const dismissed = localStorage.getItem('pwa-install-dismissed');
+       // We need to wait for checkStandalone to update store? No, we can check logic directly
+       // But checkStandalone is async? No, it's sync.
+       // However, setStandalone updates the store which might not be immediate for getState? 
+       // setStandalone is sync in Zustand usually but let's rely on the local check
+       const isStandaloneMode =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone ||
+        document.referrer.includes('android-app://');
+       
+       if (!isStandaloneMode && !dismissed) {
+         setInstallPromptVisible(true);
+       }
+    }
 
     // Handle beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // Only show if not already standalone
-      if (!isStandalone) {
-        setIsInstallPromptVisible(true);
+      // Only show if not already standalone and not dismissed
+      const dismissed = localStorage.getItem('pwa-install-dismissed');
+      // We need to check current state of isStandalone, but we have it in dependency or use getState
+      if (!useAppStore.getState().isStandalone && !dismissed) {
+        setInstallPromptVisible(true);
       }
     };
 
@@ -51,33 +75,10 @@ export function usePWA() {
       window.removeEventListener('resize', checkStandalone);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, [isStandalone]);
-
-  const installPWA = async () => {
-    if (!deferredPrompt) return;
-    
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-      setIsInstallPromptVisible(false);
-    }
-  };
-
-  const dismissInstallPrompt = () => {
-    setIsInstallPromptVisible(false);
-    // Maybe save to local storage to show ribbon instead
-    localStorage.setItem('pwa-install-dismissed', 'true');
-  };
+  }, [setStandalone, setDeferredPrompt, setInstallPromptVisible]);
 
   return {
     needRefresh,
     updateServiceWorker,
-    isStandalone,
-    isInstallPromptVisible,
-    deferredPrompt,
-    installPWA,
-    dismissInstallPrompt,
   };
 }
