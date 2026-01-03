@@ -1,7 +1,7 @@
 import { HeroUIProvider } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import { Lock, MessageSquare, Settings as SettingsIcon, Users } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Toaster } from 'sonner';
 import { ChatList } from './components/ChatList';
 import { ChatView } from './components/ChatView';
@@ -14,11 +14,13 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 import { useAppStore } from './stores/appStore';
 import { useOfflineSync } from './hooks/useOfflineSync';
+import { usePWA } from './hooks/usePWA';
 
 type TabType = 'chats' | 'keys' | 'settings';
 
 export default function App() {
   useOfflineSync();
+  usePWA();
 
   const {
     initializeApp,
@@ -37,20 +39,45 @@ export default function App() {
     initializeApp();
   }, [initializeApp]);
 
-  useEffect(() => {
-    const handleBlur = () => {
-      // Disable auto-lock in development environment
-      if (import.meta.env.DEV) {
-        return;
-      }
+  const lockTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-      if (identities.length > 0) {
-        setLocked(true);
+  useEffect(() => {
+    const startLockTimer = () => {
+      if (lockTimeoutRef.current) return;
+      
+      lockTimeoutRef.current = setTimeout(() => {
+        if (identities.length > 0) {
+          setLocked(true);
+        }
+        lockTimeoutRef.current = null;
+      }, 60000); // 1 minute
+    };
+
+    const cancelLockTimer = () => {
+      if (lockTimeoutRef.current) {
+        clearTimeout(lockTimeoutRef.current);
+        lockTimeoutRef.current = null;
       }
     };
 
-    window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        startLockTimer();
+      } else {
+        cancelLockTimer();
+      }
+    };
+
+    window.addEventListener('blur', startLockTimer);
+    window.addEventListener('focus', cancelLockTimer);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('blur', startLockTimer);
+      window.removeEventListener('focus', cancelLockTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      cancelLockTimer();
+    };
   }, [identities.length, setLocked]);
 
   const renderContent = () => {
