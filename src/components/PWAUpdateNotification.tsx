@@ -2,6 +2,7 @@ import { usePWA } from '../hooks/usePWA';
 import { RefreshCw, ShieldAlert, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface VersionInfo {
   version: string;
@@ -10,6 +11,7 @@ interface VersionInfo {
 
 export function PWAUpdateNotification() {
   const { needRefresh, updateServiceWorker } = usePWA();
+  const { t } = useTranslation();
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
@@ -38,9 +40,9 @@ export function PWAUpdateNotification() {
                   <ShieldAlert className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-industrial-100">New Security Update</h3>
+                  <h3 className="text-sm font-bold text-industrial-100">{t('pwa.update.title')}</h3>
                   <p className="text-xs text-industrial-400">
-                    {versionInfo ? `v${versionInfo.version} Available` : 'Update available'}
+                    {versionInfo ? t('pwa.update.available', { version: versionInfo.version }) : t('pwa.update.available_generic')}
                   </p>
                 </div>
               </div>
@@ -49,7 +51,7 @@ export function PWAUpdateNotification() {
                 className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
               >
                 <RefreshCw className="w-3 h-3" />
-                Update
+                {t('pwa.update.button')}
               </button>
             </div>
             
@@ -57,9 +59,9 @@ export function PWAUpdateNotification() {
               <div className="px-4 pb-3 bg-industrial-900/50">
                 <div className="flex items-center gap-2 mb-1 pt-2">
                   <Info className="w-3 h-3 text-industrial-400" />
-                  <span className="text-xs font-medium text-industrial-300">Improvements:</span>
+                  <span className="text-xs font-medium text-industrial-300">{t('pwa.update.improvements')}</span>
                 </div>
-                <ul className="list-disc list-inside text-xs text-industrial-400 space-y-0.5 ml-1">
+                <ul className="list-disc list-inside text-xs text-industrial-400 space-y-0.5 ms-1">
                   {versionInfo.changes.map((change, idx) => (
                     <li key={idx}>{change}</li>
                   ))}

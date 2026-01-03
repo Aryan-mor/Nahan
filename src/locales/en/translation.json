@@ -1,0 +1,230 @@
+{
+  "app": {
+    "title": "Nahan",
+    "subtitle": "Secure Messenger",
+    "encrypted_locally": "Encrypted Locally",
+    "initializing": "Initializing NAHAN...",
+    "nav": {
+      "chats": "Chats",
+      "keys": "Keys",
+      "settings": "Settings"
+    },
+    "security": {
+      "secure": "Secure",
+      "notice": "Messages are stored locally on your device."
+    },
+    "error": {
+      "title": "Initialization Error",
+      "retry": "Retry"
+    }
+  },
+  "language_selector": {
+    "title": "Select Language",
+    "subtitle": "Please choose your preferred language",
+    "persian_prompt": "لطفاً زبان مورد نظر خود را انتخاب کنید"
+  },
+  "auth": {
+    "create_pin": {
+      "label": "Create PIN",
+      "sublabel": "Set a 6-digit security PIN"
+    },
+    "confirm_pin": {
+      "label": "Confirm PIN",
+      "sublabel": "Re-enter your 6-digit PIN"
+    },
+    "error": {
+      "pin_mismatch": "PINs don't match. Please try again.",
+      "generate": "Failed to generate identity",
+      "warning_required": "Please accept the warning",
+      "name_required": "Please enter your display name"
+    },
+    "back": "Back",
+    "warning": {
+      "title": "Important Warning",
+      "desc1": "NAHAN is a decentralized, offline tool. We do not store your PIN or keys on any server.",
+      "desc2": "If you forget your PIN, your identity and messages cannot be recovered.",
+      "checkbox": "I understand that my PIN cannot be recovered",
+      "continue": "Continue"
+    },
+    "identity": {
+      "title": "Create Identity",
+      "subtitle": "Final step to secure your communications",
+      "display_name": "Display Name",
+      "placeholder": "How should others see you?",
+      "generating": "Generating Keys...",
+      "submit": "Start Using NAHAN"
+    },
+    "welcome": "Welcome to NAHAN!"
+  },
+  "pinpad": {
+    "enter_pin": "Enter PIN",
+    "backspace": "Backspace",
+    "enter": "Enter"
+  },
+  "lock": {
+    "select_identity": "Select Identity",
+    "enter_pin": "Enter PIN",
+    "sublabel": "Enter your 6-digit security PIN",
+    "error": {
+      "select": "Please select an identity",
+      "max_attempts": "Maximum attempts reached. Wiping data...",
+      "incorrect_pin": "Incorrect PIN. {{count}} attempts remaining before data wipe.",
+      "verify": "Verification failed",
+      "verify_toast": "Failed to verify PIN"
+    },
+    "welcome": "Welcome back!"
+  },
+  "chat": {
+    "options": "Chat options",
+    "verify_key": "Verify Key",
+    "clear_history": "Clear History",
+    "encrypted_notice": "Messages are end-to-end encrypted. Only you and {{name}} can read them.",
+    "input": {
+      "placeholder": "Type a secure message...",
+      "send_success_clipboard": "Message sent & copied to clipboard",
+      "send_success": "Message sent",
+      "send_error": "Failed to send message",
+      "decrypt_success": "Message decrypted and imported",
+      "decrypt_error": "Failed to decrypt message",
+      "paste_success": "Text pasted",
+      "clipboard_empty": "Clipboard empty",
+      "paste_tooltip": "Paste from Clipboard",
+      "footer": "End-to-End Encrypted via PGP"
+    },
+    "message": {
+      "encrypted_block": "Encrypted block",
+      "text": "Message text",
+      "copied": "{{label}} copied",
+      "copy_failed": "Failed to copy",
+      "encrypted_copied": "Encrypted block copied",
+      "delete_confirm": "Are you sure you want to delete this message?",
+      "deleted": "Message deleted",
+      "options": "Message options",
+      "copy_encrypted": "Copy Encrypted",
+      "copy_text": "Copy Text",
+      "copy_plain": "Copy Plain Text",
+      "text_copied": "Text copied",
+      "delete": "Delete",
+      "copy_block_btn": "Copy Block"
+    }
+  },
+  "pwa": {
+    "install": {
+      "title": "Install Nahan",
+      "subtitle": "Secure. Fast. Private.",
+      "features": {
+        "offline": {
+          "title": "Offline Access",
+          "desc": "Use Nahan even without internet."
+        },
+        "privacy": {
+          "title": "Privacy",
+          "desc": "No browser history or URL bars."
+        },
+        "speed": {
+          "title": "Speed",
+          "desc": "Instant launch from your home screen."
+        }
+      },
+      "ios": {
+        "title": "To install on iOS:",
+        "share": "Tap the Share button",
+        "add": "Select 'Add to Home Screen'"
+      },
+      "android": {
+        "title": "To install on your device:",
+        "menu": "Tap the Menu button (3 dots)",
+        "add": "Select 'Install App' or 'Add to Home Screen'"
+      },
+      "install_button": "Install Now",
+      "dismiss": "Maybe later"
+    },
+    "update": {
+      "title": "New Security Update",
+      "available": "v{{version}} Available",
+      "available_generic": "Update available",
+      "button": "Update",
+      "improvements": "Improvements:"
+    }
+  },
+  "settings": {
+    "install": {
+      "title": "Install Nahan",
+      "subtitle": "Get the full experience",
+      "button": "Install"
+    },
+    "general": {
+      "title": "General Settings",
+      "language": "Language",
+      "clipboard": {
+        "title": "Auto Clear Clipboard",
+        "subtitle": "Automatically clear sensitive data",
+        "timeout": "Clear After (seconds)"
+      }
+    },
+    "security": {
+      "title": "Security",
+      "info": {
+        "title": "Security Information",
+        "desc": "NAHAN uses industry-standard OpenPGP encryption with ECC Curve25519 keys.",
+        "points": {
+          "1": "All encryption happens locally on your device",
+          "2": "No data is transmitted to external servers",
+          "3": "Private keys are encrypted with your passphrase",
+          "4": "Messages are signed and encrypted for authenticity"
+        }
+      },
+      "advanced": {
+        "title": "Advanced Options",
+        "subtitle": "Show additional security settings",
+        "warning": "These options are for advanced users. Use with caution.",
+        "export": "Export All Data",
+        "clear": "Clear All Data"
+      }
+    },
+    "data": {
+      "title": "Data Overview",
+      "identities": "Identities",
+      "contacts": "Contacts",
+      "current_identity": "Current Identity",
+      "none": "None"
+    },
+    "export": {
+      "title": "Export All Data",
+      "info_title": "Export Information",
+      "info_desc": "This will export all your identities (with encrypted private keys) and contacts to a JSON file.",
+      "password_label": "Export Password",
+      "password_placeholder": "Enter a password to protect the export",
+      "notes_title": "Security Notes:",
+      "notes": {
+        "1": "Private keys remain encrypted with your original passphrases",
+        "2": "This export file should be stored securely",
+        "3": "The export password adds an additional layer of protection"
+      },
+      "cancel": "Cancel",
+      "confirm": "Export Data",
+      "success": "Data exported successfully",
+      "error": "Failed to export data",
+      "password_error": "Please enter a password for the export file",
+      "password_length_error": "Password must be at least 8 characters long"
+    },
+    "clear": {
+      "title": "Clear All Data",
+      "warning": "This action will permanently delete all identities, contacts, and messages. This cannot be undone.",
+      "data_list_title": "Data to be deleted:",
+      "data_list": {
+        "identities": "• {{count}} identity(ies)",
+        "contacts": "• {{count}} contact(s)",
+        "messages": "• All encrypted messages",
+        "settings": "• Application settings"
+      },
+      "recommendation_title": "Recommendation:",
+      "recommendation": "Consider exporting your data first before clearing it, in case you need it later.",
+      "cancel": "Cancel",
+      "confirm": "Clear All Data",
+      "confirm_alert": "Are you sure you want to clear all data? This action cannot be undone.",
+      "success": "All data cleared successfully",
+      "error": "Failed to clear data"
+    }
+  }
+}

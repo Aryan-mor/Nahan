@@ -2,6 +2,7 @@ import { HeroUIProvider } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import { Lock, MessageSquare, Settings as SettingsIcon, Users } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Toaster } from 'sonner';
 import { ChatList } from './components/ChatList';
 import { ChatView } from './components/ChatView';
@@ -9,12 +10,12 @@ import { KeyExchange } from './components/KeyExchange';
 import { LanguageSelector } from './components/LanguageSelector';
 import { LockScreen } from './components/LockScreen';
 import { Onboarding } from './components/Onboarding';
-import { Settings } from './components/Settings';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
-import { useAppStore } from './stores/appStore';
+import { Settings } from './components/Settings';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
+import { useAppStore } from './stores/appStore';
 
 type TabType = 'chats' | 'keys' | 'settings';
 
@@ -35,6 +36,16 @@ export default function App() {
     setActiveTab,
   } = useAppStore();
 
+  const { t, i18n } = useTranslation();
+
+  useEffect(() => {
+    if (language) {
+      i18n.changeLanguage(language);
+      document.documentElement.lang = language;
+      document.documentElement.dir = language === 'fa' ? 'rtl' : 'ltr';
+    }
+  }, [language, i18n]);
+
   useEffect(() => {
     initializeApp();
   }, [initializeApp]);
@@ -44,7 +55,7 @@ export default function App() {
   useEffect(() => {
     const startLockTimer = () => {
       if (lockTimeoutRef.current) return;
-      
+
       lockTimeoutRef.current = setTimeout(() => {
         if (identities.length > 0) {
           setLocked(true);
@@ -86,7 +97,7 @@ export default function App() {
         <div className="min-h-screen bg-industrial-950 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industrial-400 mx-auto mb-4"></div>
-            <p className="text-industrial-300">Initializing NAHAN...</p>
+            <p className="text-industrial-300">{t('app.initializing')}</p>
           </div>
         </div>
       );
@@ -99,13 +110,13 @@ export default function App() {
             <div className="text-red-400 mb-4">
               <Lock className="h-16 w-16 mx-auto" />
             </div>
-            <h1 className="text-2xl font-bold text-industrial-100 mb-2">Initialization Error</h1>
+            <h1 className="text-2xl font-bold text-industrial-100 mb-2">{t('app.error.title')}</h1>
             <p className="text-industrial-300">{error}</p>
             <button
               onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-industrial-700 hover:bg-industrial-600 text-white rounded-lg transition-colors"
             >
-              Retry
+              {t('app.error.retry')}
             </button>
           </div>
         </div>
@@ -128,9 +139,9 @@ export default function App() {
     }
 
     const tabs = [
-      { id: 'chats' as TabType, label: 'Chats', icon: MessageSquare },
-      { id: 'keys' as TabType, label: 'Keys', icon: Users },
-      { id: 'settings' as TabType, label: 'Settings', icon: SettingsIcon },
+      { id: 'chats' as TabType, label: t('app.nav.chats'), icon: MessageSquare },
+      { id: 'keys' as TabType, label: t('app.nav.keys'), icon: Users },
+      { id: 'settings' as TabType, label: t('app.nav.settings'), icon: SettingsIcon },
     ];
 
     return (
@@ -143,19 +154,23 @@ export default function App() {
         {/* Header (Hidden if ChatView is active - though ChatView covers it anyway) */}
         <header className="bg-industrial-900 border-b border-industrial-800 px-4 py-3 sticky top-0 z-40">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-industrial-700 rounded-lg flex items-center justify-center">
-                <Lock className="w-5 h-5 text-industrial-300" />
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-industrial-800 rounded-lg flex items-center justify-center overflow-hidden border border-industrial-700">
+                <img
+                  src={`${import.meta.env.BASE_URL}pwa-192x192.png`}
+                  alt="Nahan"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <h1 className="text-xl font-bold text-industrial-100">NAHAN</h1>
+              <h1 className="text-xl font-bold text-industrial-100">{t('app.title')}</h1>
               <span className="text-xs text-industrial-400 bg-industrial-800 px-2 py-1 rounded hidden sm:inline-block">
-                Secure Messenger
+                {t('app.subtitle')}
               </span>
             </div>
             <div className="text-xs sm:text-sm text-industrial-400">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="hidden sm:inline">Encrypted Locally</span>
+                <span className="hidden sm:inline">{t('app.encrypted_locally')}</span>
               </div>
             </div>
           </div>
@@ -163,7 +178,7 @@ export default function App() {
 
         <div className="flex-1 flex flex-col md:flex-row max-w-6xl mx-auto w-full overflow-hidden">
           {/* Desktop Sidebar Navigation */}
-          <nav className="hidden md:block w-64 bg-industrial-900 border-r border-industrial-800 min-h-[calc(100vh-64px)] p-4 sticky top-[64px] h-[calc(100vh-64px)] overflow-y-auto">
+          <nav className="hidden md:block w-64 bg-industrial-900 border-e border-industrial-800 min-h-[calc(100vh-64px)] p-4 sticky top-[64px] h-[calc(100vh-64px)] overflow-y-auto">
             <div className="space-y-2">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -171,7 +186,7 @@ export default function App() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-start transition-colors ${
                       activeTab === tab.id
                         ? 'bg-industrial-700 text-industrial-100'
                         : 'text-industrial-400 hover:bg-industrial-800 hover:text-industrial-200'
@@ -186,13 +201,13 @@ export default function App() {
 
             {/* Security Notice */}
             <div className="mt-8 p-3 bg-industrial-800 border border-industrial-700 rounded-lg">
-              <div className="flex items-center space-x-2 mb-2">
+              <div className="flex items-center gap-2 mb-2">
                 <Lock className="w-4 h-4 text-green-400" />
-                <span className="text-sm font-medium text-green-400">Secure</span>
+                <span className="text-sm font-medium text-green-400">
+                  {t('app.security.secure')}
+                </span>
               </div>
-              <p className="text-xs text-industrial-400">
-                Messages are stored locally on your device.
-              </p>
+              <p className="text-xs text-industrial-400">{t('app.security.notice')}</p>
             </div>
           </nav>
 
@@ -222,7 +237,7 @@ export default function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${
+                  className={`flex flex-col items-center justify-center w-full h-full gap-1 ${
                     isActive
                       ? 'text-industrial-100'
                       : 'text-industrial-500 hover:text-industrial-300'

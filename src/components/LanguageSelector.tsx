@@ -1,8 +1,10 @@
 import { Card, CardBody } from '@heroui/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../stores/appStore';
 
 export function LanguageSelector() {
   const { setLanguage } = useAppStore();
+  const { t } = useTranslation();
 
   const languages = [
     { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
@@ -13,9 +15,9 @@ export function LanguageSelector() {
     <div className="min-h-screen bg-industrial-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-industrial-100 mb-2">Select Language</h1>
-          <p className="text-industrial-400">Please choose your preferred language</p>
-          <p className="text-industrial-400 font-persian mt-1">لطفاً زبان مورد نظر خود را انتخاب کنید</p>
+          <h1 className="text-3xl font-bold text-industrial-100 mb-2">{t('language_selector.title')}</h1>
+          <p className="text-industrial-400">{t('language_selector.subtitle')}</p>
+          <p className="text-industrial-400 font-persian mt-1">{t('language_selector.persian_prompt')}</p>
         </div>
 
         <div className="grid gap-4">
@@ -30,7 +32,7 @@ export function LanguageSelector() {
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-4">
                     <span className="text-4xl" role="img" aria-label={lang.name}>{lang.flag}</span>
-                    <div className="text-left">
+                    <div className="text-start">
                       <h3 className="text-lg font-bold text-industrial-100">{lang.nativeName}</h3>
                       <p className="text-sm text-industrial-400">{lang.name}</p>
                     </div>

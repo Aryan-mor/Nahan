@@ -51,7 +51,7 @@ body {
 }
 
 /* Persian font support */
-.font-persian {
+.font-persian, :lang(fa) {
   font-family: 'Vazirmatn', sans-serif;
 }
 

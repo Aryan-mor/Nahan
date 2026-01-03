@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import {
   Card,
   CardHeader,
@@ -35,11 +36,11 @@ import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 
 export function Settings() {
-  const { identities, contacts, currentIdentity, initializeApp, isStandalone, setInstallPromptVisible } = useAppStore();
+  const { identities, contacts, currentIdentity, initializeApp, isStandalone, setInstallPromptVisible, language, setLanguage } = useAppStore();
+  const { t } = useTranslation();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const { isOpen: isExportOpen, onOpen: onExportOpen, onOpenChange: onExportOpenChange } = useDisclosure();
 
-  const [language, setLanguage] = useState('en');
   const [autoClearClipboard, setAutoClearClipboard] = useState(true);
   const [clipboardTimeout, setClipboardTimeout] = useState(60);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -49,16 +50,16 @@ export function Settings() {
   const [isClearing, setIsClearing] = useState(false);
 
   const handleClearAllData = async () => {
-    if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+    if (confirm(t('settings.clear.confirm_alert'))) {
       setIsClearing(true);
       try {
         await storageService.clearAllData();
-        toast.success('All data cleared successfully');
+        toast.success(t('settings.clear.success'));
 
         // Reinitialize the app
         await initializeApp();
       } catch (error) {
-        toast.error('Failed to clear data');
+        toast.error(t('settings.clear.error'));
         console.error(error);
       } finally {
         setIsClearing(false);
@@ -69,12 +70,12 @@ export function Settings() {
 
   const handleExportData = async () => {
     if (!exportPassword) {
-      toast.error('Please enter a password for the export file');
+      toast.error(t('settings.export.password_error'));
       return;
     }
 
     if (exportPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long');
+      toast.error(t('settings.export.password_length_error'));
       return;
     }
 
@@ -114,11 +115,11 @@ export function Settings() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Data exported successfully');
+      toast.success(t('settings.export.success'));
       onExportOpenChange();
       setExportPassword('');
     } catch (error) {
-      toast.error('Failed to export data');
+      toast.error(t('settings.export.error'));
       console.error(error);
     } finally {
       setIsExporting(false);
@@ -146,8 +147,8 @@ export function Settings() {
                 <Download className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="font-medium text-industrial-100">Install Nahan</p>
-                <p className="text-xs text-industrial-400">Get the full experience</p>
+                <p className="font-medium text-industrial-100">{t('settings.install.title')}</p>
+                <p className="text-xs text-industrial-400">{t('settings.install.subtitle')}</p>
               </div>
             </div>
             <Button 
@@ -156,7 +157,7 @@ export function Settings() {
               onPress={() => setInstallPromptVisible(true)}
               className="bg-blue-600"
             >
-              Install
+              {t('settings.install.button')}
             </Button>
           </CardBody>
         </Card>
@@ -166,11 +167,11 @@ export function Settings() {
       <Card className="bg-industrial-900 border-industrial-800">
         <CardHeader className="flex items-center gap-3 p-4">
           <SettingsIcon className="w-5 h-5 text-industrial-400" />
-          <h2 className="text-lg font-semibold text-industrial-100">General Settings</h2>
+          <h2 className="text-lg font-semibold text-industrial-100">{t('settings.general.title')}</h2>
         </CardHeader>
         <CardBody className="space-y-6 p-4 pt-0">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-industrial-300">Language</label>
+            <label className="text-sm font-medium text-industrial-300">{t('settings.general.language')}</label>
             <Select
               selectedKeys={[language || 'en']}
               onSelectionChange={(keys) => setLanguage(Array.from(keys)[0] as string)}
@@ -199,8 +200,8 @@ export function Settings() {
               <div className="flex items-center space-x-3">
                 <Clock className="w-5 h-5 text-industrial-400" />
                 <div>
-                  <p className="font-medium text-industrial-100">Auto Clear Clipboard</p>
-                  <p className="text-sm text-industrial-400">Automatically clear sensitive data</p>
+                  <p className="font-medium text-industrial-100">{t('settings.general.clipboard.title')}</p>
+                  <p className="text-sm text-industrial-400">{t('settings.general.clipboard.subtitle')}</p>
                 </div>
               </div>
               <Switch
@@ -214,7 +215,7 @@ export function Settings() {
 
             {autoClearClipboard && (
               <div className="ml-8 space-y-2">
-                <label className="text-sm font-medium text-industrial-300">Clear After (seconds)</label>
+                <label className="text-sm font-medium text-industrial-300">{t('settings.general.clipboard.timeout')}</label>
                 <Input
                   type="number"
                   value={clipboardTimeout.toString()}
@@ -237,24 +238,24 @@ export function Settings() {
       <Card className="bg-industrial-900 border-industrial-800">
         <CardHeader className="flex items-center gap-3 p-4">
           <Shield className="w-5 h-5 text-industrial-400" />
-          <h2 className="text-lg font-semibold text-industrial-100">Security</h2>
+          <h2 className="text-lg font-semibold text-industrial-100">{t('settings.security.title')}</h2>
         </CardHeader>
         <CardBody className="space-y-6 p-4 pt-0">
           <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
             <div className="flex items-center space-x-3 mb-3">
               <Info className="w-5 h-5 text-blue-400" />
               <div>
-                <p className="font-medium text-industrial-100">Security Information</p>
+                <p className="font-medium text-industrial-100">{t('settings.security.info.title')}</p>
                 <p className="text-sm text-industrial-400">
-                  NAHAN uses industry-standard OpenPGP encryption with ECC Curve25519 keys.
+                  {t('settings.security.info.desc')}
                 </p>
               </div>
             </div>
             <ul className="text-sm text-industrial-400 space-y-1 list-disc list-inside">
-              <li>All encryption happens locally on your device</li>
-              <li>No data is transmitted to external servers</li>
-              <li>Private keys are encrypted with your passphrase</li>
-              <li>Messages are signed and encrypted for authenticity</li>
+              <li>{t('settings.security.info.points.1')}</li>
+              <li>{t('settings.security.info.points.2')}</li>
+              <li>{t('settings.security.info.points.3')}</li>
+              <li>{t('settings.security.info.points.4')}</li>
             </ul>
           </div>
 
@@ -264,8 +265,8 @@ export function Settings() {
             <div className="flex items-center space-x-3">
               <AlertTriangle className="w-5 h-5 text-yellow-400" />
               <div>
-                <p className="font-medium text-industrial-100">Advanced Options</p>
-                <p className="text-sm text-industrial-400">Show additional security settings</p>
+                <p className="font-medium text-industrial-100">{t('settings.security.advanced.title')}</p>
+                <p className="text-sm text-industrial-400">{t('settings.security.advanced.subtitle')}</p>
               </div>
             </div>
             <Switch
@@ -282,10 +283,10 @@ export function Settings() {
               <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="font-medium text-yellow-400">Warning</span>
+                  <span className="font-medium text-yellow-400">{t('settings.security.advanced.warning')}</span>
                 </div>
                 <p className="text-sm text-yellow-300">
-                  These options are for advanced users. Use with caution.
+                  {t('settings.security.advanced.warning')}
                 </p>
               </div>
 
@@ -298,7 +299,7 @@ export function Settings() {
                   onPress={onExportOpen}
                   className="flex-1"
                 >
-                  Export All Data
+                  {t('settings.security.advanced.export')}
                 </Button>
                 <Button
                   size="sm"
@@ -308,7 +309,7 @@ export function Settings() {
                   onPress={onOpen}
                   className="flex-1"
                 >
-                  Clear All Data
+                  {t('settings.security.advanced.clear')}
                 </Button>
               </div>
             </div>
@@ -320,14 +321,14 @@ export function Settings() {
       <Card className="bg-industrial-900 border-industrial-800">
         <CardHeader className="flex items-center gap-3 p-4">
           <Info className="w-5 h-5 text-industrial-400" />
-          <h2 className="text-lg font-semibold text-industrial-100">Data Overview</h2>
+          <h2 className="text-lg font-semibold text-industrial-100">{t('settings.data.title')}</h2>
         </CardHeader>
         <CardBody className="p-4 pt-0">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-industrial-400">Identities</p>
+                  <p className="text-sm text-industrial-400">{t('settings.data.identities')}</p>
                   <p className="text-2xl font-bold text-industrial-100">{identities.length}</p>
                 </div>
                 <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center">
@@ -339,7 +340,7 @@ export function Settings() {
             <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-industrial-400">Contacts</p>
+                  <p className="text-sm text-industrial-400">{t('settings.data.contacts')}</p>
                   <p className="text-2xl font-bold text-industrial-100">{contacts.length}</p>
                 </div>
                 <div className="w-8 h-8 bg-green-600/20 rounded-lg flex items-center justify-center">
@@ -351,9 +352,9 @@ export function Settings() {
             <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-industrial-400">Current Identity</p>
+                  <p className="text-sm text-industrial-400">{t('settings.data.current_identity')}</p>
                   <p className="text-lg font-bold text-industrial-100 truncate max-w-[120px]">
-                    {currentIdentity?.name || 'None'}
+                    {currentIdentity?.name || t('settings.data.none')}
                   </p>
                 </div>
                 <div className="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center">
@@ -380,22 +381,22 @@ export function Settings() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Export All Data</ModalHeader>
+              <ModalHeader>{t('settings.export.title')}</ModalHeader>
               <ModalBody className="py-6">
                 <div className="space-y-4">
                   <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
                       <Info className="w-4 h-4 text-blue-400" />
-                      <span className="font-medium text-blue-400">Export Information</span>
+                      <span className="font-medium text-blue-400">{t('settings.export.info_title')}</span>
                     </div>
                     <p className="text-sm text-industrial-400">
-                      This will export all your identities (with encrypted private keys) and contacts to a JSON file.
+                      {t('settings.export.info_desc')}
                     </p>
                   </div>
 
                   <Input
-                    label="Export Password"
-                    placeholder="Enter a password to protect the export"
+                    label={t('settings.export.password_label')}
+                    placeholder={t('settings.export.password_placeholder')}
                     type={showExportPassword ? 'text' : 'password'}
                     value={exportPassword}
                     onChange={(e) => setExportPassword(e.target.value)}
@@ -416,25 +417,25 @@ export function Settings() {
                   />
 
                   <div className="text-xs text-industrial-400 bg-industrial-950 p-3 rounded-lg border border-industrial-800">
-                    <p className="font-medium mb-1 text-industrial-300">Security Notes:</p>
+                    <p className="font-medium mb-1 text-industrial-300">{t('settings.export.notes_title')}</p>
                     <ul className="list-disc list-inside space-y-1">
-                      <li>Private keys remain encrypted with your original passphrases</li>
-                      <li>This export file should be stored securely</li>
-                      <li>The export password adds an additional layer of protection</li>
+                      <li>{t('settings.export.notes.1')}</li>
+                      <li>{t('settings.export.notes.2')}</li>
+                      <li>{t('settings.export.notes.3')}</li>
                     </ul>
                   </div>
                 </div>
               </ModalBody>
               <ModalFooter>
                 <Button color="danger" variant="light" onPress={onClose}>
-                  Cancel
+                  {t('settings.export.cancel')}
                 </Button>
                 <Button
                   color="primary"
                   onPress={handleExportData}
                   isLoading={isExporting}
                 >
-                  Export Data
+                  {t('settings.export.confirm')}
                 </Button>
               </ModalFooter>
             </>
@@ -457,50 +458,49 @@ export function Settings() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Clear All Data</ModalHeader>
+              <ModalHeader>{t('settings.clear.title')}</ModalHeader>
               <ModalBody className="py-6">
                 <div className="space-y-4">
                   <div className="bg-red-900/20 border border-red-700 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
                       <AlertTriangle className="w-4 h-4 text-red-400" />
-                      <span className="font-medium text-red-400">Warning</span>
+                      <span className="font-medium text-red-400">{t('settings.security.advanced.warning')}</span>
                     </div>
                     <p className="text-sm text-red-300">
-                      This action will permanently delete all identities, contacts, and messages.
-                      This cannot be undone.
+                      {t('settings.clear.warning')}
                     </p>
                   </div>
 
                   <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
                     <p className="text-sm text-industrial-400">
-                      Data to be deleted:
+                      {t('settings.clear.data_list_title')}
                     </p>
                     <ul className="text-sm text-industrial-400 mt-2 space-y-1">
-                      <li>• {identities.length} identity{identities.length !== 1 ? 'ies' : ''}</li>
-                      <li>• {contacts.length} contact{contacts.length !== 1 ? 's' : ''}</li>
-                      <li>• All encrypted messages</li>
-                      <li>• Application settings</li>
+                      <li>{t('settings.clear.data_list.identities', { count: identities.length })}</li>
+                      <li>{t('settings.clear.data_list.contacts', { count: contacts.length })}</li>
+                      <li>{t('settings.clear.data_list.messages')}</li>
+                      <li>{t('settings.clear.data_list.settings')}</li>
                     </ul>
                   </div>
 
                   <div className="text-xs text-industrial-400 bg-industrial-950 p-3 rounded-lg border border-industrial-800">
-                    <p className="font-medium mb-1 text-industrial-300">Recommendation:</p>
+                    <p className="font-medium mb-1 text-industrial-300">{t('settings.clear.recommendation_title')}</p>
                     <p>
-                      Consider exporting your data first before clearing it, in case you need it later.
+                      {t('settings.clear.recommendation')}
                     </p>
                   </div>
                 </div>
               </ModalBody>
               <ModalFooter>
                 <Button color="primary" variant="light" onPress={onClose}>
-                  Cancel
+                  {t('settings.clear.cancel')}
                 </Button>
                 <Button
                   color="danger"
                   onPress={handleClearAllData}
                   isLoading={isClearing}
                 >
-                  Clear All Data
+                  {t('settings.clear.confirm')}
                 </Button>
               </ModalFooter>
             </>
