@@ -1,12 +1,14 @@
 import { Button, Textarea, Tooltip } from '@heroui/react';
 import { ClipboardPaste, Lock, Send } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useAppStore } from '../stores/appStore';
 import { ManualPasteModal } from './ManualPasteModal';
 
 export function ChatInput() {
   const { sendMessage, processIncomingMessage } = useAppStore();
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,10 +25,10 @@ export function ChatInput() {
       // Auto-copy encrypted content to clipboard
       try {
         await navigator.clipboard.writeText(encryptedContent);
-        toast.success('Message sent & copied to clipboard');
+        toast.success(t('chat.input.send_success_clipboard'));
       } catch (clipboardError) {
         console.warn('Failed to auto-copy to clipboard:', clipboardError);
-        toast.success('Message sent'); // Still success, just clipboard failed
+        toast.success(t('chat.input.send_success')); // Still success, just clipboard failed
       }
 
       setText('');
@@ -35,7 +37,7 @@ export function ChatInput() {
         // Simple hack to reset height logic if controlled component doesn't do it automatically
       }
     } catch (error) {
-      toast.error('Failed to send message');
+      toast.error(t('chat.input.send_error'));
       console.error(error);
     } finally {
       setIsSending(false);
@@ -50,10 +52,10 @@ export function ChatInput() {
       setIsProcessing(true);
       try {
         await processIncomingMessage(content);
-        toast.success('Message decrypted and imported');
+        toast.success(t('chat.input.decrypt_success'));
         setText(''); // Clear input if it was partial
       } catch (err) {
-        toast.error('Failed to decrypt message');
+        toast.error(t('chat.input.decrypt_error'));
         console.error(err);
         throw err; // Re-throw for modal handling
       } finally {
@@ -62,7 +64,7 @@ export function ChatInput() {
     } else {
       // Regular text paste
       setText((prev) => prev + content);
-      toast.info('Text pasted');
+      toast.info(t('chat.input.paste_success'));
       textareaRef.current?.focus();
     }
   };
@@ -95,7 +97,7 @@ export function ChatInput() {
             ref={textareaRef}
             value={text}
             onValueChange={setText}
-            placeholder="Type a secure message..."
+            placeholder={t('chat.input.placeholder')}
             minRows={1}
             maxRows={4}
             variant="flat"
@@ -124,7 +126,7 @@ export function ChatInput() {
             <Send className="w-4 h-4" />
           </Button>
         ) : (
-          <Tooltip content="Paste from Clipboard">
+          <Tooltip content={t('chat.input.paste_tooltip')}>
             <Button
               isIconOnly
               variant="flat"
@@ -140,7 +142,7 @@ export function ChatInput() {
       <div className="text-center mt-1">
         <span className="text-[10px] text-industrial-600 flex items-center justify-center gap-1">
           <Lock className="w-3 h-3" />
-          End-to-End Encrypted via PGP
+          {t('chat.input.footer')}
         </span>
       </div>
 

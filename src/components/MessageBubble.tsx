@@ -2,6 +2,7 @@ import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@
 import { motion } from 'framer-motion';
 import { Copy, Lock, MoreVertical, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { SecureMessage } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
@@ -12,6 +13,7 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const { deleteMessage } = useAppStore();
+  const { t } = useTranslation();
   const isOutgoing = message.isOutgoing;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -20,23 +22,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   const smartCopy = () => {
     const textToCopy = isOutgoing ? message.content.encrypted : message.content.plain;
-    const label = isOutgoing ? 'Encrypted block' : 'Message text';
+    const label = isOutgoing ? t('chat.message.encrypted_block') : t('chat.message.text');
 
     navigator.clipboard
       .writeText(textToCopy)
-      .then(() => toast.success(`${label} copied`))
-      .catch(() => toast.error('Failed to copy'));
+      .then(() => toast.success(t('chat.message.copied', { label })))
+      .catch(() => toast.error(t('chat.message.copy_failed')));
   };
 
   const copyEncrypted = () => {
     navigator.clipboard.writeText(message.content.encrypted);
-    toast.success('Encrypted block copied');
+    toast.success(t('chat.message.encrypted_copied'));
   };
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this message?')) {
+    if (confirm(t('chat.message.delete_confirm'))) {
       deleteMessage(message.id);
-      toast.success('Message deleted');
+      toast.success(t('chat.message.deleted'));
     }
   };
 
@@ -104,7 +106,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 </Button>
               </DropdownTrigger>
               <DropdownMenu
-                aria-label="Message options"
+                aria-label={t('chat.message.options')}
                 className="bg-industrial-900 border border-industrial-800 text-industrial-200"
               >
                 <DropdownItem
@@ -112,7 +114,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   startContent={<Copy className="w-4 h-4" />}
                   onPress={smartCopy}
                 >
-                  {isOutgoing ? 'Copy Encrypted' : 'Copy Text'}
+                  {isOutgoing ? t('chat.message.copy_encrypted') : t('chat.message.copy_text')}
                 </DropdownItem>
                 {/* Secondary copy option for incoming messages to get encrypted block */}
                 {!isOutgoing ? (
@@ -121,7 +123,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     startContent={<Lock className="w-4 h-4" />}
                     onPress={copyEncrypted}
                   >
-                    Copy Encrypted
+                    {t('chat.message.copy_encrypted')}
                   </DropdownItem>
                 ) : (
                   // For outgoing, we might want to copy plain text as secondary?
@@ -130,10 +132,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     startContent={<Copy className="w-4 h-4" />}
                     onPress={() => {
                       navigator.clipboard.writeText(message.content.plain);
-                      toast.success('Text copied');
+                      toast.success(t('chat.message.text_copied'));
                     }}
                   >
-                    Copy Plain Text
+                    {t('chat.message.copy_plain')}
                   </DropdownItem>
                 )}
                 <DropdownItem
@@ -143,7 +145,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   startContent={<Trash2 className="w-4 h-4" />}
                   onPress={handleDelete}
                 >
-                  Delete
+                  {t('chat.message.delete')}
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
@@ -163,7 +165,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             className="text-[10px] flex items-center gap-1 text-industrial-500 hover:text-primary-400 transition-colors"
           >
             <Lock className="w-3 h-3" />
-            Copy Block
+            {t('chat.message.copy_block_btn')}
           </button>
         </div>
       </div>

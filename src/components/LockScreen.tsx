@@ -1,6 +1,7 @@
 import { Avatar, Select, SelectItem } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { cryptoService } from '../services/crypto';
 import { Identity } from '../services/storage';
@@ -18,6 +19,7 @@ export function LockScreen() {
     resetFailedAttempts,
     wipeData,
   } = useAppStore();
+  const { t } = useTranslation();
   const [selectedIdentityId, setSelectedIdentityId] = useState<string>('');
   const [passphrase, setPassphrase] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -38,7 +40,7 @@ export function LockScreen() {
   const handleUnlock = async (pin: string) => {
     const identity = identities.find((i) => i.id === selectedIdentityId);
     if (!identity) {
-      toast.error('Please select an identity');
+      toast.error(t('lock.error.select'));
       return;
     }
 
@@ -55,20 +57,10 @@ export function LockScreen() {
         setCurrentIdentity(identity);
       }
 
-      // We need to verify against the selected identity specifically
-      // But unlockApp uses currentIdentity.
-      // So we rely on the above setCurrentIdentity,
-      // OR we can manually verify here and then call setSessionPassphrase if valid.
-      // However, unlockApp handles setting isLocked=false and sessionPassphrase.
-
-      // Since setCurrentIdentity updates store, let's just use unlockApp?
-      // State updates might be async in React batching but Zustand is synchronous usually.
-      // Safer approach: Verify manually here, then set session passphrase if valid.
-
       const isValid = await cryptoService.verifyPrivateKeyPassphrase(identity.privateKey, pin);
 
       if (isValid) {
-        toast.success('Welcome back!');
+        toast.success(t('lock.welcome'));
         setCurrentIdentity(identity);
         resetFailedAttempts();
         // Set session passphrase explicitly
@@ -85,23 +77,21 @@ export function LockScreen() {
         const currentFailed = failedAttempts + 1;
 
         if (currentFailed >= 5) {
-          toast.error('Maximum attempts reached. Wiping data...');
+          toast.error(t('lock.error.max_attempts'));
           await wipeData();
           return;
         }
 
         const remaining = 5 - currentFailed;
-        const msg = `Incorrect PIN. ${remaining} attempt${
-          remaining === 1 ? '' : 's'
-        } remaining before data wipe.`;
+        const msg = t('lock.error.incorrect_pin', { count: remaining });
         setError(msg);
         setPassphrase('');
         toast.warning(msg);
       }
     } catch (error) {
       console.error(error);
-      setError('Verification failed');
-      toast.error('Failed to verify PIN');
+      setError(t('lock.error.verify'));
+      toast.error(t('lock.error.verify_toast'));
     } finally {
       setIsUnlocking(false);
     }
@@ -118,7 +108,7 @@ export function LockScreen() {
         {identities.length > 1 && (
           <div className="mb-6 px-6">
             <Select
-              label="Select Identity"
+              label={t('lock.select_identity')}
               selectedKeys={selectedIdentityId ? [selectedIdentityId] : []}
               onSelectionChange={(keys) => {
                 setSelectedIdentityId(Array.from(keys)[0] as string);
@@ -146,7 +136,7 @@ export function LockScreen() {
                 <SelectItem key={identity.id} textValue={identity.name}>
                   <div className="flex items-center gap-2">
                     <Avatar alt={identity.name} className="w-6 h-6 text-xs" name={identity.name} />
-                    <div className="flex flex-col">
+                    <div className="flex flex-col text-start">
                       <span className="text-industrial-100">{identity.name}</span>
                       <span className="text-tiny text-industrial-500 font-mono">
                         #{identity.fingerprint.slice(-4)}
@@ -163,8 +153,8 @@ export function LockScreen() {
           value={passphrase}
           onChange={setPassphrase}
           onComplete={handleUnlock}
-          label="Enter PIN"
-          subLabel="Enter your 6-digit security PIN"
+          label={t('lock.enter_pin')}
+          subLabel={t('lock.sublabel')}
           error={error}
           isLoading={isUnlocking}
         />

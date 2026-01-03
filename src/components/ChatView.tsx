@@ -9,12 +9,14 @@ import {
 import { motion } from 'framer-motion';
 import { ArrowLeft, MoreVertical, Shield } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../stores/appStore';
 import { ChatInput } from './ChatInput';
 import { MessageBubble } from './MessageBubble';
 
 export function ChatView() {
   const { activeChat, messages, setActiveChat } = useAppStore();
+  const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -39,9 +41,9 @@ export function ChatView() {
             isIconOnly
             variant="light"
             onPress={() => setActiveChat(null)}
-            className="text-industrial-300 -ml-2"
+            className="text-industrial-300 -ms-2"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className={`w-6 h-6 ${isRTL ? 'rotate-180' : ''}`} />
           </Button>
 
           <div className="flex items-center gap-3">
@@ -65,14 +67,14 @@ export function ChatView() {
             </Button>
           </DropdownTrigger>
           <DropdownMenu
-            aria-label="Chat options"
+            aria-label={t('chat.options')}
             className="bg-industrial-900 border border-industrial-800 text-industrial-200"
           >
             <DropdownItem key="verify" startContent={<Shield className="w-4 h-4" />}>
-              Verify Key
+              {t('chat.verify_key')}
             </DropdownItem>
             <DropdownItem key="clear" className="text-danger" color="danger">
-              Clear History
+              {t('chat.clear_history')}
             </DropdownItem>
           </DropdownMenu>
         </Dropdown>
@@ -84,7 +86,7 @@ export function ChatView() {
           <div className="flex flex-col items-center justify-center h-full text-industrial-500 space-y-4 opacity-50">
             <Shield className="w-16 h-16" />
             <p className="text-center max-w-xs text-sm">
-              Messages are end-to-end encrypted. Only you and {activeChat.name} can read them.
+              {t('chat.encrypted_notice', { name: activeChat.name })}
             </p>
           </div>
         ) : (

@@ -43,10 +43,6 @@ export function usePWA() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     if (isIOS) {
        const dismissed = localStorage.getItem('pwa-install-dismissed');
-       // We need to wait for checkStandalone to update store? No, we can check logic directly
-       // But checkStandalone is async? No, it's sync.
-       // However, setStandalone updates the store which might not be immediate for getState? 
-       // setStandalone is sync in Zustand usually but let's rely on the local check
        const isStandaloneMode =
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone ||
@@ -54,6 +50,25 @@ export function usePWA() {
        
        if (!isStandaloneMode && !dismissed) {
          setInstallPromptVisible(true);
+       }
+    }
+
+    // Check Android - Ensure modal shows up even if beforeinstallprompt doesn't fire immediately
+    const isAndroid = /Android/.test(navigator.userAgent);
+    if (isAndroid) {
+       const dismissed = localStorage.getItem('pwa-install-dismissed');
+       const isStandaloneMode =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone ||
+        document.referrer.includes('android-app://');
+       
+       if (!isStandaloneMode && !dismissed) {
+         // Small delay to prioritize the native event if it fires
+         setTimeout(() => {
+           if (!useAppStore.getState().isInstallPromptVisible) {
+             setInstallPromptVisible(true);
+           }
+         }, 2000);
        }
     }
 

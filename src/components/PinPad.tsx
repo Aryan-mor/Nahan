@@ -1,5 +1,6 @@
 import { Delete, CornerDownLeft } from 'lucide-react';
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface PinPadProps {
   value: string;
@@ -16,12 +17,15 @@ export const PinPad: React.FC<PinPadProps> = ({
   value,
   onChange,
   onComplete,
-  label = 'Enter PIN',
+  label,
   subLabel,
   error,
   maxLength = 6,
   isLoading = false,
 }) => {
+  const { t } = useTranslation();
+  const displayLabel = label || t('pinpad.enter_pin');
+
   const handleNumberClick = (num: number) => {
     if (value.length < maxLength && !isLoading) {
       const newValue = value + num;
@@ -76,7 +80,7 @@ export const PinPad: React.FC<PinPadProps> = ({
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto p-6">
       {/* Header / Display */}
       <div className="text-center mb-8 w-full">
-        <h2 className="text-2xl font-bold text-industrial-100 mb-2">{label}</h2>
+        <h2 className="text-2xl font-bold text-industrial-100 mb-2">{displayLabel}</h2>
         {subLabel && <p className="text-industrial-400 text-sm mb-6">{subLabel}</p>}
 
         {/* Dots Display */}
@@ -118,7 +122,7 @@ export const PinPad: React.FC<PinPadProps> = ({
           onClick={handleDelete}
           disabled={isLoading || value.length === 0}
           className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Backspace"
+          aria-label={t('pinpad.backspace')}
         >
           <Delete className="w-8 h-8" />
         </button>
@@ -135,7 +139,7 @@ export const PinPad: React.FC<PinPadProps> = ({
           onClick={handleEnter}
           disabled={isLoading || value.length === 0}
           className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Enter"
+          aria-label={t('pinpad.enter')}
         >
           <CornerDownLeft className="w-8 h-8" />
         </button>

@@ -2,6 +2,7 @@ import { Button, Card, CardBody, Checkbox, Input } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, ArrowLeft, ArrowRight, ShieldCheck, User } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { cryptoService } from '../services/crypto';
 import { storageService } from '../services/storage';
@@ -12,6 +13,7 @@ type Step = 'create-pin' | 'confirm-pin' | 'warning' | 'identity';
 
 export function Onboarding() {
   const { addIdentity, setCurrentIdentity, setLocked, setSessionPassphrase } = useAppStore();
+  const { t } = useTranslation();
 
   const [step, setStep] = useState<Step>('create-pin');
   const [pin, setPin] = useState('');
@@ -35,7 +37,7 @@ export function Onboarding() {
         setStep('warning');
       }, 300);
     } else {
-      toast.error("PINs don't match. Please try again.");
+      toast.error(t('auth.error.pin_mismatch'));
       setConfirmedPin('');
       setPin('');
       setTimeout(() => {
@@ -48,13 +50,13 @@ export function Onboarding() {
     if (agreed) {
       setStep('identity');
     } else {
-      toast.error('Please accept the warning');
+      toast.error(t('auth.error.warning_required'));
     }
   };
 
   const handleGenerateIdentity = async () => {
     if (!name.trim()) {
-      toast.error('Please enter your display name');
+      toast.error(t('auth.error.name_required'));
       return;
     }
 
@@ -85,10 +87,10 @@ export function Onboarding() {
       setSessionPassphrase(pin); // Set session passphrase for immediate use
       setLocked(false); // Unlock immediately after creation
 
-      toast.success('Welcome to NAHAN!');
+      toast.success(t('auth.welcome'));
     } catch (error) {
       console.error(error);
-      toast.error('Failed to generate identity');
+      toast.error(t('auth.error.generate'));
     } finally {
       setIsGenerating(false);
     }
@@ -109,8 +111,8 @@ export function Onboarding() {
               value={pin}
               onChange={setPin}
               onComplete={handleCreatePin}
-              label="Create PIN"
-              subLabel="Set a 6-digit security PIN"
+              label={t('auth.create_pin.label')}
+              subLabel={t('auth.create_pin.sublabel')}
             />
           </motion.div>
         );
@@ -128,8 +130,8 @@ export function Onboarding() {
               value={confirmedPin}
               onChange={setConfirmedPin}
               onComplete={handleConfirmPin}
-              label="Confirm PIN"
-              subLabel="Re-enter your 6-digit PIN"
+              label={t('auth.confirm_pin.label')}
+              subLabel={t('auth.confirm_pin.sublabel')}
             />
             <div className="flex justify-center mt-4">
               <button
@@ -140,7 +142,7 @@ export function Onboarding() {
                 }}
                 className="text-industrial-400 hover:text-industrial-200 text-sm flex items-center gap-1"
               >
-                <ArrowLeft className="w-3 h-3" /> Back
+                <ArrowLeft className="w-3 h-3" /> {t('auth.back')}
               </button>
             </div>
           </motion.div>
@@ -160,15 +162,14 @@ export function Onboarding() {
                   <AlertTriangle className="w-8 h-8 text-yellow-500" />
                 </div>
 
-                <h2 className="text-2xl font-bold text-industrial-100">Important Warning</h2>
+                <h2 className="text-2xl font-bold text-industrial-100">{t('auth.warning.title')}</h2>
 
-                <div className="bg-industrial-950 p-4 rounded-lg border border-industrial-800 text-left">
+                <div className="bg-industrial-950 p-4 rounded-lg border border-industrial-800 text-start">
                   <p className="text-industrial-300 text-sm leading-relaxed">
-                    NAHAN is a decentralized, offline tool. We do not store your PIN or keys on any
-                    server.
+                    {t('auth.warning.desc1')}
                   </p>
                   <p className="text-red-400 font-bold text-sm mt-3">
-                    If you forget your PIN, your identity and messages cannot be recovered.
+                    {t('auth.warning.desc2')}
                   </p>
                 </div>
 
@@ -180,7 +181,7 @@ export function Onboarding() {
                     label: 'text-industrial-300 text-sm',
                   }}
                 >
-                  I understand that my PIN cannot be recovered
+                  {t('auth.warning.checkbox')}
                 </Checkbox>
 
                 <Button
@@ -190,7 +191,7 @@ export function Onboarding() {
                   onPress={handleWarningAccept}
                   isDisabled={!agreed}
                 >
-                  Continue
+                  {t('auth.warning.continue')}
                 </Button>
               </CardBody>
             </Card>
@@ -209,15 +210,15 @@ export function Onboarding() {
               <div className="w-16 h-16 bg-industrial-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl border border-industrial-700">
                 <ShieldCheck className="w-8 h-8 text-industrial-100" />
               </div>
-              <h1 className="text-2xl font-bold text-industrial-100">Create Identity</h1>
-              <p className="text-industrial-400">Final step to secure your communications</p>
+              <h1 className="text-2xl font-bold text-industrial-100">{t('auth.identity.title')}</h1>
+              <p className="text-industrial-400">{t('auth.identity.subtitle')}</p>
             </div>
 
             <Card className="bg-industrial-900 border-industrial-800 shadow-xl">
               <CardBody className="p-6 space-y-6">
                 <Input
-                  label="Display Name"
-                  placeholder="How should others see you?"
+                  label={t('auth.identity.display_name')}
+                  placeholder={t('auth.identity.placeholder')}
                   value={name}
                   onValueChange={setName}
                   startContent={
@@ -239,7 +240,7 @@ export function Onboarding() {
                   isLoading={isGenerating}
                   onPress={handleGenerateIdentity}
                 >
-                  {isGenerating ? 'Generating Keys...' : 'Start Using NAHAN'}
+                  {isGenerating ? t('auth.identity.generating') : t('auth.identity.submit')}
                 </Button>
               </CardBody>
             </Card>

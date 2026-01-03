@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Download, MoreVertical, Share, Shield, WifiOff, X, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useAppStore } from '../stores/appStore';
 
 export function PWAInstallPrompt() {
@@ -11,6 +12,7 @@ export function PWAInstallPrompt() {
     isInstallPromptVisible,
     setInstallPromptVisible,
   } = useAppStore();
+  const { t } = useTranslation();
 
   const [isIOS, setIsIOS] = useState(false);
 
@@ -46,7 +48,7 @@ export function PWAInstallPrompt() {
         >
           <button
             onClick={handleDismiss}
-            className="absolute top-4 right-4 text-industrial-400 hover:text-industrial-200"
+            className="absolute top-4 end-4 text-industrial-400 hover:text-industrial-200"
           >
             <X className="w-5 h-5" />
           </button>
@@ -60,8 +62,8 @@ export function PWAInstallPrompt() {
               />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-industrial-100">Install Nahan</h2>
-              <p className="text-sm text-industrial-400">Secure. Fast. Private.</p>
+              <h2 className="text-xl font-bold text-industrial-100">{t('pwa.install.title')}</h2>
+              <p className="text-sm text-industrial-400">{t('pwa.install.subtitle')}</p>
             </div>
           </div>
 
@@ -71,9 +73,9 @@ export function PWAInstallPrompt() {
                 <WifiOff className="w-4 h-4 text-blue-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-industrial-200">Offline Access</h3>
+                <h3 className="text-sm font-semibold text-industrial-200">{t('pwa.install.features.offline.title')}</h3>
                 <p className="text-xs text-industrial-400 leading-relaxed">
-                  Use Nahan even without internet.
+                  {t('pwa.install.features.offline.desc')}
                 </p>
               </div>
             </div>
@@ -83,9 +85,9 @@ export function PWAInstallPrompt() {
                 <Shield className="w-4 h-4 text-green-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-industrial-200">Privacy</h3>
+                <h3 className="text-sm font-semibold text-industrial-200">{t('pwa.install.features.privacy.title')}</h3>
                 <p className="text-xs text-industrial-400 leading-relaxed">
-                  No browser history or URL bars.
+                  {t('pwa.install.features.privacy.desc')}
                 </p>
               </div>
             </div>
@@ -95,9 +97,9 @@ export function PWAInstallPrompt() {
                 <Zap className="w-4 h-4 text-purple-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-industrial-200">Speed</h3>
+                <h3 className="text-sm font-semibold text-industrial-200">{t('pwa.install.features.speed.title')}</h3>
                 <p className="text-xs text-industrial-400 leading-relaxed">
-                  Instant launch from your home screen.
+                  {t('pwa.install.features.speed.desc')}
                 </p>
               </div>
             </div>
@@ -107,13 +109,13 @@ export function PWAInstallPrompt() {
           {isIOS ? (
             <div className="bg-industrial-800/50 rounded-lg p-4 border border-industrial-700/50">
               <p className="text-sm font-medium text-industrial-200 mb-3 text-center">
-                To install on iOS:
+                {t('pwa.install.ios.title')}
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
                   <Share className="w-5 h-5 text-blue-400 shrink-0" />
                   <span>
-                    Tap the <span className="font-bold text-industrial-100">Share</span> button
+                    <Trans i18nKey="pwa.install.ios.share" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
@@ -121,8 +123,7 @@ export function PWAInstallPrompt() {
                     +
                   </div>
                   <span>
-                    Select{' '}
-                    <span className="font-bold text-industrial-100">'Add to Home Screen'</span>
+                    <Trans i18nKey="pwa.install.ios.add" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
                   </span>
                 </div>
               </div>
@@ -134,27 +135,25 @@ export function PWAInstallPrompt() {
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-medium transition-all shadow-lg shadow-blue-900/20 active:scale-95"
             >
               <Download className="w-4 h-4" />
-              Install Now
+              {t('pwa.install.install_button')}
             </button>
           ) : (
             /* Android/Browser Menu Instructions */
             <div className="bg-industrial-800/50 rounded-lg p-4 border border-industrial-700/50">
               <p className="text-sm font-medium text-industrial-200 mb-3 text-center">
-                To install on your device:
+                {t('pwa.install.android.title')}
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
                   <MoreVertical className="w-5 h-5 text-industrial-400 shrink-0" />
                   <span>
-                    Tap the <span className="font-bold text-industrial-100">Menu</span> button (3
-                    dots)
+                    <Trans i18nKey="pwa.install.android.menu" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
                   <Download className="w-5 h-5 text-industrial-400 shrink-0" />
                   <span>
-                    Select <span className="font-bold text-industrial-100">'Install App'</span> or{' '}
-                    <span className="font-bold text-industrial-100">'Add to Home Screen'</span>
+                    <Trans i18nKey="pwa.install.android.add" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
                   </span>
                 </div>
               </div>
@@ -165,7 +164,7 @@ export function PWAInstallPrompt() {
             onClick={handleDismiss}
             className="w-full mt-3 py-2 text-xs font-medium text-industrial-500 hover:text-industrial-300 transition-colors"
           >
-            Maybe later
+            {t('pwa.install.dismiss')}
           </button>
         </motion.div>
       </motion.div>
