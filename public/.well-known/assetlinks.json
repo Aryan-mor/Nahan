@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.aryan_mor.nahan",
+      "sha256_cert_fingerprints": [
+        "REPLACE_WITH_YOUR_SHA256_CERT_FINGERPRINT"
+      ]
+    }
+  }
+]

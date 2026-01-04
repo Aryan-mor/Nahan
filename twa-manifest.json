@@ -1,0 +1,39 @@
+{
+  "packageId": "io.github.aryan_mor.nahan",
+  "host": "aryan-mor.github.io",
+  "name": "Nahan",
+  "launcherName": "Nahan",
+  "display": "standalone",
+  "themeColor": "#020617",
+  "navigationColor": "#020617",
+  "backgroundColor": "#020617",
+  "startUrl": "/Nahan/",
+  "iconUrl": "https://aryan-mor.github.io/Nahan/maskable-icon.png",
+  "maskableIconUrl": "https://aryan-mor.github.io/Nahan/maskable-icon.png",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://aryan-mor.github.io/Nahan/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": false
+    },
+    "locationDelegation": {
+      "enabled": false
+    },
+    "updateViaWifiOnly": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableNotifications": true,
+  "shortcuts": [],
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  }
+}

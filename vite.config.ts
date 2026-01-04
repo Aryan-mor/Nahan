@@ -28,6 +28,7 @@ export default defineConfig(({ command, mode }) => {
           navigateFallback: 'index.html',
         },
         strategies: 'generateSW',
+        manifestFilename: 'manifest.json',
         registerType: 'autoUpdate',
         includeAssets: [
           'favicon.ico',
