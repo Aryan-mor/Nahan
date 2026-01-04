@@ -1,4 +1,11 @@
 /**
+ * @deprecated This file is deprecated and should not be used for detection.
+ * Use handleUniversalInput from appStore.ts instead, which handles all input types
+ * including ZWC, contact intros, and messages without causing "incorrect header check" errors.
+ *
+ * This file is kept only for backward compatibility with generateStealthID function
+ * which is still used for generating contact sharing IDs.
+ *
  * Stealth ID Service - Generates and parses steganographic contact IDs
  * Uses Nahan-Tag Protocol to hide public keys in plain sight
  * Format: ID|name|publicKey (compressed and embedded in poetry)

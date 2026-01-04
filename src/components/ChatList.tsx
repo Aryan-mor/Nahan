@@ -15,12 +15,14 @@ import { motion } from 'framer-motion';
 import { ClipboardPaste, MessageSquare, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { DetectionResult } from '../hooks/useClipboardDetection';
 import { SecureMessage, storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { ManualPasteModal } from './ManualPasteModal';
+import { NewMessageModal } from './NewMessageModal';
 
-export function ChatList({ onNewChat }: { onNewChat: () => void }) {
-  const { contacts, getContactsWithBroadcast, setActiveChat, processIncomingMessage } = useAppStore();
+export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; onDetection?: (result: DetectionResult) => void }) {
+  const { contacts, getContactsWithBroadcast, setActiveChat, handleUniversalInput, lastStorageUpdate } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [lastMessages, setLastMessages] = useState<Record<string, SecureMessage | undefined>>({});
 
@@ -34,87 +36,56 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
   const [isSenderSelectOpen, setIsSenderSelectOpen] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
-  const processPasteContent = async (content: string) => {
-    // Use unified detection logic - same as ChatInput.tsx
-    // This ensures ZWC, PGP, and Base64 messages are all handled consistently
-    setIsProcessingPaste(true);
-    try {
-      // Import required services
-      const { CamouflageService } = await import('../services/camouflage');
-      const camouflageService = CamouflageService.getInstance();
-      const naclUtil = await import('tweetnacl-util');
-
-      let encryptedData: string | null = null;
-
-      // 1. Check if it's a stealth message (ZWC-embedded)
-      if (camouflageService.hasZWC(content)) {
-        try {
-          let binary: Uint8Array;
-          try {
-            binary = camouflageService.decodeFromZWC(content, false);
-          } catch (strictError: unknown) {
-            const error = strictError as Error;
-            if (error.message?.includes('Checksum mismatch') || error.message?.includes('corrupted')) {
-              binary = camouflageService.decodeFromZWC(content, true);
-            } else {
-              throw strictError;
-            }
-          }
-          encryptedData = naclUtil.encodeBase64(binary);
-        } catch (error) {
-          console.error('Failed to extract ZWC message in ChatList:', error);
-          throw new Error('Failed to extract hidden message from cover text');
-        }
-      }
-
-      // 2. Check if it's a PGP message (legacy format)
-      if (!encryptedData && content.includes('-----BEGIN PGP MESSAGE-----')) {
-        encryptedData = content;
-      }
-
-      // 3. Check if it's a Nahan Compact Protocol message (base64)
-      if (!encryptedData) {
-        try {
-          const decoded = naclUtil.decodeBase64(content.trim());
-          if (decoded.length > 0 && (decoded[0] === 0x01 || decoded[0] === 0x02)) {
-            encryptedData = content.trim();
-          }
-        } catch {
-          // Not base64, continue
-        }
-      }
-
-      if (encryptedData) {
-        await processIncomingMessage(encryptedData);
-        toast.success('Message decrypted and imported');
-      } else {
-        toast.info('No encrypted message found in content');
-        throw new Error('No encrypted message found');
-      }
-    } catch (error: any) {
-      if (error.message === 'SENDER_UNKNOWN') {
-        setPendingMessage(content);
-        setIsSenderSelectOpen(true);
-      } else {
-        toast.error('Failed to decrypt message');
-        console.error(error);
-        throw error; // Re-throw for modal handling if called from there
-      }
-    } finally {
-      setIsProcessingPaste(false);
-    }
-  };
+  // New Message Modal
+  const [newMessageResult, setNewMessageResult] = useState<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>(null);
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
 
   const handlePaste = async () => {
+    let clipboardText = '';
     try {
-      const clipboardText = await navigator.clipboard.readText();
+      clipboardText = await navigator.clipboard.readText();
       if (!clipboardText) {
         throw new Error('Clipboard empty');
       }
-      await processPasteContent(clipboardText);
-    } catch (error) {
-      console.warn('Clipboard access failed, opening manual input:', error);
-      setIsManualPasteOpen(true);
+      const result = await handleUniversalInput(clipboardText, undefined, true);
+
+      // If a message was detected, show the new message modal
+      if (result && result.type === 'message') {
+        setNewMessageResult(result);
+        setShowNewMessageModal(true);
+      }
+    } catch (error: unknown) {
+      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      if (err.message === 'SENDER_UNKNOWN') {
+        setPendingMessage(clipboardText);
+        setIsSenderSelectOpen(true);
+      } else if (err.message === 'CONTACT_INTRO_DETECTED') {
+        // UNIFICATION: Handle contact ID detection the same way as auto-detector
+        if (onDetection && err.keyData) {
+          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
+          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
+          if (contactPublicKey) {
+            onDetection({
+              type: 'id',
+              contactName: contactName,
+              contactPublicKey: contactPublicKey,
+            });
+          } else {
+            toast.info('Contact key detected');
+            onNewChat(); // Fallback: Navigate to keys tab if handler not available
+          }
+        } else {
+          toast.info('Contact key detected');
+          onNewChat(); // Fallback: Navigate to keys tab if handler not available
+        }
+      } else {
+        toast.error('Failed to process input');
+        console.error('[UniversalInput] Error:', error);
+        // If clipboard access failed, open manual input
+        if (err.message?.includes('Clipboard')) {
+          setIsManualPasteOpen(true);
+        }
+      }
     }
   };
 
@@ -125,12 +96,87 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
     setIsProcessingPaste(true);
 
     try {
-      await processIncomingMessage(pendingMessage, fingerprint);
-      toast.success('Message assigned and imported');
+      const result = await handleUniversalInput(pendingMessage, fingerprint, true);
+
+      // If a message was detected, show the new message modal
+      if (result && result.type === 'message') {
+        setNewMessageResult(result);
+        setShowNewMessageModal(true);
+      }
+
       setPendingMessage(null);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to import message');
+    } catch (error: unknown) {
+      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      if (err.message === 'CONTACT_INTRO_DETECTED') {
+        // UNIFICATION: Handle contact ID detection the same way as auto-detector
+        if (onDetection && err.keyData) {
+          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
+          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
+          if (contactPublicKey) {
+            onDetection({
+              type: 'id',
+              contactName: contactName,
+              contactPublicKey: contactPublicKey,
+            });
+          } else {
+            toast.info('Contact key detected');
+            onNewChat(); // Fallback: Navigate to keys tab if handler not available
+          }
+        } else {
+          toast.info('Contact key detected');
+          onNewChat(); // Fallback: Navigate to keys tab if handler not available
+        }
+      } else {
+        console.error('[UniversalInput] Error:', error);
+        toast.error('Failed to import message');
+      }
+    } finally {
+      setIsProcessingPaste(false);
+    }
+  };
+
+  const handleManualPaste = async (content: string) => {
+    setIsProcessingPaste(true);
+    try {
+      const result = await handleUniversalInput(content, undefined, true);
+
+      // If a message was detected, show the new message modal
+      if (result && result.type === 'message') {
+        setNewMessageResult(result);
+        setShowNewMessageModal(true);
+      }
+
+      setIsManualPasteOpen(false);
+    } catch (error: unknown) {
+      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      if (err.message === 'SENDER_UNKNOWN') {
+        setPendingMessage(content);
+        setIsManualPasteOpen(false);
+        setIsSenderSelectOpen(true);
+      } else if (err.message === 'CONTACT_INTRO_DETECTED') {
+        // UNIFICATION: Handle contact ID detection the same way as auto-detector
+        setIsManualPasteOpen(false);
+        if (onDetection && err.keyData) {
+          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
+          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
+          if (contactPublicKey) {
+            onDetection({
+              type: 'id',
+              contactName: contactName,
+              contactPublicKey: contactPublicKey,
+            });
+          } else {
+            toast.info('Contact key detected');
+            onNewChat(); // Fallback: Navigate to keys tab if handler not available
+          }
+        } else {
+          toast.info('Contact key detected');
+          onNewChat(); // Fallback: Navigate to keys tab if handler not available
+        }
+      } else {
+        toast.error('Failed to process input');
+        console.error('[UniversalInput] Error:', error);
+      }
     } finally {
       setIsProcessingPaste(false);
     }
@@ -141,33 +187,40 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       const { sessionPassphrase } = useAppStore.getState();
       if (!sessionPassphrase) return;
 
-      const map: Record<string, SecureMessage | undefined> = {};
-      // Load messages for all contacts including broadcast
       const allContacts = getContactsWithBroadcast();
-      for (const contact of allContacts) {
-        // For broadcast contact, we need to aggregate messages from all contacts
-        if (contact.id === 'system_broadcast') {
-          // Get the most recent broadcast message across all contacts
-          let latestBroadcast: SecureMessage | undefined;
-          for (const c of contacts) {
-            const messages = await storageService.getMessagesByFingerprint(c.fingerprint, sessionPassphrase);
-            const broadcastMsgs = messages.filter(m => m.isBroadcast && !m.isOutgoing);
-            if (broadcastMsgs.length > 0) {
-              const latest = broadcastMsgs[0]; // Already sorted descending
-              if (!latestBroadcast || new Date(latest.createdAt) > new Date(latestBroadcast.createdAt)) {
-                latestBroadcast = latest;
-              }
-            }
-          }
-          map[contact.fingerprint] = latestBroadcast;
-        } else {
-          map[contact.fingerprint] = await storageService.getLastMessage(contact.fingerprint, sessionPassphrase);
-        }
+
+      // REFACTORED PREVIEW: Extract fingerprints for efficient batch query
+      // REMOVED: No loop that aggregates broadcast messages from individual contacts
+      // This prevents private messages from one user leaking into the broadcast preview row
+      const fingerprints = allContacts
+        .filter(c => c.fingerprint !== 'BROADCAST') // Exclude BROADCAST from batch query
+        .map(c => c.fingerprint);
+
+      // Use optimized getChatSummaries to fetch last messages in batch
+      const summaries = await storageService.getChatSummaries(fingerprints, sessionPassphrase);
+
+      const map: Record<string, SecureMessage | undefined> = { ...summaries };
+
+      // ISOLATION: Query storageService.getMessagesByFingerprint('BROADCAST', ...) directly
+      // This prevents private messages from leaking into broadcast preview
+      // CRITICAL: Ensure broadcast preview is populated before sorting
+      const broadcastContact = allContacts.find(c => c.fingerprint === 'BROADCAST');
+      if (broadcastContact) {
+        // ISOLATION: ONLY query storageService.getMessagesByFingerprint('BROADCAST', passphrase)
+        // No aggregation from individual contacts - direct query only
+        const broadcastMessages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
+        const latestBroadcast = broadcastMessages.length > 0 ? broadcastMessages[0] : undefined;
+        map['BROADCAST'] = latestBroadcast;
       }
+
+      console.log('[UI] Refreshing Chat List');
+      console.log('[ChatList] Last messages map updated:', map);
       setLastMessages(map);
     };
     loadLastMessages();
-  }, [contacts, getContactsWithBroadcast]);
+    // REACTIVITY: Strictly tied to lastStorageUpdate to trigger re-fetch when IndexedDB changes
+    // This ensures ChatList updates when messages are imported via clipboard or sent
+  }, [lastStorageUpdate, contacts, getContactsWithBroadcast]);
 
   // Get contacts with broadcast at index 0
   const allContacts = getContactsWithBroadcast();
@@ -178,23 +231,57 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
         c.fingerprint.toLowerCase().includes(searchQuery.toLowerCase()),
     )
     .sort((a, b) => {
-      // Sort by last message time, then created time
+      // Two-Tier Sorting System: Pinned Broadcast + Chronological
+
+      // Tier 1 (Pinned): Broadcast Channel always at top
+      if (a.fingerprint === 'BROADCAST') {
+        return -1; // Broadcast always comes first
+      }
+      if (b.fingerprint === 'BROADCAST') {
+        return 1; // Broadcast always comes first
+      }
+
+      // Tier 2 (Chronological): All other contacts sorted by newest first
       const msgA = lastMessages[a.fingerprint];
       const msgB = lastMessages[b.fingerprint];
 
-      // Helper to convert date to timestamp (handles both Date objects and strings)
-      const getTime = (date: Date | string): number => {
+      // Helper to convert date to timestamp (handles all date formats consistently)
+      // Supports: Date objects, ISO strings, timestamp numbers, and invalid dates
+      const getTime = (date: Date | string | number | undefined | null): number => {
+        if (!date) return 0;
+
+        // Handle Date objects
         if (date instanceof Date) {
-          return date.getTime();
+          const time = date.getTime();
+          return isNaN(time) ? 0 : time;
         }
-        const dateObj = new Date(date);
-        return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
+
+        // Handle numbers (timestamps)
+        if (typeof date === 'number') {
+          return isNaN(date) ? 0 : date;
+        }
+
+        // Handle strings (ISO format, etc.)
+        if (typeof date === 'string') {
+          const dateObj = new Date(date);
+          const time = dateObj.getTime();
+          return isNaN(time) ? 0 : time;
+        }
+
+        return 0;
       };
 
+      // Sort Logic: Newest messages/contacts MUST be at the top
+      // timeB - timeA ensures descending order (newest first)
       const timeA = msgA ? getTime(msgA.createdAt) : getTime(a.createdAt);
       const timeB = msgB ? getTime(msgB.createdAt) : getTime(b.createdAt);
-      return timeB - timeA;
+      return timeB - timeA; // Correct: newest at top
     });
+
+  // Log sorting result
+  const broadcastCount = filteredContacts.filter(c => c.fingerprint === 'BROADCAST').length;
+  const regularContactsCount = filteredContacts.length - broadcastCount;
+  console.log(`[UI] Chat list sorted: Broadcast pinned, ${regularContactsCount} contacts chronological`);
 
   // Filter out broadcast contact from modal (only show real contacts)
   const modalFilteredContacts = contacts.filter(
@@ -275,8 +362,10 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
             </Button>
           </div>
         ) : (
-          filteredContacts.map((contact) => {
+          filteredContacts.map((contact, index) => {
             const lastMsg = lastMessages[contact.fingerprint];
+            const isBroadcast = contact.fingerprint === 'BROADCAST';
+            const showSeparator = isBroadcast && filteredContacts.length > 1 && index === 0;
 
             return (
               <motion.div
@@ -284,11 +373,16 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileTap={{ scale: 0.98 }}
+                className={isBroadcast ? 'order-first' : ''}
               >
                 <Card
                   isPressable
                   onPress={() => setActiveChat(contact)}
-                  className="bg-industrial-900 border-industrial-800 hover:bg-industrial-800 transition-colors w-full"
+                  className={`w-full transition-colors ${
+                    isBroadcast
+                      ? 'bg-industrial-800/50 border-primary-500/20 hover:bg-industrial-800/70'
+                      : 'bg-industrial-900 border-industrial-800 hover:bg-industrial-800'
+                  }`}
                 >
                   <CardBody className="flex flex-row items-center gap-3 p-3 overflow-hidden">
                     <Avatar
@@ -318,6 +412,17 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
                     </div>
                   </CardBody>
                 </Card>
+
+                {/* Section Separator: Show after broadcast if there are other contacts */}
+                {showSeparator && (
+                  <div className="mt-3 mb-2 px-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-industrial-800"></div>
+                      <span className="text-xs text-industrial-500 px-2">Recent Conversations</span>
+                      <div className="flex-1 h-px bg-industrial-800"></div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             );
           })
@@ -328,6 +433,9 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
+        isDismissable={false}
+        isKeyboardDismissDisabled={true}
+        shouldCloseOnInteractOutside={() => false}
         classNames={{
           base: 'bg-industrial-900 border border-industrial-800',
           header: 'border-b border-industrial-800',
@@ -414,6 +522,9 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       <Modal
         isOpen={isSenderSelectOpen}
         onOpenChange={setIsSenderSelectOpen}
+        isDismissable={false}
+        isKeyboardDismissDisabled={true}
+        shouldCloseOnInteractOutside={() => false}
         classNames={{
           base: 'bg-industrial-900 border border-industrial-800',
           header: 'border-b border-industrial-800',
@@ -481,9 +592,23 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       <ManualPasteModal
         isOpen={isManualPasteOpen}
         onClose={() => setIsManualPasteOpen(false)}
-        onSubmit={processPasteContent}
-        title="Import PGP Message"
+        onSubmit={handleManualPaste}
+        title="Import Message or Key"
       />
+
+      {/* New Message Modal */}
+      {newMessageResult && (
+        <NewMessageModal
+          isOpen={showNewMessageModal}
+          onClose={() => {
+            setShowNewMessageModal(false);
+            setNewMessageResult(null);
+          }}
+          senderName={newMessageResult.senderName}
+          senderFingerprint={newMessageResult.fingerprint}
+          isBroadcast={newMessageResult.isBroadcast}
+        />
+      )}
     </div>
   );
 }

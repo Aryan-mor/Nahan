@@ -6,7 +6,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { CamouflageService } from '../services/camouflage';
 import { CryptoService } from '../services/crypto';
-import { secureStorage, setPassphrase } from '../services/secureStorage';
+import { clearKeyCache, secureStorage, setPassphrase } from '../services/secureStorage';
+import { parseStealthID } from '../services/stealthId';
 import { Contact, Identity, SecureMessage, storageService } from '../services/storage';
 import { useUIStore } from './uiStore';
 
@@ -31,6 +32,7 @@ interface AppState {
   activeChat: Contact | null;
   messages: SecureMessage[];
   messageInput: string; // Global chat input state
+  lastStorageUpdate: number; // Timestamp of last IndexedDB write - triggers UI reactivity
 
   // Stealth Mode State
   isStealthMode: boolean;
@@ -61,7 +63,8 @@ interface AppState {
   clearChatHistory: (fingerprint: string) => Promise<void>;
   refreshMessages: () => Promise<void>;
   processPendingMessages: () => Promise<number>;
-  processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<void>;
+  processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
+  handleUniversalInput: (input: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
   setSessionPassphrase: (passphrase: string) => void;
   getContactsWithBroadcast: () => Contact[];
 }
@@ -78,6 +81,7 @@ export const useAppStore = create<AppState>()(
       activeChat: null,
       messages: [],
       messageInput: '', // Global chat input state
+      lastStorageUpdate: Date.now(), // Initialize to current time for reactivity
 
       // Stealth Mode Initial State
       isStealthMode: false,
@@ -195,7 +199,9 @@ export const useAppStore = create<AppState>()(
             throw new Error('SecureStorage: Missing key');
           }
 
-          // Check if we're in broadcast mode
+          // CRITICAL: Strict broadcast vs private message isolation
+          // Broadcast messages MUST use 'BROADCAST' as recipientFingerprint
+          // Private messages MUST use the contact's fingerprint
           if (activeChat.id === 'system_broadcast') {
             // Broadcast mode: store message with recipientFingerprint: 'BROADCAST'
             await storageService.storeMessage({
@@ -211,14 +217,16 @@ export const useAppStore = create<AppState>()(
               isBroadcast: true,
             }, sessionPassphrase);
 
+            // Update lastStorageUpdate to trigger UI reactivity
+            const now = Date.now();
             // Update messages for broadcast channel
             const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
-            set({ messages });
+            set({ messages, lastStorageUpdate: now });
           } else {
-            // Standard mode: store message for single recipient
+            // Standard mode: store message for single recipient (NOT broadcast)
             const newMessage = await storageService.storeMessage({
               senderFingerprint: identity.fingerprint,
-              recipientFingerprint: activeChat.fingerprint,
+              recipientFingerprint: activeChat.fingerprint, // Use contact's fingerprint, not BROADCAST
               content: {
                 plain: pendingPlaintext,
                 encrypted: finalOutput,
@@ -226,10 +234,14 @@ export const useAppStore = create<AppState>()(
               isOutgoing: true,
               read: true,
               status: isOffline ? 'pending' : 'sent',
+              isBroadcast: false, // Explicitly mark as not broadcast
             }, sessionPassphrase);
 
+            // Update lastStorageUpdate to trigger UI reactivity
+            const now = Date.now();
             set((state) => ({
               messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+              lastStorageUpdate: now,
             }));
           }
 
@@ -302,11 +314,20 @@ export const useAppStore = create<AppState>()(
         if (!identityExists) return false;
 
         try {
+          // CRITICAL: Clear any stale key cache at the very beginning
+          // This ensures fresh key derivation for the unlock attempt
+          setPassphrase(null);
+          clearKeyCache();
+          console.log('[AUTH] Cache Cleared');
+
           // Step 1: Decrypt the vault entry with PIN attempt to get identity structure
           // This decrypts the vault entry and returns the identity object
           // The identity.privateKey is already encrypted with the user's PIN
+          // Use fresh PIN (no cached keys) for decryption
           const identityWithEncryptedPrivateKey = await storageService.getIdentity(pin);
           if (!identityWithEncryptedPrivateKey) {
+            // Decryption failed - likely wrong PIN
+            console.warn('[unlockApp] Failed to decrypt identity - wrong PIN or corrupted data');
             return false;
           }
 
@@ -318,10 +339,13 @@ export const useAppStore = create<AppState>()(
           );
 
           if (!isValid) {
+            // PIN verification failed - wrong PIN
+            console.warn('[unlockApp] PIN verification failed - wrong PIN');
             return false;
           }
 
           // Step 3: Set passphrase FIRST to enable encryption layer
+          // This clears the key cache to ensure fresh keys are used
           setPassphrase(pin);
 
           // Step 4: Re-fetch the decrypted identity and contacts (now that PIN is verified)
@@ -331,6 +355,7 @@ export const useAppStore = create<AppState>()(
           const decryptedContacts = await storageService.getContacts(pin);
 
           if (!decryptedIdentity) {
+            console.error('[unlockApp] Failed to re-fetch identity after PIN verification');
             return false;
           }
 
@@ -347,7 +372,20 @@ export const useAppStore = create<AppState>()(
 
           return true;
         } catch (error) {
-          console.error('Unlock failed:', error);
+          // Log the full error for debugging
+          console.error('[unlockApp] Unlock failed:', error);
+
+          // Check if it's a decryption error (wrong PIN or corrupted data)
+          if (error instanceof Error) {
+            if (error.message.includes('Decryption failed')) {
+              console.error('[unlockApp] Decryption error - wrong PIN or corrupted vault data');
+            } else if (error.message.includes('invalid passphrase')) {
+              console.error('[unlockApp] Invalid passphrase - wrong PIN');
+            } else {
+              console.error('[unlockApp] Unexpected error during unlock:', error.message);
+            }
+          }
+
           return false;
         }
       },
@@ -481,6 +519,9 @@ export const useAppStore = create<AppState>()(
           // Step 5: Store message in database
           const isOffline = !navigator.onLine;
 
+          // CRITICAL: Strict broadcast vs private message isolation
+          // Broadcast messages MUST use 'BROADCAST' as recipientFingerprint
+          // Private messages MUST use the contact's fingerprint
           if (isBroadcast) {
             // Broadcast mode: store with recipientFingerprint: 'BROADCAST'
             await storageService.storeMessage({
@@ -495,11 +536,17 @@ export const useAppStore = create<AppState>()(
               status: isOffline ? 'pending' : 'sent',
               isBroadcast: true,
             }, sessionPassphrase);
+
+            // Update lastStorageUpdate to trigger UI reactivity
+            const now = Date.now();
+            // Update messages if active chat is broadcast
+            const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
+            set({ messages, lastStorageUpdate: now });
           } else {
-            // Regular mode: store for specific recipient
+            // Regular mode: store for specific recipient (NOT broadcast)
             const newMessage = await storageService.storeMessage({
               senderFingerprint: identity.fingerprint,
-              recipientFingerprint: activeChat.fingerprint,
+              recipientFingerprint: activeChat.fingerprint, // Use contact's fingerprint, not BROADCAST
               content: {
                 plain: text,
                 encrypted: finalOutput,
@@ -507,18 +554,16 @@ export const useAppStore = create<AppState>()(
               isOutgoing: true,
               read: true,
               status: isOffline ? 'pending' : 'sent',
+              isBroadcast: false, // Explicitly mark as not broadcast
             }, sessionPassphrase);
 
+            // Update lastStorageUpdate to trigger UI reactivity
+            const now = Date.now();
             // Update state
             set((state) => ({
               messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+              lastStorageUpdate: now,
             }));
-          }
-
-          // Update messages if active chat is broadcast
-          if (isBroadcast) {
-            const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
-            set({ messages });
           }
 
           // Clear input after successful auto-stealth send
@@ -569,6 +614,12 @@ export const useAppStore = create<AppState>()(
 
           const isOffline = !navigator.onLine;
 
+          // CRITICAL: Ensure private messages are stored with contact's fingerprint, not BROADCAST
+          // Double-check that we're not in broadcast mode
+          if (activeChat.id === 'system_broadcast') {
+            throw new Error('Cannot send standard encrypted message to broadcast channel');
+          }
+
           // Store message
           const newMessage = await storageService.storeMessage({
             senderFingerprint: identity.fingerprint,
@@ -582,10 +633,12 @@ export const useAppStore = create<AppState>()(
             status: isOffline ? 'pending' : 'sent',
           }, sessionPassphrase);
 
-          // Update state
+          // Update lastStorageUpdate to trigger UI reactivity
+          const now = Date.now();
           set((state) => ({
             messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
             messageInput: '', // Clear input after successful standard send
+            lastStorageUpdate: now,
           }));
 
           return encryptedContent;
@@ -665,6 +718,254 @@ export const useAppStore = create<AppState>()(
         return pending.length;
       },
 
+      /**
+       * Universal input handler - processes any input (ZWC, keys, messages)
+       * Detection priority:
+       * 1. ZWC: Decode if camouflageService.hasZWC()
+       * 2. Contact Intro: Check if decoded binary or original string is a key using parseKeyInput()
+       * 3. Secure Message: Check version byte (0x01 = encrypted, 0x02 = signed/broadcast)
+       */
+      handleUniversalInput: async (input: string, targetContactFingerprint?, skipNavigation = false) => {
+        const { identity, sessionPassphrase } = get();
+
+        if (!identity || !sessionPassphrase) {
+          throw new Error('Authentication required');
+        }
+
+        console.log('[UniversalInput] Processing input, length:', input.length);
+
+        // Step 1: Check for ZWC (Zero-Width Characters) - highest priority
+        let extractedBinary: Uint8Array | null = null;
+        let processedText = input;
+        let isZWC = false;
+
+        if (camouflageService.hasZWC(input)) {
+          isZWC = true;
+          console.log('[UniversalInput] ZWC detected, extracting binary...');
+          try {
+            // Try strict decoding first
+            try {
+              extractedBinary = camouflageService.decodeFromZWC(input, false);
+              console.log('[UniversalInput] ZWC strict decode successful, binary length:', extractedBinary.length);
+            } catch (strictError: unknown) {
+              // If strict fails with checksum error, try lenient mode
+              const error = strictError as Error;
+              if (error.message?.includes('Checksum mismatch') || error.message?.includes('corrupted')) {
+                console.warn('[UniversalInput] ZWC strict decode failed, trying lenient mode...', error.message);
+                extractedBinary = camouflageService.decodeFromZWC(input, true);
+                console.log('[UniversalInput] ZWC lenient decode successful, binary length:', extractedBinary.length);
+              } else {
+                throw strictError; // Re-throw if it's a different error
+              }
+            }
+            // Convert binary to base64 for further processing
+            const naclUtil = await import('tweetnacl-util');
+            processedText = naclUtil.encodeBase64(extractedBinary);
+            console.log('[UniversalInput] Converted ZWC to Base64, length:', processedText.length);
+          } catch (error) {
+            console.error('[UniversalInput] Failed to decode ZWC message:', error);
+            throw new Error('Failed to extract hidden message from cover text');
+          }
+        }
+
+        // Step 2: Check if it's a Contact Intro (USERNAME+KEY or plain key)
+        // CRITICAL: Check the ORIGINAL input string first (before ZWC decoding)
+        // This handles cases like "Name+Key" format which won't be in the decoded binary
+        const originalKeyParseResult = cryptoService.parseKeyInput(input);
+        if (originalKeyParseResult.isValid) {
+          console.log('[UniversalInput] Contact intro detected in original input (key format)');
+          // Trigger Add Contact flow by throwing a specific error that UI can catch
+          // CRITICAL: Use consistent keys (name, publicKey) for CONTACT_INTRO_DETECTED
+          const contactIntroError = new Error('CONTACT_INTRO_DETECTED') as Error & {
+            keyData: { name: string; publicKey: string };
+          };
+          contactIntroError.keyData = {
+            name: originalKeyParseResult.username || 'Unknown',
+            publicKey: originalKeyParseResult.key,
+          };
+          throw contactIntroError;
+        }
+
+        // Also check decoded binary if ZWC was detected (in case key is embedded in ZWC)
+        if (extractedBinary) {
+          // Try to decode binary as UTF-8 string to check for key format
+          try {
+            const decoder = new TextDecoder();
+            const decodedString = decoder.decode(extractedBinary);
+            const binaryKeyParseResult = cryptoService.parseKeyInput(decodedString);
+            if (binaryKeyParseResult.isValid) {
+              console.log('[UniversalInput] Contact intro detected in decoded binary (key format)');
+              // CRITICAL: Use consistent keys (name, publicKey) for CONTACT_INTRO_DETECTED
+              const contactIntroError = new Error('CONTACT_INTRO_DETECTED') as Error & {
+                keyData: { name: string; publicKey: string };
+              };
+              contactIntroError.keyData = {
+                name: binaryKeyParseResult.username || 'Unknown',
+                publicKey: binaryKeyParseResult.key,
+              };
+              throw contactIntroError;
+            }
+          } catch {
+            // Not a valid UTF-8 string or not a key - continue to message processing
+          }
+        }
+
+        // Step 3: Check if it's a Secure Message (check version byte)
+        let messageBytes: Uint8Array;
+        if (extractedBinary) {
+          messageBytes = extractedBinary;
+        } else if (typeof processedText === 'string') {
+          // Check if it's a PGP message (legacy format)
+          if (processedText.includes('-----BEGIN PGP MESSAGE-----')) {
+            console.log('[UniversalInput] PGP message detected (legacy format)');
+            // Route to processIncomingMessage for PGP handling
+            return await get().processIncomingMessage(processedText, targetContactFingerprint, skipNavigation);
+          }
+
+          // Try to decode as base64
+          try {
+            const naclUtil = await import('tweetnacl-util');
+            messageBytes = naclUtil.decodeBase64(processedText.trim());
+          } catch {
+            throw new Error('Invalid message format: Not a valid key, ZWC, PGP, or Base64 message');
+          }
+        } else {
+          throw new Error('Invalid message format');
+        }
+
+        if (messageBytes.length === 0) {
+          throw new Error('Message is empty');
+        }
+
+        // Read version byte (first byte)
+        const version = messageBytes[0];
+        console.log('[UniversalInput] Version byte:', `0x${version.toString(16).padStart(2, '0')}`, version === 0x01 ? '(Encrypted)' : version === 0x02 ? '(Signed/Broadcast)' : '(Unknown)');
+
+        if (version !== 0x01 && version !== 0x02) {
+          throw new Error(`Unsupported protocol version: 0x${version.toString(16).padStart(2, '0')}`);
+        }
+
+        // PROTOCOL COLLISION FIX: For v0x02, check for identity packet first
+        // Identity packets (Stealth IDs) also use version 0x02, so we must check before broadcast handling
+        if (version === 0x02) {
+          console.log('[UniversalInput] Version 0x02 detected - checking for identity packet first');
+
+          // First, try parseStealthID to detect identity packets
+          try {
+            const parsedIdentity = parseStealthID(messageBytes);
+            if (parsedIdentity) {
+              // This is an identity packet (Stealth ID), not a broadcast message
+              console.log('[Protocol] Identity Packet Detected');
+              const contactIntroError = new Error('CONTACT_INTRO_DETECTED') as Error & { keyData: { name: string; publicKey: string } };
+              contactIntroError.keyData = {
+                name: parsedIdentity.name,
+                publicKey: parsedIdentity.publicKey,
+              };
+              throw contactIntroError;
+            }
+          } catch (error: any) {
+            // If it's a CONTACT_INTRO_DETECTED error, re-throw it
+            if (error.message === 'CONTACT_INTRO_DETECTED') {
+              throw error;
+            }
+            // If parseStealthID fails (not an identity packet), continue to broadcast handling
+            console.log('[UniversalInput] Not an identity packet, proceeding to broadcast verification');
+          }
+
+          // Only proceed to verifySignedMessage if it's not an identity packet
+          console.log('[UniversalInput] Routing v0x02 to verifySignedMessage for broadcast handling');
+          const { sessionPassphrase, contacts, identity } = get();
+          const contactKeys = contacts.map((c) => c.publicKey);
+
+          const signedResult = await cryptoService.verifySignedMessage(messageBytes, contactKeys);
+
+          if (signedResult.verified && signedResult.senderFingerprint) {
+            // Find the sender contact
+            const sender = contacts.find((c) => c.fingerprint === signedResult.senderFingerprint);
+            if (!sender) {
+              throw new Error('Sender not found in contacts');
+            }
+
+            // CRITICAL: Use sender's fingerprint as storage context (unified routing)
+            // Do NOT use 'BROADCAST' as recipient fingerprint
+            // Use original input if ZWC, otherwise use processed text
+            const storedEncrypted = isZWC ? input : (processedText || input);
+            const newMessage = await storageService.storeMessage({
+              senderFingerprint: sender.fingerprint,
+              recipientFingerprint: identity.fingerprint, // Use user's fingerprint, not 'BROADCAST'
+              content: {
+                plain: signedResult.data,
+                encrypted: storedEncrypted,
+              },
+              isOutgoing: false,
+              read: false,
+              isVerified: true,
+              status: 'sent',
+              isBroadcast: true,
+            }, sessionPassphrase);
+
+            // REACTIVITY: Update lastStorageUpdate after successful storeMessage
+            const now = Date.now();
+            console.log(`[Storage] Message saved to ${sender.fingerprint}`);
+            console.log(`[Store] Storage updated at ${now}, triggering UI refresh`);
+            set({ lastStorageUpdate: now });
+            console.log('[UI] Triggering Re-render');
+            console.log('[UI] Modal Triggered');
+
+            // If activeChat is broadcast, update messages array immediately
+            // This ensures the UI shows the new message even when skipNavigation is true
+            const { activeChat } = get();
+            if (skipNavigation && activeChat && activeChat.id === 'system_broadcast') {
+              set((state) => ({
+                messages: [newMessage, ...state.messages],
+              }));
+            }
+
+          // UI-driven navigation: Do not auto-navigate when skipNavigation is true
+          // The UI will show a modal and let the user decide when to navigate
+          if (!skipNavigation) {
+            // Navigate to sender's chat (unified routing - no special broadcast handling)
+            set({ activeChat: sender });
+            const messages = await storageService.getMessagesByFingerprint(sender.fingerprint, sessionPassphrase);
+            set({ messages });
+          } else {
+            // If skipNavigation is true, update state only if already in sender's chat
+            const { activeChat } = get();
+            if (activeChat && activeChat.fingerprint === sender.fingerprint) {
+              // Update messages if already in sender's chat
+              set((state) => ({
+                messages: [newMessage, ...state.messages],
+              }));
+            }
+          }
+
+          // Always return result object for UI to show modal
+          // For broadcast, fingerprint is the sender's fingerprint, but isBroadcast is true
+          return {
+            type: 'message' as const,
+            fingerprint: sender.fingerprint,
+            isBroadcast: true,
+            senderName: sender.name,
+          };
+          } else {
+            throw new Error('Signature verification failed: Message signature is invalid or sender is unknown');
+          }
+        }
+
+        // For v0x01 (encrypted), route to processIncomingMessage
+        // CRITICAL: Ensure processIncomingMessage returns the full result object
+        const naclUtil = await import('tweetnacl-util');
+        const base64Message = naclUtil.encodeBase64(messageBytes);
+        const result = await get().processIncomingMessage(base64Message, targetContactFingerprint, skipNavigation);
+
+        // Ensure we return the full result object (not null)
+        if (!result) {
+          throw new Error('Failed to process incoming message');
+        }
+
+        return result;
+      },
+
       processIncomingMessage: async (encryptedText, targetContactFingerprint, skipNavigation = false) => {
         const { identity, sessionPassphrase, contacts } = get();
 
@@ -679,19 +980,19 @@ export const useAppStore = create<AppState>()(
 
         if (camouflageService.hasZWC(encryptedText)) {
           isZWC = true;
-          console.log('TRACE [appStore] ZWC detected in processIncomingMessage');
+          console.log('[UniversalInput] ZWC detected in processIncomingMessage');
           try {
             // Try strict decoding first
             try {
               extractedBinary = camouflageService.decodeFromZWC(encryptedText, false);
-              console.log('TRACE [appStore] ZWC strict decode successful, binary length:', extractedBinary.length);
+              console.log('[UniversalInput] ZWC strict decode successful, binary length:', extractedBinary.length);
             } catch (strictError: unknown) {
               // If strict fails with checksum error, try lenient mode
               const error = strictError as Error;
               if (error.message?.includes('Checksum mismatch') || error.message?.includes('corrupted')) {
-                console.warn('TRACE [appStore] ZWC strict decode failed, trying lenient mode...', error.message);
+                console.warn('[UniversalInput] ZWC strict decode failed, trying lenient mode...', error.message);
                 extractedBinary = camouflageService.decodeFromZWC(encryptedText, true);
-                console.log('TRACE [appStore] ZWC lenient decode successful, binary length:', extractedBinary.length);
+                console.log('[UniversalInput] ZWC lenient decode successful, binary length:', extractedBinary.length);
               } else {
                 throw strictError; // Re-throw if it's a different error
               }
@@ -699,13 +1000,13 @@ export const useAppStore = create<AppState>()(
             // Convert binary to base64 for duplicate check and crypto operations
             const naclUtil = await import('tweetnacl-util');
             processedText = naclUtil.encodeBase64(extractedBinary);
-            console.log('TRACE [appStore] processedText (Base64):', processedText.substring(0, 50) + '...', 'length:', processedText.length);
+            console.log('[UniversalInput] processedText (Base64):', processedText.substring(0, 50) + '...', 'length:', processedText.length);
           } catch (error) {
-            console.error('TRACE [appStore] Failed to decode ZWC message:', error);
+            console.error('[UniversalInput] Failed to decode ZWC message:', error);
             throw new Error('Failed to extract hidden message from cover text');
           }
         } else {
-          console.log('TRACE [appStore] No ZWC detected, using processedText as-is:', processedText.substring(0, 50) + '...');
+          console.log('[UniversalInput] No ZWC detected, using processedText as-is:', processedText.substring(0, 50) + '...');
         }
 
         // Step 2: Check if message already exists (deduplication)
@@ -739,7 +1040,7 @@ export const useAppStore = create<AppState>()(
 
           // Read version byte (first byte)
           const version = messageBytes[0];
-          console.log('TRACE [appStore] Version Byte:', `0x${version.toString(16).padStart(2, '0')}`, version === 0x01 ? '(Encrypted)' : version === 0x02 ? '(Signed/Broadcast)' : '(Unknown)');
+          console.log('[UniversalInput] Version Byte:', `0x${version.toString(16).padStart(2, '0')}`, version === 0x01 ? '(Encrypted)' : version === 0x02 ? '(Signed/Broadcast)' : '(Unknown)');
 
           const contactKeys = contacts.map((c) => c.publicKey);
           let result;
@@ -748,7 +1049,7 @@ export const useAppStore = create<AppState>()(
           // Route to correct handler based on version byte
           if (version === 0x01) {
             // Version 0x01: Encrypted message - use decryptMessage
-            console.log('TRACE [appStore] Routing to decryptMessage (v0x01)');
+            console.log('[UniversalInput] Routing to decryptMessage (v0x01)');
             try {
               result = await cryptoService.decryptMessage(
                 messageBytes,
@@ -756,18 +1057,18 @@ export const useAppStore = create<AppState>()(
                 sessionPassphrase,
                 contactKeys,
               );
-              console.log('TRACE [appStore] decryptMessage succeeded');
+              console.log('[UniversalInput] decryptMessage succeeded');
             } catch (decryptError) {
-              console.error('TRACE [appStore] decryptMessage FAILED:', decryptError);
+              console.error('[UniversalInput] decryptMessage FAILED:', decryptError);
               throw decryptError;
             }
           } else if (version === 0x02) {
             // Version 0x02: Signed broadcast message - use verifySignedMessage
             // CRITICAL: Do not call decryptMessage on version 0x02, it will cause pako errors
-            console.log('TRACE [appStore] Routing to verifySignedMessage (v0x02)');
+            console.log('[UniversalInput] Routing to verifySignedMessage (v0x02)');
             try {
               const signedResult = await cryptoService.verifySignedMessage(messageBytes, contactKeys);
-              console.log('TRACE [appStore] verifySignedMessage result:', {
+              console.log('[UniversalInput] verifySignedMessage result:', {
                 verified: signedResult.verified,
                 senderFingerprint: signedResult.senderFingerprint,
               });
@@ -781,22 +1082,22 @@ export const useAppStore = create<AppState>()(
                   senderFingerprint: signedResult.senderFingerprint,
                 };
                 isBroadcast = true;
-                console.log('TRACE [appStore] Broadcast message verified successfully');
+                console.log('[UniversalInput] Broadcast message verified successfully');
               } else {
-                console.error('TRACE [appStore] Signature verification failed: verified=false or no senderFingerprint');
+                console.error('[UniversalInput] Signature verification failed: verified=false or no senderFingerprint');
                 throw new Error('Signature verification failed: Message signature is invalid or sender is unknown');
               }
             } catch (verifyError) {
               // Re-throw with clear error message for UI feedback
               const err = verifyError as Error;
-              console.error('TRACE [appStore] verifySignedMessage FAILED:', err.message);
+              console.error('[UniversalInput] verifySignedMessage FAILED:', err.message);
               if (err.message?.includes('verification failed') || err.message?.includes('Invalid signed message')) {
                 throw new Error('Signature verification failed: The broadcast message signature is invalid or corrupted');
               }
               throw verifyError;
             }
           } else {
-            console.error('TRACE [appStore] Unsupported protocol version:', `0x${version.toString(16).padStart(2, '0')}`);
+            console.error('[UniversalInput] Unsupported protocol version:', `0x${version.toString(16).padStart(2, '0')}`);
             throw new Error(`Unsupported protocol version: 0x${version.toString(16).padStart(2, '0')}`);
           }
 
@@ -833,8 +1134,10 @@ export const useAppStore = create<AppState>()(
           }
 
           // Store the message
-          // If it's a broadcast, store with recipientFingerprint: 'BROADCAST'
-          const recipientFingerprint = isBroadcast ? 'BROADCAST' : identity.fingerprint;
+          // CRITICAL: Unified routing - use sender's fingerprint as storage context for BOTH v0x01 and v0x02
+          // Do NOT use 'BROADCAST' as recipient fingerprint
+          const recipientFingerprint = identity.fingerprint; // Always use user's fingerprint
+          console.log('[UniversalInput] Storing message, isBroadcast:', isBroadcast, 'senderFingerprint:', sender.fingerprint, 'recipientFingerprint:', recipientFingerprint);
 
           // Store the original encryptedText (ZWC text if it was ZWC, or original text if not)
           // This preserves the original format for display and re-sharing
@@ -854,27 +1157,42 @@ export const useAppStore = create<AppState>()(
             isBroadcast: isBroadcast,
           }, sessionPassphrase);
 
-          // Clear global messageInput after successful processing
-          set({ messageInput: '' });
+          // REACTIVITY: Update lastStorageUpdate after successful storeMessage
+          const now = Date.now();
+          console.log(`[Storage] Message saved to ${sender.fingerprint}`);
+          console.log(`[Store] Storage updated at ${now}, triggering UI refresh`);
+          set({ messageInput: '', lastStorageUpdate: now });
+          console.log('[UI] Triggering Re-render');
+          console.log('[UI] Modal Triggered');
+          console.log('[UI] Modal Triggered');
 
-          // Only navigate if skipNavigation is false (default behavior for backward compatibility)
-          if (!skipNavigation) {
-            // Navigate to the chat
-            set({ activeChat: sender });
-
-            // Refresh messages if we are now in that chat
-            const messages = await storageService.getMessagesByFingerprint(sender.fingerprint, sessionPassphrase);
-            set({ messages });
-          } else {
-            // If skipNavigation is true (auto-import), update state if this is the active chat
+          // If activeChat matches the sender, update messages array immediately
+          // This ensures the UI shows the new message even when skipNavigation is true
             const { activeChat } = get();
-            if (activeChat && activeChat.fingerprint === sender.fingerprint) {
-              // Prepend new message to maintain descending order (newest first)
+          if (skipNavigation && activeChat && activeChat.fingerprint === sender.fingerprint) {
+            // Update messages if already in sender's chat (unified routing)
               set((state) => ({
                 messages: [newMessage, ...state.messages],
               }));
             }
+
+          // UI-driven navigation: Do not auto-navigate when skipNavigation is true
+          // The UI will show a modal and let the user decide when to navigate
+          if (!skipNavigation) {
+            // Unified routing - navigate to sender's chat for both v0x01 and v0x02
+            set({ activeChat: sender });
+            const messages = await storageService.getMessagesByFingerprint(sender.fingerprint, sessionPassphrase);
+            set({ messages });
           }
+          // Note: Message array update for skipNavigation=true is handled above before navigation check
+
+          // Always return result object for UI to show modal
+          return {
+            type: 'message' as const,
+            fingerprint: sender.fingerprint,
+            isBroadcast: isBroadcast,
+            senderName: sender.name,
+          };
         } catch (error) {
           console.error('Failed to process incoming message:', error);
           throw error;

@@ -15,12 +15,36 @@
  */
 
 /**
+ * Key cache: Maps (passphrase, salt) -> CryptoKey
+ * Salt is converted to base64 string for use as map key
+ */
+const keyCache = new Map<string, CryptoKey>();
+
+/**
+ * Generate cache key from passphrase and salt
+ */
+function getCacheKey(passphrase: string, salt: Uint8Array): string {
+  const saltBase64 = btoa(String.fromCharCode(...salt));
+  return `${passphrase}:${saltBase64}`;
+}
+
+/**
  * Derive encryption key from passphrase using PBKDF2
+ * Uses cached key if available to avoid expensive PBKDF2 re-computation
  * @param passphrase User PIN/passphrase
  * @param salt Salt for key derivation
  * @returns Encryption key (32 bytes for AES-256)
  */
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  const cacheKey = getCacheKey(passphrase, salt);
+
+  // Check cache first
+  const cached = keyCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  // Derive new key
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -30,7 +54,7 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     ['deriveBits', 'deriveKey'],
   );
 
-  return crypto.subtle.deriveKey(
+  const key = await crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt: salt,
@@ -44,6 +68,10 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     false,
     ['encrypt', 'decrypt'],
   );
+
+  // Cache the key for future use
+  keyCache.set(cacheKey, key);
+  return key;
 }
 
 /**
@@ -149,7 +177,32 @@ export async function decryptData(encryptedData: string, passphrase: string): Pr
     if (error instanceof Error && error.message.includes('Old unencrypted format')) {
       throw error;
     }
-    // Decryption failed - likely wrong passphrase
+
+    // Log the original error for debugging
+    console.error('[secureStorage] Decryption error:', error);
+
+    // Clear key cache on decryption failure to prevent stale keys
+    // This ensures fresh keys are derived on retry
+    keyCache.clear();
+
+    // Check if it's a specific crypto error
+    if (error instanceof Error) {
+      // DOMException with specific error names
+      if (error.name === 'OperationError' || error.name === 'InvalidAccessError') {
+        // This usually means wrong passphrase (key derivation succeeds but decryption fails)
+        // or corrupted authentication tag
+        throw new Error('Decryption failed - invalid passphrase or corrupted data');
+      }
+
+      // Check for specific error messages
+      if (error.message.includes('bad decrypt') ||
+          error.message.includes('decryption failed') ||
+          error.message.includes('Unsupported state or unable to authenticate data')) {
+        throw new Error('Decryption failed - invalid passphrase or corrupted data');
+      }
+    }
+
+    // Generic fallback
     throw new Error('Decryption failed - invalid passphrase or corrupted data');
   }
 }
@@ -166,9 +219,22 @@ let currentPassphrase: string | null = null;
 /**
  * Set the current passphrase for encryption
  * Must be called before any setItem operations
+ * Clears key cache when passphrase changes to ensure security
  */
 export function setPassphrase(passphrase: string | null): void {
+  // Clear cache when passphrase changes to prevent key reuse across sessions
+  if (currentPassphrase !== passphrase) {
+    keyCache.clear();
+  }
   currentPassphrase = passphrase;
+}
+
+/**
+ * Clear the key cache
+ * Useful when decryption fails to ensure fresh keys are derived on retry
+ */
+export function clearKeyCache(): void {
+  keyCache.clear();
 }
 
 /**

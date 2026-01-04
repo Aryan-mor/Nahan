@@ -7,6 +7,7 @@ import { toast, Toaster } from 'sonner';
 import { ChatList } from './components/ChatList';
 import { ClipboardPermissionPrompt } from './components/ClipboardPermissionPrompt';
 import { DetectionModal } from './components/DetectionModal';
+import { NewMessageModal } from './components/NewMessageModal';
 import { ChatView } from './components/ChatView';
 import { KeyExchange } from './components/KeyExchange';
 import { LanguageSelector } from './components/LanguageSelector';
@@ -54,6 +55,10 @@ export default function App() {
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
   const [showDetectionModal, setShowDetectionModal] = useState(false);
 
+  // New message modal state
+  const [newMessageResult, setNewMessageResult] = useState<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>(null);
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+
   // Check if clipboard detection should be enabled
   useEffect(() => {
     // Only enable if:
@@ -98,21 +103,24 @@ export default function App() {
   // Handle clipboard detection results
   const handleDetection = async (result: DetectionResult) => {
     // Safety check: Prevent showing modal for user's own identity
+    // CRITICAL: Only block if fingerprint matches exactly - don't accidentally block valid new contacts
     if (result.type === 'id' && result.contactPublicKey && identity) {
       try {
         const { CryptoService } = await import('./services/crypto');
         const cryptoService = CryptoService.getInstance();
         const detectedFingerprint = await cryptoService.getFingerprint(result.contactPublicKey);
 
-        // Compare with user's own fingerprint
+        // Compare with user's own fingerprint - only block if exact match
         if (detectedFingerprint === identity.fingerprint) {
           // This is the user's own identity - silently ignore
           console.debug('App: Ignoring own identity detection');
           return;
         }
+        // If fingerprints don't match, proceed with detection (valid new contact)
       } catch (error) {
         // If fingerprint generation fails, proceed with detection (fail-safe)
-        console.debug('Failed to verify identity in handleDetection:', error);
+        // This ensures valid contacts aren't accidentally blocked
+        console.debug('Failed to verify identity in handleDetection, proceeding with detection:', error);
       }
     }
 
@@ -159,8 +167,14 @@ export default function App() {
     }
   };
 
+  // Handle new message from clipboard detection
+  const handleNewMessage = (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => {
+    setNewMessageResult(result);
+    setShowNewMessageModal(true);
+  };
+
   // Enable clipboard detection when conditions are met
-  useClipboardDetection(clipboardDetectionEnabled, handleDetection);
+  useClipboardDetection(clipboardDetectionEnabled, handleDetection, handleNewMessage);
 
   useEffect(() => {
     if (language) {
@@ -192,12 +206,15 @@ export default function App() {
     const startLockTimer = () => {
       if (lockTimeoutRef.current) return;
 
+      // Lock timeout: 5 minutes in dev mode, 1 minute in production
+      const lockTimeout = import.meta.env.DEV ? 300000 : 60000; // 5 minutes : 1 minute
+
       lockTimeoutRef.current = setTimeout(() => {
         if (identity) {
           setLocked(true);
         }
         lockTimeoutRef.current = null;
-      }, 60000); // 1 minute
+      }, lockTimeout);
     };
 
     const cancelLockTimer = () => {
@@ -321,6 +338,20 @@ export default function App() {
           />
         )}
 
+        {/* New Message Modal */}
+        {newMessageResult && (
+          <NewMessageModal
+            isOpen={showNewMessageModal}
+            onClose={() => {
+              setShowNewMessageModal(false);
+              setNewMessageResult(null);
+            }}
+            senderName={newMessageResult.senderName}
+            senderFingerprint={newMessageResult.fingerprint}
+            isBroadcast={newMessageResult.isBroadcast}
+          />
+        )}
+
         {/* Full Screen Chat View Overlay */}
         <AnimatePresence>{activeChat && <ChatView />}</AnimatePresence>
 
@@ -386,10 +417,10 @@ export default function App() {
 
           {/* Main Content */}
           <main className="flex-1 flex flex-col h-[calc(100vh-64px-64px)] md:h-[calc(100vh-64px)] w-full relative">
-            {activeTab === 'chats' && <ChatList onNewChat={() => setActiveTab('keys')} />}
+            {activeTab === 'chats' && <ChatList onNewChat={() => setActiveTab('keys')} onDetection={handleDetection} />}
             {activeTab === 'keys' && (
               <div className="p-4 md:p-6 overflow-y-auto h-full">
-                <KeyExchange defaultTab="contacts" />
+                <KeyExchange defaultTab="contacts" onDetection={handleDetection} onNewMessage={handleNewMessage} />
               </div>
             )}
             {activeTab === 'settings' && (

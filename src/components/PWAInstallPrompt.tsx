@@ -26,6 +26,9 @@ export function PWAInstallPrompt() {
     setIsIOS(isIOSDevice);
   }, []);
 
+  // Don't show install prompt in dev mode
+  if (import.meta.env.DEV) return null;
+
   if (isStandalone || !isInstallPromptVisible) return null;
 
   const handleDismiss = () => {

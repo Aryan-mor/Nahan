@@ -39,6 +39,8 @@ export function usePWA() {
     checkStandalone();
     window.addEventListener('resize', checkStandalone);
 
+    // Don't show install prompt in dev mode
+    if (!import.meta.env.DEV) {
     // Check iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     if (isIOS) {
@@ -69,6 +71,7 @@ export function usePWA() {
              setInstallPromptVisible(true);
            }
          }, 2000);
+        }
        }
     }
 
@@ -76,11 +79,14 @@ export function usePWA() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      // Don't show install prompt in dev mode
+      if (!import.meta.env.DEV) {
       // Only show if not already standalone and not dismissed
       const dismissed = localStorage.getItem('pwa-install-dismissed');
       // We need to check current state of isStandalone, but we have it in dependency or use getState
       if (!useUIStore.getState().isStandalone && !dismissed) {
         setInstallPromptVisible(true);
+        }
       }
     };
 

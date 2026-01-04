@@ -56,9 +56,12 @@ export function LockScreen() {
         resetFailedAttempts();
 
         // Show install prompt if not installed (even if dismissed previously)
+        // Don't show in dev mode
+        if (!import.meta.env.DEV) {
         const { isStandalone, setInstallPromptVisible } = useUIStore.getState();
         if (!isStandalone) {
            setInstallPromptVisible(true);
+          }
         }
       } else {
         incrementFailedAttempts();

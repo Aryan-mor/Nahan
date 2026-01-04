@@ -42,7 +42,17 @@ import { generateStealthID } from '../services/stealthId';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
-export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identity' | 'contacts' }) {
+import { DetectionResult } from '../hooks/useClipboardDetection';
+
+export function KeyExchange({
+  defaultTab = 'identity',
+  onDetection,
+  onNewMessage,
+}: {
+  defaultTab?: 'identity' | 'contacts';
+  onDetection?: (result: DetectionResult) => void;
+  onNewMessage?: (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => void;
+}) {
   const {
     identity,
     contacts,
@@ -52,6 +62,7 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
     setSessionPassphrase,
     setActiveChat,
     sessionPassphrase,
+    handleUniversalInput,
   } = useAppStore();
 
   const { setActiveTab: setGlobalActiveTab } = useUIStore();
@@ -98,6 +109,7 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
 
   const [showPassphrase, setShowPassphrase] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   // --- Identity Logic ---
 
@@ -423,6 +435,58 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
       } catch {
         // Invalid key, stay on input step
       }
+    }
+  };
+
+  const handleImportDecode = async () => {
+    if (!contactForm.publicKey.trim()) {
+      toast.error('Please enter content to decode');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await handleUniversalInput(contactForm.publicKey.trim(), undefined, true);
+
+      // If a message was detected, show the new message modal
+      if (result && result.type === 'message') {
+        if (onNewMessage) {
+          onNewMessage(result);
+        }
+        // Clear the textarea after successful import
+        setContactForm({ ...contactForm, publicKey: '' });
+        // Note: Modal will be closed by the parent component when DetectionModal/NewMessageModal is shown
+      }
+    } catch (error: unknown) {
+      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      if (err.message === 'CONTACT_INTRO_DETECTED') {
+        // UNIFICATION: Handle contact ID detection the same way as auto-detector
+        if (onDetection && err.keyData) {
+          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
+          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
+          if (contactPublicKey) {
+            onDetection({
+              type: 'id',
+              contactName: contactName,
+              contactPublicKey: contactPublicKey,
+            });
+            // Clear the textarea after successful import
+            setContactForm({ ...contactForm, publicKey: '' });
+            // Note: Modal will be closed by the parent component when DetectionModal is shown
+          } else {
+            toast.error('Invalid contact key format');
+          }
+        } else {
+          toast.error('Contact key detected but handler not available');
+        }
+      } else if (err.message === 'SENDER_UNKNOWN') {
+        toast.error('Unknown sender. Please add the contact first.');
+      } else {
+        toast.error('Failed to decode content. Please check the format.');
+        console.error('[KeyExchange] Import decode error:', error);
+      }
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -827,8 +891,18 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
                       }}
                     />
                     <p className="text-xs text-industrial-400">
-                      Paste the full PGP Public Key block. The name will be automatically extracted.
+                      Paste the full PGP Public Key block, Stealth ID (Poetry), or encrypted message. The name will be automatically extracted.
                     </p>
+                    <Button
+                      color="primary"
+                      variant="bordered"
+                      onPress={handleImportDecode}
+                      isLoading={isImporting}
+                      isDisabled={!contactForm.publicKey.trim() || isImporting}
+                      className="w-full"
+                    >
+                      Import & Decode
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">

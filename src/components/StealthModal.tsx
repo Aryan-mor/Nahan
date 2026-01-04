@@ -168,6 +168,9 @@ export function StealthModal({
       size="2xl"
       placement="center"
       scrollBehavior="inside"
+      isDismissable={false}
+      isKeyboardDismissDisabled={true}
+      shouldCloseOnInteractOutside={(e) => false}
       classNames={{
         base: 'bg-industrial-900 border border-industrial-800 max-h-[90vh]',
         header: 'border-b border-industrial-800 flex-shrink-0',

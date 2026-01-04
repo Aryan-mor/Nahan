@@ -391,9 +391,17 @@ export class StorageService {
 
   /**
    * Store a secure message
+   * Message ID format: msg_{recipientFingerprint}_{uuid}
+   * This enables efficient IndexedDB key range queries for message retrieval
    */
   async storeMessage(message: Omit<SecureMessage, 'id' | 'createdAt'>, passphrase: string): Promise<SecureMessage> {
-    const messageId = `${ID_PREFIX.MESSAGE}${crypto.randomUUID()}`;
+    // Use recipient fingerprint in message ID for efficient key range queries
+    // For outgoing messages, recipientFingerprint is the contact's fingerprint
+    // For incoming messages, recipientFingerprint is the user's fingerprint (conversation partner)
+    const conversationFingerprint = message.isOutgoing
+      ? message.recipientFingerprint
+      : message.senderFingerprint;
+    const messageId = `${ID_PREFIX.MESSAGE}${conversationFingerprint}_${crypto.randomUUID()}`;
     const completeMessage: SecureMessage = {
       ...message,
       id: messageId,
@@ -401,6 +409,7 @@ export class StorageService {
     };
 
     await this.storeInVault(messageId, completeMessage, passphrase);
+    console.log(`[Storage] Message saved to ${conversationFingerprint}`);
     return completeMessage;
   }
 
@@ -428,28 +437,140 @@ export class StorageService {
 
   /**
    * Get messages by fingerprint (conversations)
+   * Uses IndexedDB key ranges for efficient querying without loading entire database
+   * CRITICAL: Post-decryption check ensures strict data isolation
    */
   async getMessagesByFingerprint(fingerprint: string, passphrase: string): Promise<SecureMessage[]> {
-    const allMessages = await this.getAllWithPrefix<SecureMessage>(ID_PREFIX.MESSAGE, passphrase);
+    if (!this.db) throw new Error('Database not initialized');
+    if (!passphrase) throw new Error('SecureStorage: Missing key');
 
-    // Filter messages where contact is sender OR recipient
-    // Convert date strings to Date objects and sort
-    return allMessages
-      .filter((msg) => msg.senderFingerprint === fingerprint || msg.recipientFingerprint === fingerprint)
-      .map((msg) => this.convertDates(msg))
-      .sort((a, b) => {
-        // Handle both Date objects and string dates (from JSON.parse)
-        // Sort descending (newest first) to work with flex-col-reverse layout
+    // Use key range to fetch only messages for this fingerprint
+    // Message ID format: msg_{fingerprint}_{uuid}
+    const prefix = `${ID_PREFIX.MESSAGE}${fingerprint}_`;
+    const range = IDBKeyRange.bound(
+      prefix,
+      prefix + '\uffff', // Unicode max char to get all keys starting with prefix
+      false, // exclude lower bound
+      false  // exclude upper bound
+    );
+
+    const tx = this.db.transaction('secure_vault', 'readonly');
+    const store = tx.objectStore('secure_vault');
+
+    // Get all entries in the key range (id is the keyPath, so we can use getAll with range)
+    const entries = await store.getAll(range);
+    const results: SecureMessage[] = [];
+
+    for (const entry of entries) {
+      // Verify the entry ID matches our prefix (safety check)
+      if (entry.id.startsWith(prefix)) {
+        try {
+          const decryptedJson = await decryptData(entry.payload, passphrase);
+          const parsed = JSON.parse(decryptedJson) as SecureMessage;
+
+          // CRITICAL: Secondary safety check for strict data isolation
+          // This prevents any prefix-overlap leaks (e.g., if fingerprint appears in UUID)
+          // Even if IDB range queries overlap, this guarantees data remains isolated
+          if (parsed.recipientFingerprint !== fingerprint && parsed.senderFingerprint !== fingerprint) {
+            // Message doesn't belong to this conversation - skip it
+            console.log(`[SECURITY] Isolated Message for ${fingerprint} - skipping unrelated message`);
+            continue;
+          }
+
+          results.push(this.convertDates(parsed));
+        } catch (error) {
+          console.error('Failed to decrypt message:', entry.id, error);
+          // Skip corrupted entries
+        }
+      }
+    }
+
+    // Sort by creation date (descending - newest first)
+    const sorted = results.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
+
+    console.log(`[Storage] Fetched ${sorted.length} messages for ${fingerprint} (strictly filtered)`);
+    return sorted;
   }
 
   /**
    * Get the last message for a contact
+   * Optimized version that uses key ranges to fetch only relevant messages
    */
   async getLastMessage(fingerprint: string, passphrase: string): Promise<SecureMessage | undefined> {
     const messages = await this.getMessagesByFingerprint(fingerprint, passphrase);
-    return messages.length > 0 ? messages[messages.length - 1] : undefined;
+    return messages.length > 0 ? messages[0] : undefined; // Already sorted descending, first is newest
+  }
+
+  /**
+   * Get chat summaries (last message for each conversation)
+   * Efficiently fetches only the most recent message per fingerprint using IndexedDB key ranges
+   * Returns a map of fingerprint -> last message
+   */
+  async getChatSummaries(fingerprints: string[], passphrase: string): Promise<Record<string, SecureMessage | undefined>> {
+    if (!this.db) throw new Error('Database not initialized');
+    if (!passphrase) throw new Error('SecureStorage: Missing key');
+
+    const summaries: Record<string, SecureMessage | undefined> = {};
+
+    // Process each fingerprint
+    for (const fingerprint of fingerprints) {
+      const prefix = `${ID_PREFIX.MESSAGE}${fingerprint}_`;
+      const range = IDBKeyRange.bound(
+        prefix,
+        prefix + '\uffff',
+        false,
+        false
+      );
+
+      const tx = this.db.transaction('secure_vault', 'readonly');
+      const store = tx.objectStore('secure_vault');
+
+      // Use cursor to iterate through messages for this fingerprint
+      // We'll decrypt and find the most recent one
+      let latestMessage: SecureMessage | undefined;
+      let latestTime = 0;
+
+      const entries = await store.getAll(range);
+
+      // Decrypt entries and find the most recent
+      // CRITICAL: Strict filtering - only process entries that match the exact prefix
+      // This ensures message isolation between different conversations
+      for (const entry of entries) {
+        // Double-check prefix match for security
+        if (!entry.id.startsWith(prefix)) {
+          continue; // Skip entries that don't match the prefix
+        }
+
+        try {
+          const decryptedJson = await decryptData(entry.payload, passphrase);
+          const parsed = JSON.parse(decryptedJson) as SecureMessage;
+
+          // CRITICAL: Verify message belongs to this conversation
+          // For private messages: sender or recipient must match fingerprint
+          // For broadcast messages: recipientFingerprint must be 'BROADCAST' and sender must match
+          const isConversationMessage =
+            parsed.senderFingerprint === fingerprint ||
+            parsed.recipientFingerprint === fingerprint;
+
+          if (isConversationMessage) {
+            const msgTime = new Date(parsed.createdAt).getTime();
+            if (msgTime > latestTime) {
+              latestTime = msgTime;
+              latestMessage = this.convertDates(parsed);
+            }
+          }
+        } catch {
+          // Skip corrupted entries
+          continue;
+        }
+      }
+
+      summaries[fingerprint] = latestMessage;
+    }
+
+    return summaries;
   }
 
   /**

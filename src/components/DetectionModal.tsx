@@ -99,6 +99,9 @@ export function DetectionModal({
       isOpen={isOpen}
       onClose={onClose}
       size="md"
+      isDismissable={false}
+      isKeyboardDismissDisabled={true}
+      shouldCloseOnInteractOutside={(e) => false}
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
         header: 'border-b border-industrial-800',

@@ -66,6 +66,9 @@ export function ManualPasteModal({
     <Modal
       isOpen={isOpen}
       onOpenChange={handleClose}
+      isDismissable={false}
+      isKeyboardDismissDisabled={true}
+      shouldCloseOnInteractOutside={(e) => false}
       classNames={{
         base: 'bg-industrial-900 border border-industrial-800',
         header: 'border-b border-industrial-800',

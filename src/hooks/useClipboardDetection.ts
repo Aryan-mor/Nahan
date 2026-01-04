@@ -2,17 +2,11 @@
  * Hook for smart offline clipboard detection with user consent
  * Detects Nahan encrypted messages from clipboard when user returns to tab
  * Respects browser privacy constraints and requires explicit user permission
+ * Uses unified handleUniversalInput for all detection logic
  */
 
-import { useEffect, useState } from 'react';
-import { CamouflageService } from '../services/camouflage';
-import * as naclUtil from 'tweetnacl-util';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { detectPacketType, parseStealthID } from '../services/stealthId';
-import { CryptoService } from '../services/crypto';
-
-const camouflageService = CamouflageService.getInstance();
-const cryptoService = CryptoService.getInstance();
 
 type PermissionState = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
@@ -93,53 +87,9 @@ export async function requestClipboardPermission(): Promise<boolean> {
 }
 
 /**
- * Extract sender public key from encrypted message
- * Works with both stealth (ZWC) and direct Nahan Compact Protocol messages
- * Format: [Version (1)] [Nonce (24)] [Sender Public Key (32)] [Encrypted Payload]
- */
-function extractSenderPublicKey(encryptedData: Uint8Array): string | null {
-  try {
-    // Deserialize Nahan Compact Protocol message
-    if (encryptedData.length < 1 + 24 + 32) {
-      return null;
-    }
-
-    // Version byte is at offset 0
-    // Nonce is at offset 1-24 (24 bytes)
-    // Sender public key is at offset 25-56 (32 bytes)
-    const senderPublicKey = encryptedData.slice(25, 57);
-
-    // Convert to base64 for storage/comparison
-    return naclUtil.encodeBase64(senderPublicKey);
-  } catch (error) {
-    console.error('Failed to extract sender public key:', error);
-    return null;
-  }
-}
-
-/**
- * Compare two public keys byte by byte
- * Returns true if keys match exactly
- */
-function comparePublicKeys(key1Base64: string, key2Base64: string): boolean {
-  try {
-    const key1 = naclUtil.decodeBase64(key1Base64);
-    const key2 = naclUtil.decodeBase64(key2Base64);
-
-    if (key1.length !== key2.length) return false;
-
-    for (let i = 0; i < key1.length; i++) {
-      if (key1[i] !== key2[i]) return false;
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Detection result for clipboard content
+ * Note: This interface is kept for backward compatibility with App.tsx
+ * The actual detection is now handled by handleUniversalInput
  */
 export interface DetectionResult {
   type: 'id' | 'message';
@@ -152,14 +102,20 @@ export interface DetectionResult {
 /**
  * Check clipboard for Nahan messages or IDs when window gains focus
  * Only runs if permission is granted
- * Returns detection result or null if nothing detected
+ * Uses unified handleUniversalInput for all detection logic
+ * Returns result object for UI to show modal
  */
 export function useClipboardDetection(
   enabled: boolean,
-  onDetection: (result: DetectionResult) => void
+  onDetection: (result: DetectionResult) => void,
+  onNewMessage?: (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => void
 ) {
-  const { contacts, identity, sessionPassphrase } = useAppStore();
+  const { handleUniversalInput, identity } = useAppStore();
   const [lastCheckedClipboard, setLastCheckedClipboard] = useState<string>('');
+
+  // SYNC BLOCKING: Use ref to track last processed clipboard text synchronously
+  // This prevents the "quick re-open" loop by blocking re-detection within the same event cycle
+  const lastProcessedRef = useRef<string>('');
 
   useEffect(() => {
     if (!enabled) return;
@@ -169,131 +125,151 @@ export function useClipboardDetection(
         // Read clipboard content
         const clipboardText = await navigator.clipboard.readText();
 
-        // Skip if we already checked this content
+        // DEDUPLICATION: Clear tracking if clipboard is empty
+        // This allows re-detection if clipboard was cleared and refilled with the same text
+        if (!clipboardText || clipboardText.trim().length === 0) {
+          if (lastProcessedRef.current) {
+            lastProcessedRef.current = '';
+            setLastCheckedClipboard('');
+          }
+          return;
+        }
+
+        // SYNC BLOCKING: Check ref first to prevent re-detection in same event cycle
+        // Skip if we already processed this exact content synchronously
+        if (clipboardText === lastProcessedRef.current) {
+          return;
+        }
+
+        // Also check state for async deduplication
         if (clipboardText === lastCheckedClipboard) {
           return;
         }
 
-        // Check if it's a Nahan stealth message (ZWC-embedded)
-        if (camouflageService.hasZWC(clipboardText)) {
-          try {
-            // Decode stealth message
-            const binary = camouflageService.decodeFromZWC(clipboardText, true); // Use lenient mode for auto-detection
+        // SYNC BLOCKING: Update ref immediately before calling handleUniversalInput
+        // This synchronously blocks re-detection within the same event cycle
+        lastProcessedRef.current = clipboardText;
 
-            // Detect packet type
-            const packetType = detectPacketType(binary);
+        // Use unified handleUniversalInput for all detection
+        // skipNavigation=true to avoid auto-navigation on clipboard detection
+        try {
+          const result = await handleUniversalInput(clipboardText, undefined, true);
 
-            if (packetType === 'id') {
-              // Parse stealth ID
-              const idData = parseStealthID(binary);
-              if (idData) {
-                // Check if this is the user's own identity
-                // Compare the detected public key with the user's identity fingerprint
-                if (identity) {
-                  try {
-                    // Generate fingerprint from the detected public key
-                    const detectedFingerprint = await cryptoService.getFingerprint(idData.publicKey);
+          // CRITICAL: Always trigger UI modals when a message is detected
+          // handleUniversalInput already stored the message, so we just need to notify the UI
+          // Call onNewMessage IMMEDIATELY after handleUniversalInput succeeds
+          if (result && result.type === 'message') {
+            console.log('[Detector] Message detected, signaling App.tsx', result);
+            // Call onNewMessage for the new unified modal (primary) - IMMEDIATELY
+            if (onNewMessage) {
+              onNewMessage(result);
+            } else {
+              console.warn('[Detector] onNewMessage callback not provided');
+            }
 
-                    // Compare with user's own fingerprint
-                    if (detectedFingerprint === identity.fingerprint) {
-                      // This is the user's own identity - silently ignore
-                      console.debug('Clipboard detection: Ignoring own identity');
-                      return;
-                    }
-                  } catch (error) {
-                    // If fingerprint generation fails, proceed with detection (fail-safe)
-                    console.debug('Failed to generate fingerprint for comparison:', error);
-                  }
-                }
+            // Also call onDetection for backward compatibility with DetectionModal
+            // This ensures both modals can be triggered if needed
+            if (onDetection) {
+              const { contacts } = useAppStore.getState();
+              const sender = contacts.find(c => c.fingerprint === result.fingerprint);
+              if (sender) {
+                // Use clipboard text as encryptedData (it's already processed by handleUniversalInput)
+                // The DetectionModal will handle it appropriately
+                onDetection({
+                  type: 'message',
+                  contactName: result.senderName,
+                  contactFingerprint: result.fingerprint,
+                  encryptedData: clipboardText.trim(),
+                });
+              }
+            }
+          }
 
-                // Not the user's own identity - proceed with detection
-                setLastCheckedClipboard(clipboardText);
+          // Update last checked clipboard to prevent duplicate processing
+          setLastCheckedClipboard(clipboardText);
+        } catch (error: any) {
+          // STRICT ERROR HANDLING: Update ref for ALL known errors to prevent looping
+          // This ensures that even "invalid" text is marked as processed
+          lastProcessedRef.current = clipboardText;
+
+          // Handle specific errors silently (they're expected)
+          if (error.message === 'DUPLICATE_MESSAGE') {
+            // Duplicate message - silently ignore
+            setLastCheckedClipboard(clipboardText);
+            return;
+          } else if (error.message === 'SENDER_UNKNOWN') {
+            // Unknown sender - mark as processed to prevent loop
+            setLastCheckedClipboard(clipboardText);
+            console.debug('[UniversalInput] Unknown sender detected in clipboard');
+            return;
+          } else if (error.message === 'CONTACT_INTRO_DETECTED') {
+            // CRITICAL: Handle CONTACT_INTRO_DETECTED - map to DetectionResult and call onDetection
+            console.log('[Detector] Contact intro detected, signaling App.tsx');
+            if (onDetection && error.keyData) {
+              // Map error.keyData to DetectionResult format
+              // Support both formats: { name, publicKey } and { username, key }
+              const contactName = error.keyData.name || error.keyData.username || 'Unknown';
+              const contactPublicKey = error.keyData.publicKey || error.keyData.key;
+
+              if (contactPublicKey) {
                 onDetection({
                   type: 'id',
-                  contactName: idData.name,
-                  contactPublicKey: idData.publicKey,
+                  contactName: contactName,
+                  contactPublicKey: contactPublicKey,
                 });
-                return;
+              } else {
+                console.warn('[Detector] CONTACT_INTRO_DETECTED missing public key');
               }
-            } else if (packetType === 'message') {
-              // Extract sender public key for message
-              const senderPublicKey = extractSenderPublicKey(binary);
-
-              if (senderPublicKey) {
-                // Cross-reference with contacts
-                const matchingContact = contacts.find(contact =>
-                  comparePublicKeys(contact.publicKey, senderPublicKey)
-                );
-
-                if (matchingContact && identity && sessionPassphrase) {
-                  // Convert to base64 for the modal
-                  const encryptedData = naclUtil.encodeBase64(binary);
-                  setLastCheckedClipboard(clipboardText);
-                  onDetection({
-                    type: 'message',
-                    contactName: matchingContact.name,
-                    contactFingerprint: matchingContact.fingerprint,
-                    encryptedData: encryptedData,
-                  });
-                  return;
-                } else {
-                  // Unknown sender - could show notification but don't auto-import
-                  console.debug('Nahan message detected from unknown sender');
-                }
-              }
+            } else {
+              console.warn('[Detector] onDetection callback not provided or keyData missing');
             }
-          } catch (error) {
-            // Not a valid Nahan message or extraction failed
-            console.debug('Failed to extract Nahan message from clipboard:', error);
-          }
-        } else {
-          // Check if it's a direct Nahan Compact Protocol message (base64)
-          try {
-            const decoded = naclUtil.decodeBase64(clipboardText.trim());
-            if (decoded.length > 0 && decoded[0] === 0x01) {
-              // Nahan Compact Protocol message detected
-              const senderPublicKey = extractSenderPublicKey(decoded);
-
-              if (senderPublicKey) {
-                // Cross-reference with contacts
-                const matchingContact = contacts.find(contact =>
-                  comparePublicKeys(contact.publicKey, senderPublicKey)
-                );
-
-                if (matchingContact && identity && sessionPassphrase) {
-                  setLastCheckedClipboard(clipboardText);
-                  onDetection({
-                    type: 'message',
-                    contactName: matchingContact.name,
-                    contactFingerprint: matchingContact.fingerprint,
-                    encryptedData: clipboardText.trim(),
-                  });
-                  return;
-                }
-              }
-            }
-          } catch {
-            // Not base64 or not a Nahan message
+            // Mark as processed to prevent loop
+            setLastCheckedClipboard(clipboardText);
+            return;
+          } else if (error.message === 'Authentication required') {
+            // App is locked - mark as processed to prevent loop
+            setLastCheckedClipboard(clipboardText);
+            return;
+          } else {
+            // Other errors (invalid format, etc.) - mark as processed to prevent loop
+            // This is expected for non-Nahan clipboard content
+            setLastCheckedClipboard(clipboardText);
+            console.debug('[UniversalInput] Clipboard content is not a Nahan message:', error.message);
           }
         }
       } catch (error: any) {
         // Permission denied or clipboard empty - silently ignore
         if (error.name !== 'NotAllowedError' && error.name !== 'SecurityError') {
-          console.debug('Clipboard check failed:', error);
+          console.debug('[UniversalInput] Clipboard check failed:', error);
         }
       }
     };
+
+    // IMMEDIATE CHECK: Call checkClipboard() immediately when enabled becomes true
+    // This ensures that as soon as the app is unlocked (PIN entered), the clipboard is processed
+    checkClipboard();
 
     // Check clipboard when window gains focus
     const handleFocus = () => {
       checkClipboard();
     };
 
+    // ENHANCED REACTIVITY: Listen for visibilitychange
+    // When document becomes visible, trigger checkClipboard()
+    // This makes detection feel like a "state change" when switching apps
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkClipboard();
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [enabled, contacts, identity, sessionPassphrase, onDetection, lastCheckedClipboard]);
+  }, [enabled, handleUniversalInput, identity, lastCheckedClipboard, onDetection, onNewMessage]);
 }
 

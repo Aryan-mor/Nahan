@@ -10,7 +10,7 @@ import * as naclUtil from 'tweetnacl-util';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CamouflageService } from '../../services/camouflage';
 import { CryptoService } from '../../services/crypto';
-import { storageService } from '../../services/storage';
+import { Identity, storageService } from '../../services/storage';
 import { useAppStore } from '../appStore';
 
 // Mock storage service
@@ -55,7 +55,7 @@ const camouflageService = CamouflageService.getInstance();
 const cryptoService = CryptoService.getInstance();
 
 describe('P2P Message Flow (Version 0x01)', () => {
-  let userAIdentity: any;
+  let userAIdentity: Identity;
   let userBContact: any;
   let userAPassphrase: string;
 
@@ -65,7 +65,17 @@ describe('P2P Message Flow (Version 0x01)', () => {
 
     // Generate User A identity
     userAPassphrase = '123456';
-    userAIdentity = await cryptoService.generateKeyPair('User A', 'userA@test.com', userAPassphrase);
+    const userAKeyPair = await cryptoService.generateKeyPair('User A', 'userA@test.com', userAPassphrase);
+    userAIdentity = {
+      id: 'user-a-identity',
+      name: 'User A',
+      email: 'userA@test.com',
+      publicKey: userAKeyPair.publicKey,
+      privateKey: userAKeyPair.privateKey,
+      fingerprint: userAKeyPair.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
 
     // Generate User B contact (public key only)
     const userBKeyPair = nacl.box.keyPair();
@@ -179,7 +189,17 @@ describe('P2P Message Flow (Version 0x01)', () => {
 
     // Step 2: User B receives and processes the message
     // Set up User B's identity and contacts
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair.publicKey,
+      privateKey: userBKeyPair.privateKey,
+      fingerprint: userBKeyPair.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
     const userAContact = {
       id: 'user-a-contact',
       name: 'User A',
@@ -225,7 +245,17 @@ describe('P2P Message Flow (Version 0x01)', () => {
     const stealthOutput = await store.sendAutoStealthMessage(messageText);
 
     // Set up receiver
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair8 = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair8.publicKey,
+      privateKey: userBKeyPair8.privateKey,
+      fingerprint: userBKeyPair8.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
     const userAContact = {
       id: 'user-a-contact',
       name: 'User A',
@@ -260,7 +290,7 @@ describe('P2P Message Flow (Version 0x01)', () => {
 });
 
 describe('Broadcast Message Flow (Version 0x02)', () => {
-  let userAIdentity: any;
+  let userAIdentity: Identity;
   let userBContact: any;
   let userAPassphrase: string;
   let broadcastContact: any;
@@ -269,7 +299,17 @@ describe('Broadcast Message Flow (Version 0x02)', () => {
     await storageService.initialize();
 
     userAPassphrase = '123456';
-    userAIdentity = await cryptoService.generateKeyPair('User A', 'userA@test.com', userAPassphrase);
+    const userAKeyPair = await cryptoService.generateKeyPair('User A', 'userA@test.com', userAPassphrase);
+    userAIdentity = {
+      id: 'user-a-identity',
+      name: 'User A',
+      email: 'userA@test.com',
+      publicKey: userAKeyPair.publicKey,
+      privateKey: userAKeyPair.privateKey,
+      fingerprint: userAKeyPair.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
 
     const userBKeyPair = nacl.box.keyPair();
     const userBPublicKeyBase64 = naclUtil.encodeBase64(userBKeyPair.publicKey);
@@ -386,7 +426,17 @@ describe('Broadcast Message Flow (Version 0x02)', () => {
     const stealthOutput = await store.sendAutoStealthMessage(messageText);
 
     // Step 2: User B receives and processes the broadcast
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair5 = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair5.publicKey,
+      privateKey: userBKeyPair5.privateKey,
+      fingerprint: userBKeyPair5.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
     const userAContact = {
       id: 'user-a-contact',
       name: 'User A',
@@ -432,7 +482,17 @@ describe('Broadcast Message Flow (Version 0x02)', () => {
     const stealthOutput = await store.sendAutoStealthMessage(messageText);
 
     // Set up receiver
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair6 = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair6.publicKey,
+      privateKey: userBKeyPair6.privateKey,
+      fingerprint: userBKeyPair6.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
     const userAContact = {
       id: 'user-a-contact',
       name: 'User A',
@@ -473,7 +533,17 @@ describe('Broadcast Message Flow (Version 0x02)', () => {
     const stealthOutput = await store.sendAutoStealthMessage(messageText);
 
     // Set up receiver with User A's public key in contacts
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair7 = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair7.publicKey,
+      privateKey: userBKeyPair7.privateKey,
+      fingerprint: userBKeyPair7.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
     const userAContact = {
       id: 'user-a-contact',
       name: 'User A',
@@ -521,7 +591,17 @@ describe('Version Byte Routing', () => {
     const stealthOutput = camouflageService.embed(version0x02Packet, coverText, 'fa');
 
     // Set up receiver
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair3 = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair3.publicKey,
+      privateKey: userBKeyPair3.privateKey,
+      fingerprint: userBKeyPair3.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
 
     useAppStore.setState({
       identity: userBIdentity,
@@ -551,9 +631,19 @@ describe('Version Byte Routing', () => {
 
   it('should never call verifySignedMessage on version 0x01 messages', async () => {
     // Create a version 0x01 encrypted message
-    const userAIdentity = await cryptoService.generateKeyPair('User A', 'userA@test.com', '123456');
-    const userBKeyPair = nacl.box.keyPair();
-    const userBPublicKey = naclUtil.encodeBase64(userBKeyPair.publicKey);
+    const userAKeyPair = await cryptoService.generateKeyPair('User A', 'userA@test.com', '123456');
+    const userAIdentity = {
+      id: 'user-a-identity',
+      name: 'User A',
+      email: 'userA@test.com',
+      publicKey: userAKeyPair.publicKey,
+      privateKey: userAKeyPair.privateKey,
+      fingerprint: userAKeyPair.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
+    const userBKeyPairNacl = nacl.box.keyPair();
+    const userBPublicKey = naclUtil.encodeBase64(userBKeyPairNacl.publicKey);
 
     const messageText = 'Test P2P message';
     const encryptedBinary = await cryptoService.encryptMessage(
@@ -572,7 +662,17 @@ describe('Version Byte Routing', () => {
     const stealthOutput = camouflageService.embed(encryptedBinary, coverText, 'fa');
 
     // Set up receiver
-    const userBIdentity = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBKeyPair = await cryptoService.generateKeyPair('User B', 'userB@test.com', '123456');
+    const userBIdentity = {
+      id: 'user-b-identity',
+      name: 'User B',
+      email: 'userB@test.com',
+      publicKey: userBKeyPair.publicKey,
+      privateKey: userBKeyPair.privateKey,
+      fingerprint: userBKeyPair.fingerprint,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
     const userAContact = {
       id: 'user-a-contact',
       name: 'User A',
