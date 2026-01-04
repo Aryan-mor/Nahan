@@ -19,15 +19,29 @@ import { DetectionResult } from '../hooks/useClipboardDetection';
 import { SecureMessage, storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { ManualPasteModal } from './ManualPasteModal';
+import { MyQRModal } from './MyQRModal';
 import { NewMessageModal } from './NewMessageModal';
 
-export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; onDetection?: (result: DetectionResult) => void }) {
-  const { contacts, getContactsWithBroadcast, setActiveChat, handleUniversalInput, lastStorageUpdate } = useAppStore();
+export function ChatList({
+  onNewChat,
+  onDetection,
+}: {
+  onNewChat: () => void;
+  onDetection?: (result: DetectionResult) => void;
+}) {
+  const {
+    contacts,
+    getContactsWithBroadcast,
+    setActiveChat,
+    handleUniversalInput,
+    lastStorageUpdate,
+  } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [lastMessages, setLastMessages] = useState<Record<string, SecureMessage | undefined>>({});
 
   // New Chat Modal
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const qrModal = useDisclosure();
   const [modalSearch, setModalSearch] = useState('');
   const [isProcessingPaste, setIsProcessingPaste] = useState(false);
   const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
@@ -37,7 +51,12 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   // New Message Modal
-  const [newMessageResult, setNewMessageResult] = useState<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>(null);
+  const [newMessageResult, setNewMessageResult] = useState<{
+    type: 'message' | 'contact';
+    fingerprint: string;
+    isBroadcast: boolean;
+    senderName: string;
+  } | null>(null);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
 
   const handlePaste = async () => {
@@ -55,7 +74,10 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
         setShowNewMessageModal(true);
       }
     } catch (error: unknown) {
-      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      const err = error as {
+        message?: string;
+        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+      };
       if (err.message === 'SENDER_UNKNOWN') {
         setPendingMessage(clipboardText);
         setIsSenderSelectOpen(true);
@@ -106,7 +128,10 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
 
       setPendingMessage(null);
     } catch (error: unknown) {
-      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      const err = error as {
+        message?: string;
+        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+      };
       if (err.message === 'CONTACT_INTRO_DETECTED') {
         // UNIFICATION: Handle contact ID detection the same way as auto-detector
         if (onDetection && err.keyData) {
@@ -148,7 +173,10 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
 
       setIsManualPasteOpen(false);
     } catch (error: unknown) {
-      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      const err = error as {
+        message?: string;
+        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+      };
       if (err.message === 'SENDER_UNKNOWN') {
         setPendingMessage(content);
         setIsManualPasteOpen(false);
@@ -193,8 +221,8 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
       // REMOVED: No loop that aggregates broadcast messages from individual contacts
       // This prevents private messages from one user leaking into the broadcast preview row
       const fingerprints = allContacts
-        .filter(c => c.fingerprint !== 'BROADCAST') // Exclude BROADCAST from batch query
-        .map(c => c.fingerprint);
+        .filter((c) => c.fingerprint !== 'BROADCAST') // Exclude BROADCAST from batch query
+        .map((c) => c.fingerprint);
 
       // Use optimized getChatSummaries to fetch last messages in batch
       const summaries = await storageService.getChatSummaries(fingerprints, sessionPassphrase);
@@ -204,11 +232,14 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
       // ISOLATION: Query storageService.getMessagesByFingerprint('BROADCAST', ...) directly
       // This prevents private messages from leaking into broadcast preview
       // CRITICAL: Ensure broadcast preview is populated before sorting
-      const broadcastContact = allContacts.find(c => c.fingerprint === 'BROADCAST');
+      const broadcastContact = allContacts.find((c) => c.fingerprint === 'BROADCAST');
       if (broadcastContact) {
         // ISOLATION: ONLY query storageService.getMessagesByFingerprint('BROADCAST', passphrase)
         // No aggregation from individual contacts - direct query only
-        const broadcastMessages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
+        const broadcastMessages = await storageService.getMessagesByFingerprint(
+          'BROADCAST',
+          sessionPassphrase,
+        );
         const latestBroadcast = broadcastMessages.length > 0 ? broadcastMessages[0] : undefined;
         map['BROADCAST'] = latestBroadcast;
       }
@@ -279,9 +310,11 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
     });
 
   // Log sorting result
-  const broadcastCount = filteredContacts.filter(c => c.fingerprint === 'BROADCAST').length;
+  const broadcastCount = filteredContacts.filter((c) => c.fingerprint === 'BROADCAST').length;
   const regularContactsCount = filteredContacts.length - broadcastCount;
-  console.log(`[UI] Chat list sorted: Broadcast pinned, ${regularContactsCount} contacts chronological`);
+  console.log(
+    `[UI] Chat list sorted: Broadcast pinned, ${regularContactsCount} contacts chronological`,
+  );
 
   // Filter out broadcast contact from modal (only show real contacts)
   const modalFilteredContacts = contacts.filter(
@@ -536,10 +569,10 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
           {(onClose) => (
             <>
               <ModalHeader className="flex flex-col gap-1">
-                 Select Sender
-                 <p className="text-sm font-normal text-industrial-400">
-                    This message is unsigned or from an unknown key. Who sent it?
-                 </p>
+                Select Sender
+                <p className="text-sm font-normal text-industrial-400">
+                  This message is unsigned or from an unknown key. Who sent it?
+                </p>
               </ModalHeader>
               <ModalBody>
                 <Input
@@ -609,6 +642,8 @@ export function ChatList({ onNewChat, onDetection }: { onNewChat: () => void; on
           isBroadcast={newMessageResult.isBroadcast}
         />
       )}
+      {/* QR Modal */}
+      <MyQRModal isOpen={qrModal.isOpen} onOpenChange={qrModal.onOpenChange} />
     </div>
   );
 }

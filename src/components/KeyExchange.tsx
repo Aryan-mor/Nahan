@@ -92,6 +92,7 @@ export function KeyExchange({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [activeTab, setActiveTab] = useState<'identity' | 'contacts'>(defaultTab);
 
   // QR & Scanning State
@@ -291,34 +292,44 @@ export function KeyExchange({
       });
       mediaStreamRef.current = stream;
 
-      // Need to attach this stream to a video element in the modal
-      // We'll handle this via a ref or effect in the modal content if possible,
-      // but simpler is to just set up the scanning loop here and let the modal render the video
+      // Attach to video element if available
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(console.error);
+      }
 
-      // NOTE: For simplicity in this refactor, we are reusing the simulation logic from before
-      // or we need to ensure the video element exists in the DOM.
-      // Since the modal is dynamic, we'll attach logic when the modal opens.
-
-      // Let's use the simulation logic for reliability in this demo environment
-      // (The original code had simulation logic)
-      setTimeout(() => {
-        if (mediaStreamRef.current && mediaStreamRef.current.active) {
-          // Simulation
-          const sampleData = {
-            name: 'Sample Contact',
-            publicKey:
-              '-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nSample public key data\n-----END PGP PUBLIC KEY BLOCK-----',
-            fingerprint: 'A1B2C3D4E5F67890',
-            type: 'nahan-public-key',
-          };
-          handleScannedData(JSON.stringify(sampleData));
-          stopScanning();
-        }
-      }, 3000);
+      // Start scanning loop
+      requestAnimationFrame(scanFrame);
     } catch (error) {
       console.error('Camera error:', error);
       toast.error('Failed to access camera');
     }
+  };
+
+  const scanFrame = () => {
+    if (!mediaStreamRef.current || !mediaStreamRef.current.active) return;
+    if (!videoRef.current) {
+        requestAnimationFrame(scanFrame);
+        return;
+    }
+
+    const video = videoRef.current;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) {
+                handleScannedData(code.data);
+                return; 
+            }
+        }
+    }
+    requestAnimationFrame(scanFrame);
   };
 
   const handleScannedData = async (data: string) => {
@@ -975,20 +986,27 @@ export function KeyExchange({
         classNames={{
           base: 'bg-industrial-900 border border-industrial-800',
         }}
+        size="lg"
       >
         <ModalContent>
           {() => (
             <>
               <ModalHeader>Scan QR Code</ModalHeader>
-              <ModalBody className="py-6 items-center justify-center">
-                <div className="w-64 h-64 bg-industrial-950 rounded-lg flex items-center justify-center relative overflow-hidden">
-                  {/* In a real app, Video element would go here */}
-                  <Camera className="w-16 h-16 text-industrial-700" />
-                  <div className="absolute inset-0 border-2 border-industrial-500 border-dashed animate-pulse rounded-lg" />
-                  <p className="absolute bottom-4 text-xs text-industrial-400">Scanning...</p>
+              <ModalBody className="py-0 px-0 items-center justify-center bg-black overflow-hidden relative" style={{ minHeight: '400px' }}>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover absolute inset-0 z-0"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  muted
+                  playsInline
+                />
+                <div className="z-10 w-64 h-64 border-2 border-primary/50 border-dashed rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] pointer-events-none relative">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <Camera className="w-8 h-8 text-primary/50 animate-pulse" />
+                    </div>
                 </div>
-                <p className="text-sm text-industrial-400 text-center mt-4">
-                  Point camera at a NAHAN identity QR code
+                <p className="absolute bottom-8 z-20 text-white font-medium bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
+                  Point camera at a NAHAN QR code
                 </p>
               </ModalBody>
             </>

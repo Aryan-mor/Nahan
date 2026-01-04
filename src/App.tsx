@@ -1,23 +1,35 @@
-import { HeroUIProvider } from '@heroui/react';
+import { Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
-import { Lock, MessageSquare, Settings as SettingsIcon, Users } from 'lucide-react';
+import {
+  FileUser,
+  Lock,
+  MessageSquare,
+  QrCode,
+  Settings as SettingsIcon,
+  Users,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast, Toaster } from 'sonner';
 import { ChatList } from './components/ChatList';
+import { ChatView } from './components/ChatView';
 import { ClipboardPermissionPrompt } from './components/ClipboardPermissionPrompt';
 import { DetectionModal } from './components/DetectionModal';
-import { NewMessageModal } from './components/NewMessageModal';
-import { ChatView } from './components/ChatView';
 import { KeyExchange } from './components/KeyExchange';
 import { LanguageSelector } from './components/LanguageSelector';
 import { LockScreen } from './components/LockScreen';
+import { MyQRModal } from './components/MyQRModal';
+import { NewMessageModal } from './components/NewMessageModal';
 import { Onboarding } from './components/Onboarding';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 import { Settings } from './components/Settings';
 import { StealthModal } from './components/StealthModal';
-import { useClipboardDetection, useClipboardPermission, DetectionResult } from './hooks/useClipboardDetection';
+import {
+  DetectionResult,
+  useClipboardDetection,
+  useClipboardPermission,
+} from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
 import { useAppStore } from './stores/appStore';
@@ -46,6 +58,9 @@ export default function App() {
   const { language, isLocked, setLocked, activeTab, setActiveTab } = useUIStore();
   const { t, i18n } = useTranslation();
 
+  // QR Modal
+  const qrModal = useDisclosure();
+
   // Clipboard permission management
   const clipboardPermission = useClipboardPermission();
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
@@ -56,7 +71,12 @@ export default function App() {
   const [showDetectionModal, setShowDetectionModal] = useState(false);
 
   // New message modal state
-  const [newMessageResult, setNewMessageResult] = useState<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>(null);
+  const [newMessageResult, setNewMessageResult] = useState<{
+    type: 'message' | 'contact';
+    fingerprint: string;
+    isBroadcast: boolean;
+    senderName: string;
+  } | null>(null);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
 
   // Check if clipboard detection should be enabled
@@ -66,10 +86,7 @@ export default function App() {
     // 2. User is authenticated (has identity and passphrase)
     // 3. App is not locked
     const shouldEnable =
-      clipboardPermission.state === 'granted' &&
-      !isLocked &&
-      !!identity &&
-      !!sessionPassphrase;
+      clipboardPermission.state === 'granted' && !isLocked && !!identity && !!sessionPassphrase;
 
     setClipboardDetectionEnabled(shouldEnable);
 
@@ -93,12 +110,7 @@ export default function App() {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [
-    clipboardPermission.state,
-    isLocked,
-    identity,
-    sessionPassphrase,
-  ]);
+  }, [clipboardPermission.state, isLocked, identity, sessionPassphrase]);
 
   // Handle clipboard detection results
   const handleDetection = async (result: DetectionResult) => {
@@ -120,7 +132,10 @@ export default function App() {
       } catch (error) {
         // If fingerprint generation fails, proceed with detection (fail-safe)
         // This ensures valid contacts aren't accidentally blocked
-        console.debug('Failed to verify identity in handleDetection, proceeding with detection:', error);
+        console.debug(
+          'Failed to verify identity in handleDetection, proceeding with detection:',
+          error,
+        );
       }
     }
 
@@ -132,7 +147,10 @@ export default function App() {
         const { sessionPassphrase } = useAppStore.getState();
 
         if (sessionPassphrase) {
-          const isDuplicate = await storageService.messageExists(result.encryptedData, sessionPassphrase);
+          const isDuplicate = await storageService.messageExists(
+            result.encryptedData,
+            sessionPassphrase,
+          );
           if (isDuplicate) {
             // Message is a duplicate - silently ignore (no modal, no toast)
             console.debug('App: Ignoring duplicate message detection');
@@ -168,7 +186,12 @@ export default function App() {
   };
 
   // Handle new message from clipboard detection
-  const handleNewMessage = (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => {
+  const handleNewMessage = (result: {
+    type: 'message' | 'contact';
+    fingerprint: string;
+    isBroadcast: boolean;
+    senderName: string;
+  }) => {
     // Unify modal logic: If we have a specific message result, use detection modal first
     // This ensures consistency with the new unified modal flow
     if (result.type === 'message') {
@@ -181,12 +204,23 @@ export default function App() {
         // or fetch it from storage if needed.
         // For now, prioritize the main notification modal.
       } as any;
-      
+
       setDetectionResult(detectionResult);
       setShowDetectionModal(true);
     } else {
       setNewMessageResult(result);
       setShowNewMessageModal(true);
+    }
+  };
+
+  const handleCopyIdentity = async () => {
+    if (!identity) return;
+    try {
+      const data = `${identity.name}+${identity.publicKey}`;
+      await navigator.clipboard.writeText(data);
+      toast.success('Identity copied to clipboard');
+    } catch {
+      toast.error('Failed to copy identity');
     }
   };
 
@@ -208,8 +242,14 @@ export default function App() {
   // !!! LOG APP: Check StealthModal presence
   useEffect(() => {
     const checkModal = () => {
-      const modal = document.querySelector('[data-slot="base"]') || document.querySelector('.stealth-modal');
-      console.log("!!! LOG APP: App rendered. StealthModal presence:", !!modal, "showStealthModal state:", showStealthModal);
+      const modal =
+        document.querySelector('[data-slot="base"]') || document.querySelector('.stealth-modal');
+      console.log(
+        '!!! LOG APP: App rendered. StealthModal presence:',
+        !!modal,
+        'showStealthModal state:',
+        showStealthModal,
+      );
     };
     checkModal();
     // Check again after a short delay to catch async renders
@@ -369,6 +409,9 @@ export default function App() {
           />
         )}
 
+        {/* My QR Modal */}
+        <MyQRModal isOpen={qrModal.isOpen} onOpenChange={qrModal.onOpenChange} />
+
         {/* Full Screen Chat View Overlay */}
         <AnimatePresence>{activeChat && <ChatView />}</AnimatePresence>
 
@@ -388,10 +431,38 @@ export default function App() {
                 {t('app.subtitle')}
               </span>
             </div>
-            <div className="text-xs sm:text-sm text-industrial-400">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="hidden sm:inline">{t('app.encrypted_locally')}</span>
+
+            <div className="flex items-center gap-4">
+              {identity && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    isIconOnly
+                    variant="flat"
+                    size="sm"
+                    className="bg-industrial-800 text-industrial-300"
+                    onPress={handleCopyIdentity}
+                    title="Copy Identity"
+                  >
+                    <FileUser className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    variant="flat"
+                    size="sm"
+                    className="bg-industrial-800 text-industrial-300"
+                    onPress={qrModal.onOpen}
+                    title="Show QR Code"
+                  >
+                    <QrCode className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="text-xs sm:text-sm text-industrial-400">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  <span className="hidden sm:inline">{t('app.encrypted_locally')}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -434,10 +505,16 @@ export default function App() {
 
           {/* Main Content */}
           <main className="flex-1 flex flex-col h-[calc(100vh-64px-64px)] md:h-[calc(100vh-64px)] w-full relative">
-            {activeTab === 'chats' && <ChatList onNewChat={() => setActiveTab('keys')} onDetection={handleDetection} />}
+            {activeTab === 'chats' && (
+              <ChatList onNewChat={() => setActiveTab('keys')} onDetection={handleDetection} />
+            )}
             {activeTab === 'keys' && (
               <div className="p-4 md:p-6 overflow-y-auto h-full">
-                <KeyExchange defaultTab="contacts" onDetection={handleDetection} onNewMessage={handleNewMessage} />
+                <KeyExchange
+                  defaultTab="contacts"
+                  onDetection={handleDetection}
+                  onNewMessage={handleNewMessage}
+                />
               </div>
             )}
             {activeTab === 'settings' && (
