@@ -13,7 +13,8 @@ This document outlines the steps to package Nahan as a Trusted Web Activity (TWA
     git commit -m "chore: prepare for android build"
     git push
     ```
-    *Wait for the GitHub Action to complete deployment.*
+
+    _Wait for the GitHub Action to complete deployment._
 
 2.  **Install Bubblewrap CLI:**
     ```bash
@@ -23,11 +24,13 @@ This document outlines the steps to package Nahan as a Trusted Web Activity (TWA
 ## Build Steps
 
 1.  **Initialize Project:**
-    Only run this *after* deployment is complete and `https://aryan-mor.github.io/Nahan/manifest.json` is accessible.
+    Only run this _after_ deployment is complete and `https://aryan-mor.github.io/Nahan/manifest.json` is accessible.
+
     ```bash
     bubblewrap init --manifest=https://aryan-mor.github.io/Nahan/manifest.json
     ```
-    *Alternatively, since `twa-manifest.json` is already configured locally, you can skip `init` and try `build` directly if assets are available.*
+
+    _Alternatively, since `twa-manifest.json` is already configured locally, you can skip `init` and try `build` directly if assets are available._
 
 2.  **Build the Android App:**
     Run the build command to generate the APK and App Bundle (AAB):
@@ -39,8 +42,9 @@ This document outlines the steps to package Nahan as a Trusted Web Activity (TWA
 
 1.  **Digital Asset Links:**
     During the build/signing process, you will obtain a SHA-256 certificate fingerprint.
-    
+
     Update `public/.well-known/assetlinks.json` with this fingerprint:
+
     ```json
     "sha256_cert_fingerprints": ["<YOUR_GENERATED_SHA256>"]
     ```

@@ -26,8 +26,8 @@ document
 *.sln
 *.sw?
 .env
-app/
 gradle/
+app/
 build.gradle
 gradle.properties
 gradle.properties
@@ -37,3 +37,11 @@ settings.gradle
 manifest-checksum.txt
 android.keystore
 .gradle/
+*.txt
+
+# Android Build Artifacts
+*.apk
+*.aab
+*.idsig
+local.properties
+build/

@@ -6,8 +6,8 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
-  // Set base path: '/' for development (serve), '/Nahan/' for production (build)
-  const base = command === 'build' ? '/Nahan/' : '/';
+  // Set base path: '/' for development (serve), '/nahan/' for production (build)
+  const base = command === 'build' ? '/nahan/' : '/';
 
   return {
     base,
