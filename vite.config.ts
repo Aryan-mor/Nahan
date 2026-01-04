@@ -1,11 +1,10 @@
 import react from '@vitejs/plugin-react';
-import path from 'path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command }) => {
   // Set base path: '/' for development (serve), '/nahan/' for production (build)
   const base = command === 'build' ? '/nahan/' : '/';
 
@@ -40,6 +39,7 @@ export default defineConfig(({ command, mode }) => {
         ],
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
+          navigateFallbackDenylist: [/^\/\.well-known/],
           runtimeCaching: [
             {
               urlPattern: ({ request }) =>
