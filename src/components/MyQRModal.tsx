@@ -4,6 +4,8 @@ import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
+import { formatNahanIdentity } from '../services/stealthId';
 import { dataURItoBlob } from '../lib/utils';
 
 interface MyQRModalProps {
@@ -13,6 +15,7 @@ interface MyQRModalProps {
 
 export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
   const { identity } = useAppStore();
+  const { camouflageLanguage } = useUIStore();
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
@@ -25,8 +28,8 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
   const generateQRCode = async () => {
     if (!identity) return;
     try {
-      // Format: name+publicKey
-      const qrData = `${identity.name}+${identity.publicKey}`;
+      // Format: Stealth ID (Poetry with embedded data)
+      const qrData = formatNahanIdentity(identity, camouflageLanguage || 'fa');
       const dataUrl = await QRCode.toDataURL(qrData, {
         width: 300,
         margin: 2,
@@ -45,7 +48,7 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
   const copyToClipboard = async () => {
     if (!identity) return;
     try {
-      const data = `${identity.name}+${identity.publicKey}`;
+      const data = formatNahanIdentity(identity, camouflageLanguage || 'fa');
       await navigator.clipboard.writeText(data);
       setIsCopied(true);
       toast.success('Identity copied to clipboard');

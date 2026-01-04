@@ -21,8 +21,8 @@
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "6",
-  "appVersionCode": 6,
+  "appVersionName": "7",
+  "appVersionCode": 7,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://aryan-mor.github.io/Nahan/manifest.json",
@@ -42,11 +42,13 @@
       "sha256": "84:82:6B:83:66:DD:97:9F:93:E1:22:21:8B:A7:51:90:24:46:E9:B9:04:39:66:F9:CF:F2:31:C4:0D:35:64:44"
     }
   ],
-  "additionalTrustedOrigins": ["https://aryan-mor.github.io"],
+  "additionalTrustedOrigins": [
+    "https://aryan-mor.github.io"
+  ],
   "retainedBundles": [],
   "protocolHandlers": [],
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "6"
+  "appVersion": "7"
 }

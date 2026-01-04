@@ -20,7 +20,7 @@ import {
 import { Camera, Copy, Eye, EyeOff, Key, QrCode, Share, Upload, User } from 'lucide-react';
 import QRCode from 'qrcode';
 import { cryptoService } from '../services/crypto';
-import { generateStealthID } from '../services/stealthId';
+import { generateStealthID, formatNahanIdentity } from '../services/stealthId';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
@@ -102,17 +102,10 @@ export function KeyExchange({
     if (!identity) return;
 
     try {
-      // We still include email in QR data for backward compatibility with other PGP tools,
-      // but we don't display it in our UI.
-      const qrData = {
-        name: identity.name,
-        email: identity.email,
-        publicKey: identity.publicKey,
-        fingerprint: identity.fingerprint,
-        type: 'nahan-public-key',
-      };
+      // Use formatNahanIdentity to get the stealth ID string
+      const qrData = formatNahanIdentity(identity, camouflageLanguage || 'fa');
 
-      const dataUrl = await QRCode.toDataURL(JSON.stringify(qrData), {
+      const dataUrl = await QRCode.toDataURL(qrData, {
         width: 300,
         margin: 2,
         color: {
@@ -125,7 +118,7 @@ export function KeyExchange({
     } catch {
       toast.error('Failed to generate QR code');
     }
-  }, [identity]);
+  }, [identity, camouflageLanguage]);
 
   useEffect(() => {
     if (identity) {
@@ -197,9 +190,8 @@ export function KeyExchange({
   const copyIdentityKey = async () => {
     if (!identity) return;
     try {
-      const name = identity.name || 'Unknown';
       // Generate stealth ID (steganographic poetry) instead of plaintext
-      const stealthID = generateStealthID(name, identity.publicKey, camouflageLanguage || 'fa');
+      const stealthID = formatNahanIdentity(identity, camouflageLanguage || 'fa');
       await navigator.clipboard.writeText(stealthID);
       toast.success('Secure Stealth ID copied as poetry!');
     } catch (error) {

@@ -161,3 +161,17 @@ function getInvitePoem(lang: 'fa' | 'en'): string {
   return selectedPoem.content.join(' ');
 }
 
+/**
+ * Format user identity into a secure stealth ID string
+ * @param identity The user identity object containing name and publicKey
+ * @param lang Language for cover text ('fa' or 'en')
+ * @returns Formatted stealth ID string
+ */
+export function formatNahanIdentity(
+  identity: { name: string; publicKey: string },
+  lang: 'fa' | 'en' = 'fa'
+): string {
+  const name = identity.name || 'Unknown';
+  return generateStealthID(name, identity.publicKey, lang);
+}
+

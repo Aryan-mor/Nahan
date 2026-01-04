@@ -34,6 +34,7 @@ import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
+import { formatNahanIdentity } from './services/stealthId';
 
 type TabType = 'chats' | 'keys' | 'settings';
 
@@ -56,7 +57,7 @@ export default function App() {
     setActiveChat,
   } = useAppStore();
 
-  const { language, isLocked, setLocked, activeTab, setActiveTab } = useUIStore();
+  const { language, isLocked, setLocked, activeTab, setActiveTab, camouflageLanguage } = useUIStore();
   const { t, i18n } = useTranslation();
 
   // Back Button Control
@@ -272,7 +273,7 @@ export default function App() {
   const handleCopyIdentity = async () => {
     if (!identity) return;
     try {
-      const data = `${identity.name}+${identity.publicKey}`;
+      const data = formatNahanIdentity(identity, camouflageLanguage || 'fa');
       await navigator.clipboard.writeText(data);
       toast.success('Identity copied to clipboard');
     } catch {
