@@ -53,10 +53,60 @@ export default function App() {
     confirmStealthSend,
     sessionPassphrase,
     processIncomingMessage,
+    setActiveChat,
   } = useAppStore();
 
   const { language, isLocked, setLocked, activeTab, setActiveTab } = useUIStore();
   const { t, i18n } = useTranslation();
+
+  // Back Button Control
+  const isPopState = useRef(false);
+  const prevActiveChat = useRef(activeChat);
+  const prevShowStealthModal = useRef(showStealthModal);
+
+  // Handle popstate (Browser Back Button)
+  useEffect(() => {
+    const handlePopState = () => {
+      // Priority: Stealth Modal > Active Chat
+      if (showStealthModal) {
+        isPopState.current = true;
+        setShowStealthModal(false);
+        return;
+      }
+      if (activeChat) {
+        isPopState.current = true;
+        setActiveChat(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeChat, showStealthModal, setActiveChat, setShowStealthModal]);
+
+  // Handle state changes (Push/Pop history)
+  useEffect(() => {
+    const isChatOpening = !prevActiveChat.current && activeChat;
+    const isModalOpening = !prevShowStealthModal.current && showStealthModal;
+
+    const isChatClosing = prevActiveChat.current && !activeChat;
+    const isModalClosing = prevShowStealthModal.current && !showStealthModal;
+
+    if (isChatOpening || isModalOpening) {
+      window.history.pushState({ modalOpen: true }, '');
+    }
+
+    if ((isChatClosing || isModalClosing) && !isPopState.current) {
+      // If closed manually (UI button), sync history
+      if (window.history.state?.modalOpen) {
+        window.history.back();
+      }
+    }
+
+    // Reset and update refs
+    isPopState.current = false;
+    prevActiveChat.current = activeChat;
+    prevShowStealthModal.current = showStealthModal;
+  }, [activeChat, showStealthModal]);
 
   // QR Modal
   const qrModal = useDisclosure();
