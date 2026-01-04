@@ -26,3 +26,12 @@ document
 *.sln
 *.sw?
 .env
+app/
+gradle/
+build.gradle
+gradle.properties
+gradle.properties
+gradlew
+gradlew.bat
+settings.gradle
+

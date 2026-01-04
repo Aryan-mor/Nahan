@@ -1,39 +1,48 @@
 {
-  "packageId": "io.github.aryan_mor.nahan",
+  "packageId": "io.github.aryan_mor.twa",
   "host": "aryan-mor.github.io",
   "name": "Nahan",
   "launcherName": "Nahan",
   "display": "standalone",
   "themeColor": "#020617",
-  "navigationColor": "#020617",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
   "backgroundColor": "#020617",
+  "enableNotifications": true,
   "startUrl": "/Nahan/",
-  "iconUrl": "https://aryan-mor.github.io/Nahan/maskable-icon.png",
+  "iconUrl": "https://aryan-mor.github.io/Nahan/pwa-512x512.png",
   "maskableIconUrl": "https://aryan-mor.github.io/Nahan/maskable-icon.png",
-  "appVersion": "1.0.0",
+  "monochromeIconUrl": "https://aryan-mor.github.io/Nahan/monochrome-icon.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\Aryan\\Documents\\Projects\\nahan\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
   "appVersionCode": 1,
+  "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://aryan-mor.github.io/Nahan/manifest.json",
   "fallbackType": "customtabs",
-  "features": {
-    "playBilling": {
-      "enabled": false
-    },
-    "locationDelegation": {
-      "enabled": false
-    },
-    "updateViaWifiOnly": {
-      "enabled": true
-    }
-  },
+  "features": {},
   "alphaDependencies": {
     "enabled": false
   },
-  "enableNotifications": true,
-  "shortcuts": [],
-  "splashScreenFadeOutDuration": 300,
-  "signingKey": {
-    "path": "./android.keystore",
-    "alias": "android"
-  }
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://aryan-mor.github.io/Nahan/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
 }
