@@ -45,17 +45,18 @@ export function useClipboardPermission(): ClipboardPermissionStatus {
               setPermissionState(result.state as PermissionState);
             };
           } catch (permError) {
-            // Permissions API might not support 'clipboard-read' name
-            // Fallback: assume prompt state (will be determined on first read attempt)
-            setPermissionState('prompt');
+            // Permissions API might not support 'clipboard-read' name (e.g. Firefox)
+            // In this case, we mark as unsupported to avoid prompting users
+            // where background clipboard reading is not possible
+            setPermissionState('unsupported');
           }
         } else {
-          // Permissions API not available - assume prompt state
-          setPermissionState('prompt');
+          // Permissions API not available - assume unsupported
+          setPermissionState('unsupported');
         }
       } catch (error) {
-        // Fallback: assume prompt state
-        setPermissionState('prompt');
+        // Fallback: assume unsupported on error
+        setPermissionState('unsupported');
       }
     };
 

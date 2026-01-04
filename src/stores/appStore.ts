@@ -53,6 +53,7 @@ interface AppState {
   addContact: (contact: Contact) => void;
   removeContact: (fingerprint: string) => Promise<void>;
   wipeData: () => Promise<void>;
+  clearAllMessages: () => Promise<void>;
 
   // New Actions
   unlockApp: (pin: string) => Promise<boolean>;
@@ -309,6 +310,11 @@ export const useAppStore = create<AppState>()(
         });
         // Reload to ensure clean slate
         window.location.reload();
+      },
+
+      clearAllMessages: async () => {
+        await storageService.clearAllMessages();
+        set({ messages: [] });
       },
 
       unlockApp: async (pin: string) => {

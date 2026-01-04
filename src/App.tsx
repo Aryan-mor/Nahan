@@ -145,13 +145,19 @@ export default function App() {
     // 2. User is authenticated
     // 3. App is not locked
     // 4. We haven't shown it before (check localStorage)
+    // 5. Browser is likely to support it (Chromium-based, not Firefox)
+    const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+    const isChromium = 'chrome' in window;
+
     if (
       clipboardPermission.state !== 'granted' &&
       clipboardPermission.state !== 'unsupported' &&
       !isLocked &&
       !!identity &&
       !!sessionPassphrase &&
-      !localStorage.getItem('clipboard-permission-prompt-shown')
+      !localStorage.getItem('clipboard-permission-prompt-shown') &&
+      !isFirefox &&
+      isChromium
     ) {
       // Show prompt after a short delay to avoid showing immediately on load
       const timer = setTimeout(() => {

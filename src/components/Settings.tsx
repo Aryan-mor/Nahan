@@ -1,47 +1,43 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { toast } from 'sonner';
-import { useTranslation } from 'react-i18next';
 import {
-  Card,
-  CardHeader,
-  CardBody,
   Button,
-  Switch,
+  Card,
+  CardBody,
+  CardHeader,
+  Divider,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
   Select,
   SelectItem,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
+  Switch,
   useDisclosure,
-  Divider,
-  Input
 } from '@heroui/react';
+import { motion } from 'framer-motion';
 import {
-  Settings as SettingsIcon,
-  Trash2,
-  Download,
-  Globe,
-  Shield,
-  Clock,
   AlertTriangle,
+  Clock,
+  Download,
   Eye,
   EyeOff,
+  Globe,
   Info,
-  Lock
+  Lock,
+  Settings as SettingsIcon,
+  Shield,
+  Trash2,
 } from 'lucide-react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
 export function Settings() {
-  const {
-    identity,
-    contacts,
-    initializeApp
-  } = useAppStore();
+  const { identity, contacts, initializeApp, lockApp, wipeData, clearAllMessages } = useAppStore();
 
   const {
     isStandalone,
@@ -49,11 +45,20 @@ export function Settings() {
     language,
     setLanguage,
     camouflageLanguage,
-    setCamouflageLanguage
+    setCamouflageLanguage,
   } = useUIStore();
   const { t } = useTranslation();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const { isOpen: isExportOpen, onOpen: onExportOpen, onOpenChange: onExportOpenChange } = useDisclosure();
+  const {
+    isOpen: isExportOpen,
+    onOpen: onExportOpen,
+    onOpenChange: onExportOpenChange,
+  } = useDisclosure();
+  const {
+    isOpen: isLogoutOpen,
+    onOpen: onLogoutOpen,
+    onOpenChange: onLogoutOpenChange,
+  } = useDisclosure();
 
   const [autoClearClipboard, setAutoClearClipboard] = useState(true);
   const [clipboardTimeout, setClipboardTimeout] = useState(60);
@@ -62,23 +67,37 @@ export function Settings() {
   const [showExportPassword, setShowExportPassword] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    onLogoutOpen();
+  };
+
+  const handleLogoutConfirm = async () => {
+    console.log(`[${new Date().toISOString()}] Logout & Wipe action initiated by user`);
+    setIsLoggingOut(true);
+    try {
+      await wipeData();
+      toast.success(t('lock.logged_out', 'Logged out successfully'));
+    } catch (error) {
+      console.error('Logout failed:', error);
+      toast.error(t('settings.logout.error', 'Logout failed'));
+      setIsLoggingOut(false);
+    }
+  };
 
   const handleClearAllData = async () => {
-    if (confirm(t('settings.clear.confirm_alert'))) {
-      setIsClearing(true);
-      try {
-        await storageService.clearAllData();
-        toast.success(t('settings.clear.success'));
-
-        // Reinitialize the app
-        await initializeApp();
-      } catch (error) {
-        toast.error(t('settings.clear.error'));
-        console.error(error);
-      } finally {
-        setIsClearing(false);
-        onOpenChange();
-      }
+    console.log(`[${new Date().toISOString()}] Clear Message Data action initiated by user`);
+    setIsClearing(true);
+    try {
+      await clearAllMessages();
+      toast.success(t('settings.clear.success'));
+    } catch (error) {
+      toast.error(t('settings.clear.error'));
+      console.error(error);
+    } finally {
+      setIsClearing(false);
+      onOpenChange();
     }
   };
 
@@ -109,17 +128,19 @@ export function Settings() {
       const exportData = {
         version: '1.0',
         timestamp: new Date().toISOString(),
-        identity: identity ? {
-          ...identity,
-          // Note: Private keys are already encrypted with user passphrases
-          privateKey: identity.privateKey
-        } : null,
+        identity: identity
+          ? {
+              ...identity,
+              // Note: Private keys are already encrypted with user passphrases
+              privateKey: identity.privateKey,
+            }
+          : null,
         contacts: allContacts,
         settings: {
           language,
           autoClearClipboard,
-          clipboardTimeout
-        }
+          clipboardTimeout,
+        },
       };
 
       // Create encrypted export (simplified - in production use proper encryption)
@@ -187,23 +208,31 @@ export function Settings() {
       <Card className="bg-industrial-900 border-industrial-800">
         <CardHeader className="flex items-center gap-3 p-4">
           <SettingsIcon className="w-5 h-5 text-industrial-400" />
-          <h2 className="text-lg font-semibold text-industrial-100">{t('settings.general.title')}</h2>
+          <h2 className="text-lg font-semibold text-industrial-100">
+            {t('settings.general.title')}
+          </h2>
         </CardHeader>
         <CardBody className="space-y-6 p-4 pt-0">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-industrial-300">{t('settings.general.language')}</label>
+            <label className="text-sm font-medium text-industrial-300">
+              {t('settings.general.language')}
+            </label>
             <Select
               selectedKeys={[language || 'en']}
               onSelectionChange={(keys) => setLanguage(Array.from(keys)[0] as string)}
               className="w-full max-w-xs"
               startContent={<Globe className="w-4 h-4 text-industrial-400" />}
               classNames={{
-                trigger: "bg-industrial-950 border-industrial-700 hover:bg-industrial-800",
-                popoverContent: "bg-industrial-900 border-industrial-800"
+                trigger: 'bg-industrial-950 border-industrial-700 hover:bg-industrial-800',
+                popoverContent: 'bg-industrial-900 border-industrial-800',
               }}
             >
               {languages.map((lang) => (
-                <SelectItem key={lang.key} textValue={lang.label} className="text-industrial-100 data-[hover=true]:bg-industrial-800">
+                <SelectItem
+                  key={lang.key}
+                  textValue={lang.label}
+                  className="text-industrial-100 data-[hover=true]:bg-industrial-800"
+                >
                   <div className="flex items-center space-x-2">
                     <span>{lang.flag}</span>
                     <span>{lang.label}</span>
@@ -214,24 +243,36 @@ export function Settings() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-industrial-300">Default Camouflage Language</label>
+            <label className="text-sm font-medium text-industrial-300">
+              Default Camouflage Language
+            </label>
             <Select
               selectedKeys={[camouflageLanguage || 'fa']}
-              onSelectionChange={(keys) => setCamouflageLanguage(Array.from(keys)[0] as 'fa' | 'en')}
+              onSelectionChange={(keys) =>
+                setCamouflageLanguage(Array.from(keys)[0] as 'fa' | 'en')
+              }
               className="w-full max-w-xs"
               startContent={<Shield className="w-4 h-4 text-industrial-400" />}
               classNames={{
-                trigger: "bg-industrial-950 border-industrial-700 hover:bg-industrial-800",
-                popoverContent: "bg-industrial-900 border-industrial-800"
+                trigger: 'bg-industrial-950 border-industrial-700 hover:bg-industrial-800',
+                popoverContent: 'bg-industrial-900 border-industrial-800',
               }}
             >
-              <SelectItem key="fa" textValue="Persian (Farsi)" className="text-industrial-100 data-[hover=true]:bg-industrial-800">
+              <SelectItem
+                key="fa"
+                textValue="Persian (Farsi)"
+                className="text-industrial-100 data-[hover=true]:bg-industrial-800"
+              >
                 <div className="flex items-center space-x-2">
                   <span>🇮🇷</span>
                   <span>Persian (Farsi)</span>
                 </div>
               </SelectItem>
-              <SelectItem key="en" textValue="English" className="text-industrial-100 data-[hover=true]:bg-industrial-800">
+              <SelectItem
+                key="en"
+                textValue="English"
+                className="text-industrial-100 data-[hover=true]:bg-industrial-800"
+              >
                 <div className="flex items-center space-x-2">
                   <span>🇺🇸</span>
                   <span>English</span>
@@ -247,22 +288,28 @@ export function Settings() {
               <div className="flex items-center space-x-3">
                 <Clock className="w-5 h-5 text-industrial-400" />
                 <div>
-                  <p className="font-medium text-industrial-100">{t('settings.general.clipboard.title')}</p>
-                  <p className="text-sm text-industrial-400">{t('settings.general.clipboard.subtitle')}</p>
+                  <p className="font-medium text-industrial-100">
+                    {t('settings.general.clipboard.title')}
+                  </p>
+                  <p className="text-sm text-industrial-400">
+                    {t('settings.general.clipboard.subtitle')}
+                  </p>
                 </div>
               </div>
               <Switch
                 isSelected={autoClearClipboard}
                 onValueChange={setAutoClearClipboard}
                 classNames={{
-                  wrapper: "group-data-[selected=true]:bg-industrial-600"
+                  wrapper: 'group-data-[selected=true]:bg-industrial-600',
                 }}
               />
             </div>
 
             {autoClearClipboard && (
               <div className="ml-8 space-y-2">
-                <label className="text-sm font-medium text-industrial-300">{t('settings.general.clipboard.timeout')}</label>
+                <label className="text-sm font-medium text-industrial-300">
+                  {t('settings.general.clipboard.timeout')}
+                </label>
                 <Input
                   type="number"
                   value={clipboardTimeout.toString()}
@@ -271,8 +318,9 @@ export function Settings() {
                   max={300}
                   className="max-w-xs"
                   classNames={{
-                    input: "text-industrial-100",
-                    inputWrapper: "bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-industrial-500"
+                    input: 'text-industrial-100',
+                    inputWrapper:
+                      'bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-industrial-500',
                   }}
                 />
               </div>
@@ -285,17 +333,19 @@ export function Settings() {
       <Card className="bg-industrial-900 border-industrial-800">
         <CardHeader className="flex items-center gap-3 p-4">
           <Shield className="w-5 h-5 text-industrial-400" />
-          <h2 className="text-lg font-semibold text-industrial-100">{t('settings.security.title')}</h2>
+          <h2 className="text-lg font-semibold text-industrial-100">
+            {t('settings.security.title')}
+          </h2>
         </CardHeader>
         <CardBody className="space-y-6 p-4 pt-0">
           <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
             <div className="flex items-center space-x-3 mb-3">
               <Info className="w-5 h-5 text-blue-400" />
               <div>
-                <p className="font-medium text-industrial-100">{t('settings.security.info.title')}</p>
-                <p className="text-sm text-industrial-400">
-                  {t('settings.security.info.desc')}
+                <p className="font-medium text-industrial-100">
+                  {t('settings.security.info.title')}
                 </p>
+                <p className="text-sm text-industrial-400">{t('settings.security.info.desc')}</p>
               </div>
             </div>
             <ul className="text-sm text-industrial-400 space-y-1 list-disc list-inside">
@@ -312,15 +362,19 @@ export function Settings() {
             <div className="flex items-center space-x-3">
               <AlertTriangle className="w-5 h-5 text-yellow-400" />
               <div>
-                <p className="font-medium text-industrial-100">{t('settings.security.advanced.title')}</p>
-                <p className="text-sm text-industrial-400">{t('settings.security.advanced.subtitle')}</p>
+                <p className="font-medium text-industrial-100">
+                  {t('settings.security.advanced.title')}
+                </p>
+                <p className="text-sm text-industrial-400">
+                  {t('settings.security.advanced.subtitle')}
+                </p>
               </div>
             </div>
             <Switch
               isSelected={showAdvanced}
               onValueChange={setShowAdvanced}
               classNames={{
-                wrapper: "group-data-[selected=true]:bg-industrial-600"
+                wrapper: 'group-data-[selected=true]:bg-industrial-600',
               }}
             />
           </div>
@@ -330,11 +384,11 @@ export function Settings() {
               <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="font-medium text-yellow-400">{t('settings.security.advanced.warning')}</span>
+                  <span className="font-medium text-yellow-400">
+                    {t('settings.security.advanced.warning')}
+                  </span>
                 </div>
-                <p className="text-sm text-yellow-300">
-                  {t('settings.security.advanced.warning')}
-                </p>
+                <p className="text-sm text-yellow-300">{t('settings.security.advanced.warning')}</p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -347,6 +401,16 @@ export function Settings() {
                   className="flex-1"
                 >
                   {t('settings.security.advanced.export')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="danger"
+                  startContent={<Lock className="w-4 h-4" />}
+                  onPress={handleLogout}
+                  className="flex-1"
+                >
+                  {t('settings.security.advanced.logout', 'Logout')}
                 </Button>
                 <Button
                   size="sm"
@@ -399,7 +463,9 @@ export function Settings() {
             <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-industrial-400">{t('settings.data.current_identity')}</p>
+                  <p className="text-sm text-industrial-400">
+                    {t('settings.data.current_identity')}
+                  </p>
                   <p className="text-lg font-bold text-industrial-100 truncate max-w-[120px]">
                     {identity?.name || t('settings.data.none')}
                   </p>
@@ -413,10 +479,33 @@ export function Settings() {
         </CardBody>
       </Card>
 
-      {/* Export Modal */}
+      {/* Danger Zone */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Button
+          size="lg"
+          color="danger"
+          variant="flat"
+          startContent={<Lock className="w-5 h-5" />}
+          onPress={handleLogout}
+          className="w-full"
+        >
+          {t('settings.logout.title', 'Logout')}
+        </Button>
+        <Button
+          size="lg"
+          color="danger"
+          startContent={<Trash2 className="w-5 h-5" />}
+          onPress={onOpen}
+          className="w-full"
+        >
+          {t('settings.clear.title')}
+        </Button>
+      </div>
+
+      {/* Logout Modal */}
       <Modal
-        isOpen={isExportOpen}
-        onOpenChange={onExportOpenChange}
+        isOpen={isLogoutOpen}
+        onOpenChange={onLogoutOpenChange}
         size="md"
         placement="center"
         classNames={{
@@ -428,17 +517,61 @@ export function Settings() {
         <ModalContent>
           {(onClose) => (
             <>
+              <ModalHeader>{t('settings.logout.title', 'Logout')}</ModalHeader>
+              <ModalBody className="py-6">
+                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                    <span className="font-medium text-yellow-400">{t('settings.security.advanced.warning')}</span>
+                  </div>
+                  <p className="text-sm text-yellow-300">
+                    {t('settings.logout.warning', 'You will be logged out.')}
+                  </p>
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button color="primary" variant="light" onPress={onClose}>
+                  {t('settings.logout.cancel', 'Cancel')}
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleLogoutConfirm}
+                  isLoading={isLoggingOut}
+                >
+                  {t('settings.logout.confirm', 'Logout')}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal
+        isOpen={isExportOpen}
+        onOpenChange={onExportOpenChange}
+        size="md"
+        placement="center"
+        classNames={{
+          base: 'bg-industrial-900 border border-industrial-800 m-4',
+          header: 'border-b border-industrial-800',
+          footer: 'border-t border-industrial-800',
+        }}
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
               <ModalHeader>{t('settings.export.title')}</ModalHeader>
               <ModalBody className="py-6">
                 <div className="space-y-4">
                   <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
                       <Info className="w-4 h-4 text-blue-400" />
-                      <span className="font-medium text-blue-400">{t('settings.export.info_title')}</span>
+                      <span className="font-medium text-blue-400">
+                        {t('settings.export.info_title')}
+                      </span>
                     </div>
-                    <p className="text-sm text-industrial-400">
-                      {t('settings.export.info_desc')}
-                    </p>
+                    <p className="text-sm text-industrial-400">{t('settings.export.info_desc')}</p>
                   </div>
 
                   <Input
@@ -454,17 +587,24 @@ export function Settings() {
                         onClick={() => setShowExportPassword(!showExportPassword)}
                         className="focus:outline-none"
                       >
-                        {showExportPassword ? <EyeOff className="w-4 h-4 text-industrial-400" /> : <Eye className="w-4 h-4 text-industrial-400" />}
+                        {showExportPassword ? (
+                          <EyeOff className="w-4 h-4 text-industrial-400" />
+                        ) : (
+                          <Eye className="w-4 h-4 text-industrial-400" />
+                        )}
                       </button>
                     }
                     classNames={{
-                      input: "text-industrial-100",
-                      inputWrapper: "bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-industrial-500"
+                      input: 'text-industrial-100',
+                      inputWrapper:
+                        'bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-industrial-500',
                     }}
                   />
 
                   <div className="text-xs text-industrial-400 bg-industrial-950 p-3 rounded-lg border border-industrial-800">
-                    <p className="font-medium mb-1 text-industrial-300">{t('settings.export.notes_title')}</p>
+                    <p className="font-medium mb-1 text-industrial-300">
+                      {t('settings.export.notes_title')}
+                    </p>
                     <ul className="list-disc list-inside space-y-1">
                       <li>{t('settings.export.notes.1')}</li>
                       <li>{t('settings.export.notes.2')}</li>
@@ -477,11 +617,7 @@ export function Settings() {
                 <Button color="danger" variant="light" onPress={onClose}>
                   {t('settings.export.cancel')}
                 </Button>
-                <Button
-                  color="primary"
-                  onPress={handleExportData}
-                  isLoading={isExporting}
-                >
+                <Button color="primary" onPress={handleExportData} isLoading={isExporting}>
                   {t('settings.export.confirm')}
                 </Button>
               </ModalFooter>
@@ -497,57 +633,34 @@ export function Settings() {
         size="md"
         placement="center"
         classNames={{
-          base: "bg-industrial-900 border border-industrial-800 m-4",
-          header: "border-b border-industrial-800",
-          footer: "border-t border-industrial-800"
+          base: 'bg-industrial-900 border border-industrial-800 m-4',
+          header: 'border-b border-industrial-800',
+          footer: 'border-t border-industrial-800',
         }}
       >
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>{t('settings.clear.title')}</ModalHeader>
+              <ModalHeader>{t('settings.clear_messages.title')}</ModalHeader>
               <ModalBody className="py-6">
                 <div className="space-y-4">
                   <div className="bg-red-900/20 border border-red-700 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
                       <AlertTriangle className="w-4 h-4 text-red-400" />
-                      <span className="font-medium text-red-400">{t('settings.security.advanced.warning')}</span>
+                      <span className="font-medium text-red-400">
+                        {t('settings.security.advanced.warning')}
+                      </span>
                     </div>
-                    <p className="text-sm text-red-300">
-                      {t('settings.clear.warning')}
-                    </p>
-                  </div>
-
-                  <div className="bg-industrial-800 border border-industrial-700 rounded-lg p-4">
-                    <p className="text-sm text-industrial-400">
-                      {t('settings.clear.data_list_title')}
-                    </p>
-                    <ul className="text-sm text-industrial-400 mt-2 space-y-1">
-                      <li>{t('settings.clear.data_list.identities', { count: identity ? 1 : 0 })}</li>
-                      <li>{t('settings.clear.data_list.contacts', { count: contacts.length })}</li>
-                      <li>{t('settings.clear.data_list.messages')}</li>
-                      <li>{t('settings.clear.data_list.settings')}</li>
-                    </ul>
-                  </div>
-
-                  <div className="text-xs text-industrial-400 bg-industrial-950 p-3 rounded-lg border border-industrial-800">
-                    <p className="font-medium mb-1 text-industrial-300">{t('settings.clear.recommendation_title')}</p>
-                    <p>
-                      {t('settings.clear.recommendation')}
-                    </p>
+                    <p className="text-sm text-red-300">{t('settings.clear_messages.warning')}</p>
                   </div>
                 </div>
               </ModalBody>
               <ModalFooter>
                 <Button color="primary" variant="light" onPress={onClose}>
-                  {t('settings.clear.cancel')}
+                  {t('settings.clear_messages.cancel')}
                 </Button>
-                <Button
-                  color="danger"
-                  onPress={handleClearAllData}
-                  isLoading={isClearing}
-                >
-                  {t('settings.clear.confirm')}
+                <Button color="danger" onPress={handleClearAllData} isLoading={isClearing}>
+                  {t('settings.clear_messages.confirm')}
                 </Button>
               </ModalFooter>
             </>

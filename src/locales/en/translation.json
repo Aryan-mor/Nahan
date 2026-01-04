@@ -182,7 +182,8 @@
         "subtitle": "Show additional security settings",
         "warning": "These options are for advanced users. Use with caution.",
         "export": "Export All Data",
-        "clear": "Clear All Data"
+        "clear": "Clear & Logout",
+        "logout": "Logout"
       }
     },
     "data": {
@@ -210,6 +211,18 @@
       "error": "Failed to export data",
       "password_error": "Please enter a password for the export file",
       "password_length_error": "Password must be at least 8 characters long"
+    },
+    "logout": {
+      "title": "Logout & Wipe",
+      "warning": "Logging out will permanently delete all your data. This action cannot be undone.",
+      "confirm": "Logout & Wipe",
+      "cancel": "Cancel"
+    },
+    "clear_messages": {
+      "title": "Clear Message Data",
+      "warning": "This will remove all message history but keep your contacts and identity. You will remain logged in. This action cannot be undone.",
+      "confirm": "Clear Messages",
+      "cancel": "Cancel"
     },
     "clear": {
       "title": "Clear All Data",

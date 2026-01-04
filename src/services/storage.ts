@@ -639,6 +639,31 @@ export class StorageService {
   }
 
   /**
+   * Clear only message data (keep identities and contacts)
+   */
+  async clearAllMessages(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const tx = this.db.transaction('secure_vault', 'readwrite');
+      const store = tx.objectStore('secure_vault');
+      let cursor = await store.openCursor();
+
+      while (cursor) {
+        // ID_PREFIX.MESSAGE is 'msg_'
+        if (cursor.key.toString().startsWith(ID_PREFIX.MESSAGE)) {
+          await cursor.delete();
+        }
+        cursor = await cursor.continue();
+      }
+      await tx.done;
+    } catch (error) {
+      console.error('Failed to clear messages:', error);
+      throw new Error('Failed to clear messages');
+    }
+  }
+
+  /**
    * Close the database connection
    */
   async close(): Promise<void> {

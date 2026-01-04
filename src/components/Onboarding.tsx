@@ -22,6 +22,7 @@ export function Onboarding() {
   const [confirmedPin, setConfirmedPin] = useState('');
   const [name, setName] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
   const handleCreatePin = (value: string) => {
@@ -33,10 +34,12 @@ export function Onboarding() {
   };
 
   const handleConfirmPin = (value: string) => {
+    setIsVerifying(true);
     setConfirmedPin(value);
     if (value === pin) {
       setTimeout(() => {
         setStep('warning');
+        setIsVerifying(false);
       }, 300);
     } else {
       toast.error(t('auth.error.pin_mismatch'));
@@ -44,6 +47,7 @@ export function Onboarding() {
       setPin('');
       setTimeout(() => {
         setStep('create-pin');
+        setIsVerifying(false);
       }, 1000);
     }
   };
@@ -133,6 +137,7 @@ export function Onboarding() {
               onComplete={handleConfirmPin}
               label={t('auth.confirm_pin.label')}
               subLabel={t('auth.confirm_pin.sublabel')}
+              isLoading={isVerifying}
             />
             <div className="flex justify-center mt-4">
               <button
