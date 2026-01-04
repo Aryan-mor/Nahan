@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "releaseDate": "2026-01-03",
+  "version": "2.0.0",
+  "releaseDate": "2026-01-04",
   "changes": [
     "Initial PWA Release",
     "Offline-first architecture",

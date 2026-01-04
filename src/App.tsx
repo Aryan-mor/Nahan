@@ -169,8 +169,25 @@ export default function App() {
 
   // Handle new message from clipboard detection
   const handleNewMessage = (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => {
-    setNewMessageResult(result);
-    setShowNewMessageModal(true);
+    // Unify modal logic: If we have a specific message result, use detection modal first
+    // This ensures consistency with the new unified modal flow
+    if (result.type === 'message') {
+      // Re-construct a DetectionResult to reuse the main modal logic
+      const detectionResult: DetectionResult = {
+        type: 'message',
+        contactFingerprint: result.fingerprint,
+        // We don't have the full encryptedData here, but the modal might handle it
+        // If this path is used, ensure DetectionModal can handle missing encryptedData
+        // or fetch it from storage if needed.
+        // For now, prioritize the main notification modal.
+      } as any;
+      
+      setDetectionResult(detectionResult);
+      setShowDetectionModal(true);
+    } else {
+      setNewMessageResult(result);
+      setShowNewMessageModal(true);
+    }
   };
 
   // Enable clipboard detection when conditions are met

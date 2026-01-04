@@ -341,10 +341,16 @@ export class CryptoService {
       // Decrypt recipient's private key
       const recipientPrivateKeyBytes = await decryptPrivateKey(recipientPrivateKey, passphrase);
 
+      // Log for debugging decryption issues
+      console.log("[DEBUG-CRYPTO] Sender Key:", senderPublicKey, "Nonce:", nonce);
+
       // Decrypt using nacl.box (X25519 authenticated encryption)
       // nacl.box.open automatically verifies the Poly1305 MAC, providing authentication
       // No separate Ed25519 signature needed - nacl.box is an AEAD
       const decrypted = nacl.box.open(encryptedPayload, nonce, senderPublicKey, recipientPrivateKeyBytes);
+
+      // ADD DEBUG LOGS
+      console.log("[DEBUG-CRYPTO] Sender Key Hash:", naclUtil.encodeBase64(senderPublicKey).slice(0, 4));
 
       if (!decrypted) {
         throw new Error('Decryption failed - invalid key or corrupted message');
@@ -587,6 +593,10 @@ export class CryptoService {
 
       // Sender public key (32 bytes)
       const senderPublicKeyBytes = messageBytes.slice(offset, offset + 32);
+      
+      // ADD DEBUG LOGS
+      console.log("[DEBUG-CRYPTO] Message Version:", version, "Sender Key Hash:", naclUtil.encodeBase64(senderPublicKeyBytes).slice(0, 4));
+
       offset += 32;
 
       // Signature (64 bytes)

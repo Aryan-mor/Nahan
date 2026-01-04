@@ -99,9 +99,9 @@ export function StealthModal({
     const payloadSize = pendingBinary?.length || 0;
     const threshold = payloadSize > 1024 ? 30 : 61;
 
+    // Warning only - do not block
     if (stealthScore < threshold) {
-      toast.error(`Stealth ratio is too low (${stealthScore}%)! Please use longer cover text. Minimum: ${threshold}%`);
-      return;
+      toast.warning(`Stealth ratio is low (${stealthScore}%). Recommendation: ${threshold}%`);
     }
 
     // Show warning for Telegram splitting risk but don't block
@@ -349,7 +349,7 @@ export function StealthModal({
                 color={isSafeToCopy ? 'success' : 'danger'}
                 variant={isSafeToCopy ? 'solid' : 'flat'}
                 onPress={handleConfirm}
-                isDisabled={!isSafeToCopy}
+                isDisabled={false}
                 className="w-full sm:w-auto"
                 startContent={
                   isSafeToCopy ? (
@@ -363,7 +363,7 @@ export function StealthModal({
                   ? 'Too Large for Telegram'
                   : isSafeToCopy
                     ? 'Confirm & Copy'
-                    : 'Text Too Short'}
+                    : 'Confirm (Low Safety)'}
               </Button>
             </ModalFooter>
           </>

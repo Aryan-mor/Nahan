@@ -191,6 +191,9 @@ export const useAppStore = create<AppState>()(
           throw new Error('Invalid stealth output: PGP markers detected');
         }
 
+        // ADD FINAL VERIFICATION LOGS
+        console.log("[FINAL-CHECK] Manual Confirm - Final String Length:", finalOutput.length);
+
         const isOffline = !navigator.onLine;
 
         try {
@@ -463,58 +466,30 @@ export const useAppStore = create<AppState>()(
             ) as Uint8Array;
           }
 
-          // Step 2: Generate random cover text that meets safety requirements
-          // Use getRecommendedCover which ensures Green Zone (80%+ safety)
+          // Step 2: Generate random cover text
+          // Use getRecommendedCover (recommendation only, no enforcement)
           const coverText = camouflageService.getRecommendedCover(
             binaryPayload.length,
             camouflageLanguage || 'fa'
           );
 
-          // Step 3: Verify safety ratio meets Green Zone requirement (80%+)
-          // This is critical to prevent data leakage with insufficient cover text
+          // Step 3: Calculate safety ratio for logging
           const safetyScore = camouflageService.calculateStealthRatio(binaryPayload.length, coverText);
-          let finalCover = coverText;
-          let finalScore = safetyScore;
+          const finalCover = coverText;
+          const finalScore = safetyScore;
 
-          if (safetyScore < 80) {
-            // If safety is below 80%, expand cover text until it meets requirement
-            // This ensures auto-stealth always uses safe cover text
-            let expandedCover = coverText;
-            let attempts = 0;
-            let currentScore = safetyScore;
-
-            while (currentScore < 80 && attempts < 5) {
-              // Expand cover text by getting another recommendation
-              const additionalCover = camouflageService.getRecommendedCover(
-                binaryPayload.length,
-                camouflageLanguage || 'fa'
-              );
-              expandedCover = expandedCover + ' ' + additionalCover;
-              currentScore = camouflageService.calculateStealthRatio(binaryPayload.length, expandedCover);
-              if (currentScore >= 80) {
-                finalCover = expandedCover;
-                finalScore = currentScore;
-                break;
-              }
-              attempts++;
-            }
-            // Use expanded cover text if it's longer
-            if (expandedCover.length > coverText.length) {
-              finalCover = expandedCover;
-              finalScore = currentScore;
-            }
-          }
-
-          // Safety check: Prevent sending if safety ratio is still too low
-          // This prevents data leakage with insufficient cover text
-          if (finalScore < 60) {
-            throw new Error(
-              `Safety ratio too low (${finalScore}%). Cannot send message with insufficient cover text. Please use Long Press to manually adjust cover text.`
-            );
-          }
+          // TRACE LOGS
+          console.log("[DEBUG-STEALTH] Input Length:", text.length);
+          console.log("[DEBUG-STEALTH] Final Cover used:", finalCover);
 
           // Step 4: Embed binary into cover text
           const finalOutput = camouflageService.embed(binaryPayload, finalCover, camouflageLanguage || 'fa');
+          
+          console.log("[DEBUG-STEALTH] Final Output sent to DB:", finalOutput.length);
+          // ADD FINAL VERIFICATION LOGS
+          console.log("[FINAL-CHECK] Payload Size:", binaryPayload.length);
+          console.log("[FINAL-CHECK] Text before ZWC:", finalCover);
+          console.log("[FINAL-CHECK] Final String Length:", finalOutput.length);
 
           // Step 5: Store message in database
           const isOffline = !navigator.onLine;

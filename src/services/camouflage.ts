@@ -522,8 +522,8 @@ export class CamouflageService {
   /**
    * Embeds payload into cover text using Nahan-Tag Protocol
    * Injects exactly 2 Tags after every visible character
-   * If cover text is too short, automatically expands using poetry database
-   * NEVER uses period anchors or trailing spaces
+   * STRICT: No expansion, no poetry, no automatic appending.
+   * Uses EXACTLY the cover text provided by the user.
    */
   embed(payload: Uint8Array, coverText: string, lang: 'fa' | 'en' = 'fa'): string {
     // TRACE B [Tag Input]
@@ -536,19 +536,15 @@ export class CamouflageService {
     const tagString = this.encodeToZWC(payload);
     const totalTags = tagString.length;
 
-    // Calculate required visible characters (2 Tags per visible char)
-    const requiredVisibleChars = Math.ceil(totalTags / TAGS_PER_VISIBLE_CHAR);
-
-    // Expand cover text if too short using poetry database (with language support)
-    const expandedCoverText = this.expandCoverText(coverText, requiredVisibleChars, lang);
+    // Use EXACTLY the provided cover text - NO EXPANSION
+    const finalCoverText = coverText;
 
     // Build result: inject exactly 2 Tags after every visible character
-    // Use for...of loop to correctly handle emojis and special characters in poetry
-    // This prevents breaking 4-byte Unicode characters (surrogate pairs) into halves
+    // Use for...of loop to correctly handle emojis and special characters
     let result = '';
     let tagIndex = 0;
 
-    for (const char of expandedCoverText) {
+    for (const char of finalCoverText) {
       // Add the visible character (handles surrogate pairs correctly)
       result += char;
 
@@ -559,33 +555,14 @@ export class CamouflageService {
       }
     }
 
-    // If we still have Tags remaining (shouldn't happen with proper expansion, but safety check)
+    // If we still have Tags remaining (because cover text was too short)
+    // We append them to the END of the string
+    // This decreases stealth but ensures data integrity without forced poetry
     if (tagIndex < totalTags) {
-      console.warn(`⚠️ Warning: ${totalTags - tagIndex} Tags remaining after embedding. This should not happen.`);
-      // Add more visible characters from poetry database (use same language as embed)
-      const fallbackPoems = poetryDb[lang];
-      let additionalChars = '';
-      let poemIndex = 0;
+      console.warn(`⚠️ Warning: Cover text too short. Appending ${totalTags - tagIndex} remaining Tags to end of string.`);
       while (tagIndex < totalTags) {
-        if (additionalChars.length === 0 || additionalChars.endsWith(' ')) {
-          const poem = fallbackPoems[poemIndex % fallbackPoems.length];
-          // Join all lines of the poem with spaces
-          additionalChars += poem.content.join(' ');
-          poemIndex++;
-        } else {
-          additionalChars += ' ';
-        }
-
-        // Process additional characters using for...of to handle surrogate pairs correctly
-        for (const char of additionalChars) {
-          if (tagIndex >= totalTags) break;
-          result += char;
-          for (let j = 0; j < TAGS_PER_VISIBLE_CHAR && tagIndex < totalTags; j++) {
-            result += tagString[tagIndex];
-            tagIndex++;
-          }
-        }
-        additionalChars = '';
+        result += tagString[tagIndex];
+        tagIndex++;
       }
     }
 
