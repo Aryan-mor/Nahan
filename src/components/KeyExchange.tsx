@@ -28,7 +28,6 @@ import {
   EyeOff,
   Key,
   MessageSquare,
-  Plus,
   Share,
   Trash2,
   Upload,
@@ -37,8 +36,8 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { cryptoService } from '../services/crypto';
-import { storageService } from '../services/storage';
 import { generateStealthID } from '../services/stealthId';
+import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
@@ -51,7 +50,12 @@ export function KeyExchange({
 }: {
   defaultTab?: 'identity' | 'contacts';
   onDetection?: (result: DetectionResult) => void;
-  onNewMessage?: (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => void;
+  onNewMessage?: (result: {
+    type: 'message' | 'contact';
+    fingerprint: string;
+    isBroadcast: boolean;
+    senderName: string;
+  }) => void;
 }) {
   const {
     identity,
@@ -183,13 +187,16 @@ export function KeyExchange({
         return;
       }
 
-      const identity = await storageService.storeIdentity({
-        name: generateForm.name,
-        email: email,
-        publicKey: keyPair.publicKey,
-        privateKey: keyPair.privateKey,
-        fingerprint: keyPair.fingerprint,
-      }, sessionPassphrase);
+      const identity = await storageService.storeIdentity(
+        {
+          name: generateForm.name,
+          email: email,
+          publicKey: keyPair.publicKey,
+          privateKey: keyPair.privateKey,
+          fingerprint: keyPair.fingerprint,
+        },
+        sessionPassphrase,
+      );
 
       addIdentity(identity);
 
@@ -217,15 +224,6 @@ export function KeyExchange({
     } catch (error) {
       console.error('Failed to generate stealth ID:', error);
       toast.error('Failed to copy stealth ID');
-    }
-  };
-
-  const copyToClipboard = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(`${label} copied`);
-    } catch {
-      toast.error('Failed to copy');
     }
   };
 
@@ -348,7 +346,7 @@ export function KeyExchange({
 
           // If no name from prefix, try to get from key
           if (!name) {
-            name = (await cryptoService.getNameFromKey(publicKey)) || '';
+            name = (await cryptoService.getNameFromKey()) || '';
           }
         }
       }
@@ -415,7 +413,7 @@ export function KeyExchange({
 
         // If no name from prefix, try to get from key
         if (!name) {
-          name = await cryptoService.getNameFromKey(parsedKey);
+          name = await cryptoService.getNameFromKey();
         }
 
         // Transition to details step
@@ -458,7 +456,10 @@ export function KeyExchange({
         // Note: Modal will be closed by the parent component when DetectionModal/NewMessageModal is shown
       }
     } catch (error: unknown) {
-      const err = error as { message?: string; keyData?: { name?: string; username?: string; publicKey?: string; key?: string } };
+      const err = error as {
+        message?: string;
+        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+      };
       if (err.message === 'CONTACT_INTRO_DETECTED') {
         // UNIFICATION: Handle contact ID detection the same way as auto-detector
         if (onDetection && err.keyData) {
@@ -531,11 +532,14 @@ export function KeyExchange({
         return;
       }
 
-      const contact = await storageService.storeContact({
-        name: contactForm.name.trim(),
-        publicKey: cleanPublicKey,
-        fingerprint,
-      }, sessionPassphrase);
+      const contact = await storageService.storeContact(
+        {
+          name: contactForm.name.trim(),
+          publicKey: cleanPublicKey,
+          fingerprint,
+        },
+        sessionPassphrase,
+      );
 
       addContact(contact);
       toast.success('Contact added successfully');
@@ -603,9 +607,7 @@ export function KeyExchange({
                       className="w-20 h-20 text-2xl mx-auto mb-4 bg-industrial-800 text-industrial-100"
                     />
 
-                    <h2 className="text-2xl font-bold text-industrial-100 mb-1">
-                      {identity.name}
-                    </h2>
+                    <h2 className="text-2xl font-bold text-industrial-100 mb-1">{identity.name}</h2>
                     <div className="flex justify-center items-center gap-2 mb-6">
                       <Chip
                         size="sm"
@@ -749,7 +751,7 @@ export function KeyExchange({
                                 const stealthID = generateStealthID(
                                   contact.name,
                                   contact.publicKey,
-                                  camouflageLanguage || 'fa'
+                                  camouflageLanguage || 'fa',
                                 );
                                 await navigator.clipboard.writeText(stealthID);
                                 toast.success('Secure Stealth ID copied as poetry!');
@@ -891,7 +893,8 @@ export function KeyExchange({
                       }}
                     />
                     <p className="text-xs text-industrial-400">
-                      Paste the full PGP Public Key block, Stealth ID (Poetry), or encrypted message. The name will be automatically extracted.
+                      Paste the full PGP Public Key block, Stealth ID (Poetry), or encrypted
+                      message. The name will be automatically extracted.
                     </p>
                     <Button
                       color="primary"

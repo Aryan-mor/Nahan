@@ -30,10 +30,7 @@ const PROTOCOL_VERSION = 0x01;
  * Derive encryption key from passphrase using scrypt-like approach
  * For simplicity, we use PBKDF2 via Web Crypto API
  */
-async function deriveKeyFromPassphrase(
-  passphrase: string,
-  salt: Uint8Array,
-): Promise<Uint8Array> {
+async function deriveKeyFromPassphrase(passphrase: string, salt: Uint8Array): Promise<Uint8Array> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -46,7 +43,7 @@ async function deriveKeyFromPassphrase(
   const keyBits = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: salt as unknown as BufferSource,
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -60,10 +57,7 @@ async function deriveKeyFromPassphrase(
 /**
  * Encrypt private key with passphrase
  */
-async function encryptPrivateKey(
-  privateKey: Uint8Array,
-  passphrase: string,
-): Promise<string> {
+async function encryptPrivateKey(privateKey: Uint8Array, passphrase: string): Promise<string> {
   // Generate random salt
   const salt = nacl.randomBytes(16);
 
@@ -90,10 +84,7 @@ async function encryptPrivateKey(
 /**
  * Decrypt private key with passphrase
  */
-async function decryptPrivateKey(
-  encryptedKey: string,
-  passphrase: string,
-): Promise<Uint8Array> {
+async function decryptPrivateKey(encryptedKey: string, passphrase: string): Promise<Uint8Array> {
   const serialized = naclUtil.decodeBase64(encryptedKey);
 
   // Extract salt, nonce, and encrypted data
@@ -144,10 +135,6 @@ export class CryptoService {
     try {
       // Generate X25519 key pair for encryption (nacl.box)
       const encryptionKeyPair = nacl.box.keyPair();
-
-      // Generate Ed25519 key pair for signing
-      const signingKeyPair = nacl.sign.keyPair();
-
       // For simplicity, we use the same keypair for both (X25519)
       // In production, you might want separate keys
       const publicKey = encryptionKeyPair.publicKey;
@@ -218,9 +205,12 @@ export class CryptoService {
   /**
    * Deserialize encrypted message from Nahan Compact Protocol format
    */
-  private deserializeEncryptedMessage(
-    data: Uint8Array,
-  ): { version: number; nonce: Uint8Array; senderPublicKey: Uint8Array; encryptedPayload: Uint8Array } {
+  private deserializeEncryptedMessage(data: Uint8Array): {
+    version: number;
+    nonce: Uint8Array;
+    senderPublicKey: Uint8Array;
+    encryptedPayload: Uint8Array;
+  } {
     if (data.length < 1 + 24 + 32) {
       throw new Error('Invalid message format: too short');
     }
@@ -290,10 +280,10 @@ export class CryptoService {
       const serialized = this.serializeEncryptedMessage(nonce, senderPublicKeyBytes, finalPayload);
 
       // TRACE A [Binary Out]
-      console.log("TRACE A [Binary Out]:", {
+      console.log('TRACE A [Binary Out]:', {
         length: serialized.length,
         isUint8: serialized instanceof Uint8Array,
-        firstBytes: Array.from(serialized.slice(0, 10))
+        firstBytes: Array.from(serialized.slice(0, 10)),
       });
 
       if (options?.binary) {
@@ -328,7 +318,7 @@ export class CryptoService {
         } catch {
           // Fallback: treat as hex
           messageBytes = new Uint8Array(
-            encryptedMessage.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
+            encryptedMessage.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || [],
           );
         }
       } else {
@@ -336,21 +326,30 @@ export class CryptoService {
       }
 
       // Deserialize message
-      const { nonce, senderPublicKey, encryptedPayload } = this.deserializeEncryptedMessage(messageBytes);
+      const { nonce, senderPublicKey, encryptedPayload } =
+        this.deserializeEncryptedMessage(messageBytes);
 
       // Decrypt recipient's private key
       const recipientPrivateKeyBytes = await decryptPrivateKey(recipientPrivateKey, passphrase);
 
       // Log for debugging decryption issues
-      console.log("[DEBUG-CRYPTO] Sender Key:", senderPublicKey, "Nonce:", nonce);
+      console.log('[DEBUG-CRYPTO] Sender Key:', senderPublicKey, 'Nonce:', nonce);
 
       // Decrypt using nacl.box (X25519 authenticated encryption)
       // nacl.box.open automatically verifies the Poly1305 MAC, providing authentication
       // No separate Ed25519 signature needed - nacl.box is an AEAD
-      const decrypted = nacl.box.open(encryptedPayload, nonce, senderPublicKey, recipientPrivateKeyBytes);
+      const decrypted = nacl.box.open(
+        encryptedPayload,
+        nonce,
+        senderPublicKey,
+        recipientPrivateKeyBytes,
+      );
 
       // ADD DEBUG LOGS
-      console.log("[DEBUG-CRYPTO] Sender Key Hash:", naclUtil.encodeBase64(senderPublicKey).slice(0, 4));
+      console.log(
+        '[DEBUG-CRYPTO] Sender Key Hash:',
+        naclUtil.encodeBase64(senderPublicKey).slice(0, 4),
+      );
 
       if (!decrypted) {
         throw new Error('Decryption failed - invalid key or corrupted message');
@@ -459,7 +458,7 @@ export class CryptoService {
   /**
    * Extract name from key (not applicable for compact protocol, returns null)
    */
-  async getNameFromKey(publicKey: string): Promise<string | null> {
+  async getNameFromKey(): Promise<string | null> {
     // Nahan Compact Protocol doesn't embed names in keys
     return null;
   }
@@ -514,7 +513,10 @@ export class CryptoService {
 
       // Hash the X25519 public key to create a deterministic seed for Ed25519
       // This ensures both sender and receiver can derive the same Ed25519 public key
-      const hash = await crypto.subtle.digest('SHA-256', senderX25519PublicKey);
+      const hash = await crypto.subtle.digest(
+        'SHA-256',
+        senderX25519PublicKey as unknown as BufferSource,
+      );
       const seed = new Uint8Array(hash).slice(0, 32);
       const signingKeyPair = nacl.sign.keyPair.fromSeed(seed);
 
@@ -593,9 +595,14 @@ export class CryptoService {
 
       // Sender public key (32 bytes)
       const senderPublicKeyBytes = messageBytes.slice(offset, offset + 32);
-      
+
       // ADD DEBUG LOGS
-      console.log("[DEBUG-CRYPTO] Message Version:", version, "Sender Key Hash:", naclUtil.encodeBase64(senderPublicKeyBytes).slice(0, 4));
+      console.log(
+        '[DEBUG-CRYPTO] Message Version:',
+        version,
+        'Sender Key Hash:',
+        naclUtil.encodeBase64(senderPublicKeyBytes).slice(0, 4),
+      );
 
       offset += 32;
 
@@ -633,7 +640,10 @@ export class CryptoService {
         try {
           const senderX25519Key = naclUtil.decodeBase64(senderKeyStr);
           // Hash the X25519 public key to create the same seed used when signing
-          const hash = await crypto.subtle.digest('SHA-256', senderX25519Key);
+          const hash = await crypto.subtle.digest(
+            'SHA-256',
+            senderX25519Key as unknown as BufferSource,
+          );
           const seed = new Uint8Array(hash).slice(0, 32);
           const derivedEd25519KeyPair = nacl.sign.keyPair.fromSeed(seed);
           const derivedEd25519PublicKey = derivedEd25519KeyPair.publicKey;
@@ -685,4 +695,3 @@ export class CryptoService {
 }
 
 export const cryptoService = CryptoService.getInstance();
-
