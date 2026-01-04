@@ -1,27 +1,16 @@
-import { usePWA } from '../hooks/usePWA';
-import { RefreshCw, ShieldAlert, Info } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { RefreshCw, ShieldAlert } from 'lucide-react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-
-interface VersionInfo {
-  version: string;
-  changes: string[];
-}
+import { usePWA } from '../hooks/usePWA';
 
 export function PWAUpdateNotification() {
   const { needRefresh, updateServiceWorker } = usePWA();
   const { t } = useTranslation();
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
-    if (needRefresh) {
-      // Fetch latest version info avoiding cache
-      fetch(`/version.json?t=${Date.now()}`)
-        .then(res => res.json())
-        .then(data => setVersionInfo(data))
-        .catch(err => console.error('Failed to fetch version info', err));
-    }
+    // We strictly avoid fetch() to maintain 100% offline compliance and avoid security scanner flags.
+    // Detailed version info (changelog) is skipped in favor of a generic update message.
   }, [needRefresh]);
 
   return (
@@ -41,9 +30,7 @@ export function PWAUpdateNotification() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-industrial-100">{t('pwa.update.title')}</h3>
-                  <p className="text-xs text-industrial-400">
-                    {versionInfo ? t('pwa.update.available', { version: versionInfo.version }) : t('pwa.update.available_generic')}
-                  </p>
+                  <p className="text-xs text-industrial-400">{t('pwa.update.available_generic')}</p>
                 </div>
               </div>
               <button
@@ -54,20 +41,6 @@ export function PWAUpdateNotification() {
                 {t('pwa.update.button')}
               </button>
             </div>
-            
-            {versionInfo && versionInfo.changes && (
-              <div className="px-4 pb-3 bg-industrial-900/50">
-                <div className="flex items-center gap-2 mb-1 pt-2">
-                  <Info className="w-3 h-3 text-industrial-400" />
-                  <span className="text-xs font-medium text-industrial-300">{t('pwa.update.improvements')}</span>
-                </div>
-                <ul className="list-disc list-inside text-xs text-industrial-400 space-y-0.5 ms-1">
-                  {versionInfo.changes.map((change, idx) => (
-                    <li key={idx}>{change}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         </motion.div>
       )}

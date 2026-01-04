@@ -26,6 +26,7 @@ import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
 import { DetectionResult } from '../hooks/useClipboardDetection';
+import { dataURItoBlob } from '../lib/utils';
 import { MyQRModal } from './MyQRModal';
 
 export function KeyExchange({
@@ -210,8 +211,7 @@ export function KeyExchange({
   const copyQRData = async () => {
     if (!qrCodeDataUrl) return;
     try {
-      const response = await fetch(qrCodeDataUrl);
-      const blob = await response.blob();
+      const blob = dataURItoBlob(qrCodeDataUrl);
       await navigator.clipboard.write([
         new ClipboardItem({
           [blob.type]: blob,
@@ -227,8 +227,7 @@ export function KeyExchange({
   const shareQRCode = async () => {
     if (!qrCodeDataUrl || !identity) return;
     try {
-      const response = await fetch(qrCodeDataUrl);
-      const blob = await response.blob();
+      const blob = dataURItoBlob(qrCodeDataUrl);
       if (navigator.share && navigator.canShare) {
         const file = new File([blob], `nahan-${identity.name}-qr.png`, {
           type: 'image/png',

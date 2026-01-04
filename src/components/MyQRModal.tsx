@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAppStore } from '../stores/appStore';
+import { dataURItoBlob } from '../lib/utils';
 
 interface MyQRModalProps {
   isOpen: boolean;
@@ -67,8 +68,7 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
   const shareQR = async () => {
     if (!qrCodeDataUrl || !identity) return;
     try {
-      const response = await fetch(qrCodeDataUrl);
-      const blob = await response.blob();
+      const blob = dataURItoBlob(qrCodeDataUrl);
       const file = new File([blob], `nahan-${identity.name}.png`, { type: 'image/png' });
 
       if (navigator.share && navigator.canShare({ files: [file] })) {

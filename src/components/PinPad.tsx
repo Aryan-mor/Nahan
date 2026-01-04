@@ -1,4 +1,4 @@
-import { Delete, CornerDownLeft } from 'lucide-react';
+import { Delete, CornerDownLeft, Loader2 } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -83,20 +83,24 @@ export const PinPad: React.FC<PinPadProps> = ({
         <h2 className="text-2xl font-bold text-industrial-100 mb-2">{displayLabel}</h2>
         {subLabel && <p className="text-industrial-400 text-sm mb-6">{subLabel}</p>}
 
-        {/* Dots Display */}
-        <div className="flex justify-center gap-4 mb-4">
-          {Array.from({ length: maxLength }).map((_, i) => (
-            <div
-              key={i}
-              className={`w-4 h-4 rounded-full transition-all duration-200 ${
-                i < value.length
-                  ? error
-                    ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
-                    : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
-                  : 'bg-industrial-800 border border-industrial-700'
-              }`}
-            />
-          ))}
+        {/* Dots Display or Loading Spinner */}
+        <div className="flex justify-center gap-4 mb-4 min-h-[1rem] items-center">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-industrial-100" />
+          ) : (
+            Array.from({ length: maxLength }).map((_, i) => (
+              <div
+                key={i}
+                className={`w-4 h-4 rounded-full transition-all duration-200 ${
+                  i < value.length
+                    ? error
+                      ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
+                      : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
+                    : 'bg-industrial-800 border border-industrial-700'
+                }`}
+              />
+            ))
+          )}
         </div>
 
         {/* Error Message */}

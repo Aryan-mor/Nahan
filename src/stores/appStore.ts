@@ -31,6 +31,7 @@ interface AppState {
   // Chat (runtime state - never persisted)
   activeChat: Contact | null;
   messages: SecureMessage[];
+  chatSummaries: Record<string, SecureMessage | undefined>; // Cache for chat list last messages
   messageInput: string; // Global chat input state
   lastStorageUpdate: number; // Timestamp of last IndexedDB write - triggers UI reactivity
 
@@ -63,6 +64,7 @@ interface AppState {
   deleteMessage: (id: string) => Promise<void>;
   clearChatHistory: (fingerprint: string) => Promise<void>;
   refreshMessages: () => Promise<void>;
+  refreshChatSummaries: () => Promise<void>;
   processPendingMessages: () => Promise<number>;
   processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
   handleUniversalInput: (input: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
@@ -81,6 +83,7 @@ export const useAppStore = create<AppState>()(
       sessionPassphrase: null,
       activeChat: null,
       messages: [],
+      chatSummaries: {},
       messageInput: '', // Global chat input state
       lastStorageUpdate: Date.now(), // Initialize to current time for reactivity
 
@@ -375,6 +378,9 @@ export const useAppStore = create<AppState>()(
             contacts: decryptedContacts,
           });
 
+          // Pre-load chat summaries while still in "unlocking" state
+          await get().refreshChatSummaries();
+
           // Step 6: Update UI lock state in uiStore
           useUIStore.getState().setLocked(false);
           useUIStore.getState().resetFailedAttempts();
@@ -668,6 +674,31 @@ export const useAppStore = create<AppState>()(
           const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint, sessionPassphrase);
           set({ messages });
         }
+      },
+
+      refreshChatSummaries: async () => {
+        const { sessionPassphrase, getContactsWithBroadcast } = get();
+        if (!sessionPassphrase) return;
+
+        const allContacts = getContactsWithBroadcast();
+        const fingerprints = allContacts
+          .filter((c) => c.fingerprint !== 'BROADCAST')
+          .map((c) => c.fingerprint);
+
+        const summaries = await storageService.getChatSummaries(fingerprints, sessionPassphrase);
+        const map: Record<string, SecureMessage | undefined> = { ...summaries };
+
+        const broadcastContact = allContacts.find((c) => c.fingerprint === 'BROADCAST');
+        if (broadcastContact) {
+          const broadcastMessages = await storageService.getMessagesByFingerprint(
+            'BROADCAST',
+            sessionPassphrase,
+          );
+          const latestBroadcast = broadcastMessages.length > 0 ? broadcastMessages[0] : undefined;
+          map['BROADCAST'] = latestBroadcast;
+        }
+
+        set({ chatSummaries: map });
       },
 
       processPendingMessages: async () => {

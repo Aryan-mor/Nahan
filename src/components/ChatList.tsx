@@ -35,9 +35,10 @@ export function ChatList({
     setActiveChat,
     handleUniversalInput,
     lastStorageUpdate,
+    chatSummaries,
+    refreshChatSummaries,
   } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [lastMessages, setLastMessages] = useState<Record<string, SecureMessage | undefined>>({});
 
   // New Chat Modal
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -211,47 +212,10 @@ export function ChatList({
   };
 
   useEffect(() => {
-    const loadLastMessages = async () => {
-      const { sessionPassphrase } = useAppStore.getState();
-      if (!sessionPassphrase) return;
-
-      const allContacts = getContactsWithBroadcast();
-
-      // REFACTORED PREVIEW: Extract fingerprints for efficient batch query
-      // REMOVED: No loop that aggregates broadcast messages from individual contacts
-      // This prevents private messages from one user leaking into the broadcast preview row
-      const fingerprints = allContacts
-        .filter((c) => c.fingerprint !== 'BROADCAST') // Exclude BROADCAST from batch query
-        .map((c) => c.fingerprint);
-
-      // Use optimized getChatSummaries to fetch last messages in batch
-      const summaries = await storageService.getChatSummaries(fingerprints, sessionPassphrase);
-
-      const map: Record<string, SecureMessage | undefined> = { ...summaries };
-
-      // ISOLATION: Query storageService.getMessagesByFingerprint('BROADCAST', ...) directly
-      // This prevents private messages from leaking into broadcast preview
-      // CRITICAL: Ensure broadcast preview is populated before sorting
-      const broadcastContact = allContacts.find((c) => c.fingerprint === 'BROADCAST');
-      if (broadcastContact) {
-        // ISOLATION: ONLY query storageService.getMessagesByFingerprint('BROADCAST', passphrase)
-        // No aggregation from individual contacts - direct query only
-        const broadcastMessages = await storageService.getMessagesByFingerprint(
-          'BROADCAST',
-          sessionPassphrase,
-        );
-        const latestBroadcast = broadcastMessages.length > 0 ? broadcastMessages[0] : undefined;
-        map['BROADCAST'] = latestBroadcast;
-      }
-
-      console.log('[UI] Refreshing Chat List');
-      console.log('[ChatList] Last messages map updated:', map);
-      setLastMessages(map);
-    };
-    loadLastMessages();
+    refreshChatSummaries();
     // REACTIVITY: Strictly tied to lastStorageUpdate to trigger re-fetch when IndexedDB changes
     // This ensures ChatList updates when messages are imported via clipboard or sent
-  }, [lastStorageUpdate, contacts, getContactsWithBroadcast]);
+  }, [lastStorageUpdate, contacts, refreshChatSummaries]);
 
   // Get contacts with broadcast at index 0
   const allContacts = getContactsWithBroadcast();
@@ -273,8 +237,8 @@ export function ChatList({
       }
 
       // Tier 2 (Chronological): All other contacts sorted by newest first
-      const msgA = lastMessages[a.fingerprint];
-      const msgB = lastMessages[b.fingerprint];
+      const msgA = chatSummaries[a.fingerprint];
+      const msgB = chatSummaries[b.fingerprint];
 
       // Helper to convert date to timestamp (handles all date formats consistently)
       // Supports: Date objects, ISO strings, timestamp numbers, and invalid dates
@@ -396,7 +360,7 @@ export function ChatList({
           </div>
         ) : (
           filteredContacts.map((contact, index) => {
-            const lastMsg = lastMessages[contact.fingerprint];
+            const lastMsg = chatSummaries[contact.fingerprint];
             const isBroadcast = contact.fingerprint === 'BROADCAST';
             const showSeparator = isBroadcast && filteredContacts.length > 1 && index === 0;
 

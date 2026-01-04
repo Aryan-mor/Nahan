@@ -1,6 +1,6 @@
 import { Avatar, Select, SelectItem } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { cryptoService } from '../services/crypto';
@@ -27,6 +27,13 @@ export function LockScreen() {
   const [passphrase, setPassphrase] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [error, setError] = useState('');
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Set initial selected identity
   useEffect(() => {
@@ -81,10 +88,14 @@ export function LockScreen() {
       }
     } catch (error) {
       console.error(error);
-      setError(t('lock.error.verify'));
-      toast.error(t('lock.error.verify_toast'));
+      if (isMounted.current) {
+        setError(t('lock.error.verify'));
+        toast.error(t('lock.error.verify_toast'));
+      }
     } finally {
-      setIsUnlocking(false);
+      if (isMounted.current) {
+        setIsUnlocking(false);
+      }
     }
   };
 
