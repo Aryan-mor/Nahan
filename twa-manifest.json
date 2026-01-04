@@ -12,17 +12,17 @@
   "navigationDividerColorDark": "#000000",
   "backgroundColor": "#020617",
   "enableNotifications": true,
-  "startUrl": "/nahan/",
+  "startUrl": "/Nahan/",
   "iconUrl": "https://aryan-mor.github.io/Nahan/pwa-512x512.png",
   "maskableIconUrl": "https://aryan-mor.github.io/Nahan/maskable-icon.png",
   "monochromeIconUrl": "https://aryan-mor.github.io/Nahan/monochrome-icon.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
-    "path": "C:\\Users\\Aryan\\Documents\\Projects\\nahan\\android.keystore",
+    "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "5",
-  "appVersionCode": 5,
+  "appVersionName": "6",
+  "appVersionCode": 6,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://aryan-mor.github.io/Nahan/manifest.json",
@@ -34,15 +34,19 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://aryan-mor.github.io/nahan/",
+  "fullScopeUrl": "https://aryan-mor.github.io/Nahan/",
   "minSdkVersion": 21,
   "orientation": "portrait",
-  "fingerprints": [],
-  "additionalTrustedOrigins": [],
+  "fingerprints": [
+    {
+      "sha256": "84:82:6B:83:66:DD:97:9F:93:E1:22:21:8B:A7:51:90:24:46:E9:B9:04:39:66:F9:CF:F2:31:C4:0D:35:64:44"
+    }
+  ],
+  "additionalTrustedOrigins": ["https://aryan-mor.github.io"],
   "retainedBundles": [],
   "protocolHandlers": [],
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "5"
+  "appVersion": "6"
 }
