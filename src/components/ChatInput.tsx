@@ -3,69 +3,198 @@ import { ClipboardPaste, Lock, Send } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import * as naclUtil from 'tweetnacl-util';
+import { useLongPress } from '../hooks/useLongPress';
+import { CamouflageService } from '../services/camouflage';
 import { useAppStore } from '../stores/appStore';
 import { ManualPasteModal } from './ManualPasteModal';
 
+const camouflageService = CamouflageService.getInstance();
+
 export function ChatInput() {
-  const { sendMessage, processIncomingMessage } = useAppStore();
+  const {
+    sendAutoStealthMessage,
+    setShowStealthModal,
+    setPendingStealthBinary,
+    setPendingPlaintext,
+    processIncomingMessage,
+    messageInput,
+    setMessageInput,
+  } = useAppStore();
   const { t } = useTranslation();
-  const [text, setText] = useState('');
-  const [isSending, setIsSending] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
+  const [isAutoStealthEncoding, setIsAutoStealthEncoding] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSend = async () => {
-    if (!text.trim()) return;
+  /**
+   * Handle single click: Auto-stealth mode
+   * Automatically encrypts and embeds message with random cover text
+   * Ensures safety ratio is met before sending
+   */
+  const handleSingleClick = async () => {
+    if (!messageInput.trim()) return;
 
-    setIsSending(true);
+    setIsAutoStealthEncoding(true);
     try {
-      const encryptedContent = await sendMessage(text);
-      
-      // Auto-copy encrypted content to clipboard
+      // Auto-stealth: encrypt + embed with random cover text
+      // sendAutoStealthMessage ensures safety ratio is >= 80% before sending
+      // It also clears messageInput upon success
+      const stealthOutput = await sendAutoStealthMessage(messageInput);
+
+      // Auto-copy stealth message to clipboard
       try {
-        await navigator.clipboard.writeText(encryptedContent);
+        await navigator.clipboard.writeText(stealthOutput);
         toast.success(t('chat.input.send_success_clipboard'));
       } catch (clipboardError) {
         console.warn('Failed to auto-copy to clipboard:', clipboardError);
         toast.success(t('chat.input.send_success')); // Still success, just clipboard failed
       }
-
-      setText('');
-      // Reset height
-      if (textareaRef.current) {
-        // Simple hack to reset height logic if controlled component doesn't do it automatically
-      }
     } catch (error) {
       toast.error(t('chat.input.send_error'));
       console.error(error);
     } finally {
-      setIsSending(false);
-      // Keep focus
+      setIsAutoStealthEncoding(false);
       textareaRef.current?.focus();
     }
   };
 
-  const processPasteContent = async (content: string) => {
-    // Check if it looks like a PGP message
-    if (content.includes('-----BEGIN PGP MESSAGE-----')) {
-      setIsProcessing(true);
-      try {
-        await processIncomingMessage(content);
-        toast.success(t('chat.input.decrypt_success'));
-        setText(''); // Clear input if it was partial
-      } catch (err) {
-        toast.error(t('chat.input.decrypt_error'));
-        console.error(err);
-        throw err; // Re-throw for modal handling
-      } finally {
-        setIsProcessing(false);
+  /**
+   * Handle long press (>500ms): Open Stealth Modal
+   * Works for both mouse (long click) and touch (long press)
+   * Allows user to customize cover text
+   */
+  const handleLongPress = async () => {
+    if (!messageInput.trim()) return;
+
+    try {
+      // Encrypt message to binary for stealth modal
+      const { activeChat, identity, sessionPassphrase } = useAppStore.getState();
+      if (!activeChat || !identity || !sessionPassphrase) {
+        toast.error('Cannot send message: Missing context');
+        return;
       }
-    } else {
-      // Regular text paste
-      setText((prev) => prev + content);
-      toast.info(t('chat.input.paste_success'));
-      textareaRef.current?.focus();
+
+      const { CryptoService } = await import('../services/crypto');
+      const cryptoService = CryptoService.getInstance();
+
+      const encryptedBinary = await cryptoService.encryptMessage(
+        messageInput,
+        activeChat.publicKey,
+        identity.privateKey,
+        sessionPassphrase,
+        { binary: true }
+      ) as Uint8Array;
+
+      // Open stealth modal with pending binary
+      setPendingStealthBinary(encryptedBinary);
+      setPendingPlaintext(messageInput);
+      setShowStealthModal(true);
+    } catch (error) {
+      toast.error('Failed to prepare stealth message');
+      console.error(error);
+    }
+  };
+
+  // Use custom hook for long press detection
+  const longPressHandlers = useLongPress({
+    onLongPress: handleLongPress,
+    onClick: handleSingleClick,
+    threshold: 500,
+    preventDefault: true,
+  });
+
+  /**
+   * Handle Enter key press
+   * Uses auto-stealth by default
+   */
+  const handleSend = async () => {
+    await handleSingleClick();
+  };
+
+  const processPasteContent = async (content: string) => {
+    // Never paste into input field - always try to decrypt first
+    setIsProcessing(true);
+
+    try {
+      let encryptedData: string | null = null;
+
+      // 1. Check if it's a stealth message (ZWC-embedded)
+      if (camouflageService.hasZWC(content)) {
+        try {
+          // First try strict decoding
+          let binary: Uint8Array;
+          try {
+            binary = camouflageService.decodeFromZWC(content, false);
+          } catch (strictError: unknown) {
+            // If strict fails with checksum error, try lenient mode
+            const error = strictError as Error;
+            if (error.message?.includes('Checksum mismatch')) {
+              console.warn('Strict decode failed, trying lenient mode...');
+              binary = camouflageService.decodeFromZWC(content, true);
+              toast.warning('Some invisible characters may have been lost, but message recovered.');
+            } else {
+              throw strictError; // Re-throw if it's a different error
+            }
+          }
+          // Convert to base64 for decryption (processIncomingMessage expects string)
+          encryptedData = naclUtil.encodeBase64(binary);
+        } catch (error: unknown) {
+          console.warn('Failed to extract stealth message:', error);
+          // Show user-friendly error
+          const err = error as Error;
+          if (err.message?.includes('prefix signature')) {
+            toast.error('Invalid stealth message format. Make sure you copied the entire message.');
+          } else if (err.message?.includes('too many invisible characters')) {
+            toast.error('Message is too corrupted to recover. Some invisible characters were lost.');
+          } else {
+            toast.error('Failed to extract hidden message. The message may be corrupted.');
+          }
+          // Continue to try other formats
+        }
+      }
+
+      // 2. Check if it's a PGP message (legacy format)
+      if (!encryptedData && content.includes('-----BEGIN PGP MESSAGE-----')) {
+        encryptedData = content;
+      }
+
+      // 3. Check if it's a Nahan Compact Protocol message (base64)
+      if (!encryptedData) {
+        // Try to decode as base64 and check if it has the protocol version byte
+        try {
+          const decoded = naclUtil.decodeBase64(content.trim());
+          // Nahan Compact Protocol starts with version byte (0x01)
+          if (decoded.length > 0 && decoded[0] === 0x01) {
+            encryptedData = content.trim();
+          }
+        } catch {
+          // Not base64, continue
+        }
+      }
+
+      // 4. If we found encrypted data, try to decrypt and add to chat
+      if (encryptedData) {
+        await processIncomingMessage(encryptedData);
+        toast.success(t('chat.input.decrypt_success'));
+        setMessageInput(''); // Clear input
+        return;
+      }
+
+      // 5. No encrypted message detected - show modal for manual paste
+      throw new Error('No encrypted message detected');
+    } catch (err: unknown) {
+      // If it's a decryption error or unknown sender, show modal
+      const error = err as Error;
+      if (error.message === 'SENDER_UNKNOWN' || error.message === 'No encrypted message detected' || error.message?.includes('decrypt') || error.message?.includes('Failed')) {
+        setIsManualPasteOpen(true);
+        toast.error(t('chat.input.decrypt_error'));
+      } else {
+        toast.error(t('chat.input.decrypt_error'));
+        console.error(error);
+      }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -95,8 +224,8 @@ export function ChatInput() {
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
-            value={text}
-            onValueChange={setText}
+            value={messageInput}
+            onValueChange={setMessageInput}
             placeholder={t('chat.input.placeholder')}
             minRows={1}
             maxRows={4}
@@ -109,22 +238,24 @@ export function ChatInput() {
             }}
             endContent={
               <div className="absolute right-2 bottom-2 text-xs text-industrial-500 font-mono">
-                {text.length}/2000
+                {messageInput.length}/2000
               </div>
             }
           />
         </div>
-        {text.trim() ? (
-          <Button
-            isIconOnly
-            color="primary"
-            variant="shadow"
-            className="rounded-full w-8 h-8 min-w-8 mb-1"
-            onPress={handleSend}
-            isLoading={isSending}
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+        {messageInput.trim() ? (
+          <Tooltip content={t('chat.input.long_press_tooltip', { defaultValue: 'Click/Tap: Auto-Stealth | Long Press/Long Click: Custom Stealth' })}>
+            <Button
+              isIconOnly
+              color="primary"
+              variant="shadow"
+              className="rounded-full w-8 h-8 min-w-8 mb-1"
+              {...longPressHandlers}
+              isLoading={isAutoStealthEncoding}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </Tooltip>
         ) : (
           <Tooltip content={t('chat.input.paste_tooltip')}>
             <Button

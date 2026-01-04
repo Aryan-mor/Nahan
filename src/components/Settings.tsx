@@ -34,9 +34,23 @@ import {
 } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 
 export function Settings() {
-  const { identities, contacts, currentIdentity, initializeApp, isStandalone, setInstallPromptVisible, language, setLanguage } = useAppStore();
+  const {
+    identity,
+    contacts,
+    initializeApp
+  } = useAppStore();
+
+  const {
+    isStandalone,
+    setInstallPromptVisible,
+    language,
+    setLanguage,
+    camouflageLanguage,
+    setCamouflageLanguage
+  } = useUIStore();
   const { t } = useTranslation();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const { isOpen: isExportOpen, onOpen: onExportOpen, onOpenChange: onExportOpenChange } = useDisclosure();
@@ -83,17 +97,23 @@ export function Settings() {
 
     try {
       // Get all data
-      const allIdentities = await storageService.getIdentities();
-      const allContacts = await storageService.getContacts();
+      const { sessionPassphrase: passphrase } = useAppStore.getState();
+      if (!passphrase) {
+        toast.error('SecureStorage: Missing key');
+        return;
+      }
+
+      const allIdentities = await storageService.getIdentities(passphrase);
+      const allContacts = await storageService.getContacts(passphrase);
 
       const exportData = {
         version: '1.0',
         timestamp: new Date().toISOString(),
-        identities: allIdentities.map(identity => ({
+        identity: identity ? {
           ...identity,
           // Note: Private keys are already encrypted with user passphrases
           privateKey: identity.privateKey
-        })),
+        } : null,
         contacts: allContacts,
         settings: {
           language,
@@ -151,9 +171,9 @@ export function Settings() {
                 <p className="text-xs text-industrial-400">{t('settings.install.subtitle')}</p>
               </div>
             </div>
-            <Button 
-              size="sm" 
-              color="primary" 
+            <Button
+              size="sm"
+              color="primary"
               onPress={() => setInstallPromptVisible(true)}
               className="bg-blue-600"
             >
@@ -190,6 +210,33 @@ export function Settings() {
                   </div>
                 </SelectItem>
               ))}
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-industrial-300">Default Camouflage Language</label>
+            <Select
+              selectedKeys={[camouflageLanguage || 'fa']}
+              onSelectionChange={(keys) => setCamouflageLanguage(Array.from(keys)[0] as 'fa' | 'en')}
+              className="w-full max-w-xs"
+              startContent={<Shield className="w-4 h-4 text-industrial-400" />}
+              classNames={{
+                trigger: "bg-industrial-950 border-industrial-700 hover:bg-industrial-800",
+                popoverContent: "bg-industrial-900 border-industrial-800"
+              }}
+            >
+              <SelectItem key="fa" textValue="Persian (Farsi)" className="text-industrial-100 data-[hover=true]:bg-industrial-800">
+                <div className="flex items-center space-x-2">
+                  <span>🇮🇷</span>
+                  <span>Persian (Farsi)</span>
+                </div>
+              </SelectItem>
+              <SelectItem key="en" textValue="English" className="text-industrial-100 data-[hover=true]:bg-industrial-800">
+                <div className="flex items-center space-x-2">
+                  <span>🇺🇸</span>
+                  <span>English</span>
+                </div>
+              </SelectItem>
             </Select>
           </div>
 
@@ -329,7 +376,7 @@ export function Settings() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-industrial-400">{t('settings.data.identities')}</p>
-                  <p className="text-2xl font-bold text-industrial-100">{identities.length}</p>
+                  <p className="text-2xl font-bold text-industrial-100">{identity ? 1 : 0}</p>
                 </div>
                 <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center">
                   <div className="w-4 h-4 bg-blue-400 rounded" />
@@ -354,7 +401,7 @@ export function Settings() {
                 <div>
                   <p className="text-sm text-industrial-400">{t('settings.data.current_identity')}</p>
                   <p className="text-lg font-bold text-industrial-100 truncate max-w-[120px]">
-                    {currentIdentity?.name || t('settings.data.none')}
+                    {identity?.name || t('settings.data.none')}
                   </p>
                 </div>
                 <div className="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center">
@@ -476,7 +523,7 @@ export function Settings() {
                       {t('settings.clear.data_list_title')}
                     </p>
                     <ul className="text-sm text-industrial-400 mt-2 space-y-1">
-                      <li>{t('settings.clear.data_list.identities', { count: identities.length })}</li>
+                      <li>{t('settings.clear.data_list.identities', { count: identity ? 1 : 0 })}</li>
                       <li>{t('settings.clear.data_list.contacts', { count: contacts.length })}</li>
                       <li>{t('settings.clear.data_list.messages')}</li>
                       <li>{t('settings.clear.data_list.settings')}</li>

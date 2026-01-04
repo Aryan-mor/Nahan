@@ -38,21 +38,25 @@ import {
 import QRCode from 'qrcode';
 import { cryptoService } from '../services/crypto';
 import { storageService } from '../services/storage';
+import { generateStealthID } from '../services/stealthId';
 import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 
 export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identity' | 'contacts' }) {
   const {
-    currentIdentity,
+    identity,
     contacts,
     addContact,
-    identities,
-    setCurrentIdentity,
     addIdentity,
     removeContact,
     setSessionPassphrase,
     setActiveChat,
-    setActiveTab: setGlobalActiveTab,
+    sessionPassphrase,
   } = useAppStore();
+
+  const { setActiveTab: setGlobalActiveTab } = useUIStore();
+
+  const { camouflageLanguage } = useUIStore();
 
   // Modals
   const {
@@ -98,16 +102,16 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
   // --- Identity Logic ---
 
   const generateQRCode = useCallback(async () => {
-    if (!currentIdentity) return;
+    if (!identity) return;
 
     try {
       // We still include email in QR data for backward compatibility with other PGP tools,
       // but we don't display it in our UI.
       const qrData = {
-        name: currentIdentity.name,
-        email: currentIdentity.email,
-        publicKey: currentIdentity.publicKey,
-        fingerprint: currentIdentity.fingerprint,
+        name: identity.name,
+        email: identity.email,
+        publicKey: identity.publicKey,
+        fingerprint: identity.fingerprint,
         type: 'nahan-public-key',
       };
 
@@ -124,13 +128,13 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
     } catch {
       toast.error('Failed to generate QR code');
     }
-  }, [currentIdentity]);
+  }, [identity]);
 
   useEffect(() => {
-    if (activeTab === 'identity' && currentIdentity) {
+    if (activeTab === 'identity' && identity) {
       generateQRCode();
     }
-  }, [activeTab, currentIdentity, generateQRCode]);
+  }, [activeTab, identity, generateQRCode]);
 
   const handleGenerateKey = async () => {
     if (!generateForm.name.trim()) {
@@ -162,13 +166,18 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
         generateForm.passphrase,
       );
 
+      if (!sessionPassphrase) {
+        toast.error('SecureStorage: Missing key');
+        return;
+      }
+
       const identity = await storageService.storeIdentity({
         name: generateForm.name,
         email: email,
         publicKey: keyPair.publicKey,
         privateKey: keyPair.privateKey,
         fingerprint: keyPair.fingerprint,
-      });
+      }, sessionPassphrase);
 
       addIdentity(identity);
 
@@ -186,17 +195,16 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
   };
 
   const copyIdentityKey = async () => {
-    if (!currentIdentity) return;
+    if (!identity) return;
     try {
-      const name = currentIdentity.name || 'Unknown';
-      // Clean up the key to ensure it's just the PGP block
-      const cleanKey = currentIdentity.publicKey.trim();
-      // Format: USERNAME+KEY
-      const textToCopy = `${name}+${cleanKey}`;
-      await navigator.clipboard.writeText(textToCopy);
-      toast.success('Public key copied');
-    } catch {
-      toast.error('Failed to copy key');
+      const name = identity.name || 'Unknown';
+      // Generate stealth ID (steganographic poetry) instead of plaintext
+      const stealthID = generateStealthID(name, identity.publicKey, camouflageLanguage || 'fa');
+      await navigator.clipboard.writeText(stealthID);
+      toast.success('Secure Stealth ID copied as poetry!');
+    } catch (error) {
+      console.error('Failed to generate stealth ID:', error);
+      toast.error('Failed to copy stealth ID');
     }
   };
 
@@ -227,18 +235,18 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
   };
 
   const shareQRCode = async () => {
-    if (!qrCodeDataUrl || !currentIdentity) return;
+    if (!qrCodeDataUrl || !identity) return;
     try {
       const response = await fetch(qrCodeDataUrl);
       const blob = await response.blob();
       if (navigator.share && navigator.canShare) {
-        const file = new File([blob], `nahan-${currentIdentity.name}-qr.png`, {
+        const file = new File([blob], `nahan-${identity.name}-qr.png`, {
           type: 'image/png',
         });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
-            title: `NAHAN Identity - ${currentIdentity.name}`,
-            text: `Scan this QR code to add ${currentIdentity.name} on NAHAN`,
+            title: `NAHAN Identity - ${identity.name}`,
+            text: `Scan this QR code to add ${identity.name} on NAHAN`,
             files: [file],
           });
         }
@@ -438,7 +446,7 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
       const fingerprint = await cryptoService.getFingerprint(keyToUse);
 
       // 3. Self-Contact Validation
-      if (currentIdentity && fingerprint === currentIdentity.fingerprint) {
+      if (identity && fingerprint === identity.fingerprint) {
         toast.error('You cannot add yourself as a contact');
         return;
       }
@@ -454,11 +462,16 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
       const cleanPublicKey = await cryptoService.removeNameFromKey(keyToUse);
 
       // 6. Store the contact
+      if (!sessionPassphrase) {
+        toast.error('SecureStorage: Missing key');
+        return;
+      }
+
       const contact = await storageService.storeContact({
         name: contactForm.name.trim(),
         publicKey: cleanPublicKey,
         fingerprint,
-      });
+      }, sessionPassphrase);
 
       addContact(contact);
       toast.success('Contact added successfully');
@@ -504,7 +517,7 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
         <CardBody className="p-4 sm:p-6">
           {activeTab === 'identity' && (
             <div className="space-y-6">
-              {!currentIdentity ? (
+              {!identity ? (
                 <div className="text-center py-12">
                   <Key className="w-16 h-16 text-industrial-600 mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-industrial-100 mb-2">No Identity Found</h3>
@@ -522,12 +535,12 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-industrial-600 to-industrial-400" />
 
                     <Avatar
-                      name={currentIdentity.name}
+                      name={identity.name}
                       className="w-20 h-20 text-2xl mx-auto mb-4 bg-industrial-800 text-industrial-100"
                     />
 
                     <h2 className="text-2xl font-bold text-industrial-100 mb-1">
-                      {currentIdentity.name}
+                      {identity.name}
                     </h2>
                     <div className="flex justify-center items-center gap-2 mb-6">
                       <Chip
@@ -535,7 +548,7 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
                         variant="flat"
                         className="bg-industrial-800 text-industrial-400 font-mono"
                       >
-                        #{currentIdentity.fingerprint.slice(-8)}
+                        #{identity.fingerprint.slice(-8)}
                       </Chip>
                     </div>
 
@@ -553,8 +566,9 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
                         startContent={<Copy className="w-4 h-4" />}
                         onPress={copyIdentityKey}
                         className="bg-industrial-800 text-industrial-200"
+                        title="Copy Stealth ID as Poetry"
                       >
-                        Copy Key
+                        Copy Stealth ID
                       </Button>
                       <Button
                         variant="flat"
@@ -566,52 +580,6 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
                       </Button>
                     </div>
                   </div>
-
-                  {/* Identity Switcher */}
-                  {identities.length > 1 && (
-                    <div className="w-full max-w-md">
-                      <p className="text-sm font-medium text-industrial-400 mb-3 px-1">
-                        Switch Identity
-                      </p>
-                      <div className="space-y-2">
-                        {identities.map((identity) => (
-                          <div
-                            key={identity.id}
-                            onClick={() => setCurrentIdentity(identity)}
-                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                              currentIdentity.id === identity.id
-                                ? 'bg-industrial-800/50 border-industrial-600'
-                                : 'bg-industrial-950 border-industrial-800 hover:border-industrial-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  currentIdentity.id === identity.id
-                                    ? 'bg-green-500'
-                                    : 'bg-industrial-600'
-                                }`}
-                              />
-                              <span className="text-industrial-200">{identity.name}</span>
-                            </div>
-                            <span className="text-xs text-industrial-500 font-mono">
-                              #{identity.fingerprint.slice(-4)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    variant="light"
-                    color="primary"
-                    startContent={<Plus className="w-4 h-4" />}
-                    onPress={onGenerateOpen}
-                    className="text-industrial-400 hover:text-industrial-200"
-                  >
-                    Create New Identity
-                  </Button>
                 </div>
               )}
             </div>
@@ -711,10 +679,23 @@ export function KeyExchange({ defaultTab = 'identity' }: { defaultTab?: 'identit
                             isIconOnly
                             size="sm"
                             variant="light"
-                            onPress={() =>
-                              copyToClipboard(`${contact.name}+${contact.publicKey}`, 'Public Key')
-                            }
+                            onPress={async () => {
+                              try {
+                                // Generate stealth ID instead of plaintext
+                                const stealthID = generateStealthID(
+                                  contact.name,
+                                  contact.publicKey,
+                                  camouflageLanguage || 'fa'
+                                );
+                                await navigator.clipboard.writeText(stealthID);
+                                toast.success('Secure Stealth ID copied as poetry!');
+                              } catch (error) {
+                                console.error('Failed to generate stealth ID:', error);
+                                toast.error('Failed to copy stealth ID');
+                              }
+                            }}
                             className="text-industrial-400 hover:text-industrial-200"
+                            title="Copy Stealth ID"
                           >
                             <Copy className="w-4 h-4" />
                           </Button>

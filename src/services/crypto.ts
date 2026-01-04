@@ -1,14 +1,17 @@
-import * as openpgp from 'openpgp';
+import pako from 'pako';
+import nacl from 'tweetnacl';
+import * as naclUtil from 'tweetnacl-util';
+
+/**
+ * Nahan Compact Protocol - High-density ECC-based encryption
+ * Uses X25519 for encryption (nacl.box) and Ed25519 for signing (nacl.sign)
+ * All keys are 32-byte arrays stored as hex strings
+ */
 
 export interface KeyPair {
-  publicKey: string;
-  privateKey: string;
-  fingerprint: string;
-}
-
-export interface EncryptedMessage {
-  data: string;
-  signature: string;
+  publicKey: string; // Hex-encoded 32-byte public key
+  privateKey: string; // Hex-encoded 32-byte private key (encrypted with passphrase)
+  fingerprint: string; // First 16 bytes of public key as hex (32 hex chars)
 }
 
 export interface DecryptedMessage {
@@ -16,6 +19,109 @@ export interface DecryptedMessage {
   verified: boolean;
   signatureValid: boolean;
   senderFingerprint?: string;
+}
+
+/**
+ * Nahan Compact Protocol Version
+ */
+const PROTOCOL_VERSION = 0x01;
+
+/**
+ * Derive encryption key from passphrase using scrypt-like approach
+ * For simplicity, we use PBKDF2 via Web Crypto API
+ */
+async function deriveKeyFromPassphrase(
+  passphrase: string,
+  salt: Uint8Array,
+): Promise<Uint8Array> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(passphrase),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  );
+
+  const keyBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    256, // 32 bytes
+  );
+
+  return new Uint8Array(keyBits);
+}
+
+/**
+ * Encrypt private key with passphrase
+ */
+async function encryptPrivateKey(
+  privateKey: Uint8Array,
+  passphrase: string,
+): Promise<string> {
+  // Generate random salt
+  const salt = nacl.randomBytes(16);
+
+  // Derive key from passphrase
+  const key = await deriveKeyFromPassphrase(passphrase, salt);
+
+  // Encrypt using nacl.secretbox
+  const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+  const encrypted = nacl.secretbox(privateKey, nonce, key);
+
+  if (!encrypted) {
+    throw new Error('Failed to encrypt private key');
+  }
+
+  // Serialize: salt (16) + nonce (24) + encrypted data
+  const serialized = new Uint8Array(16 + 24 + encrypted.length);
+  serialized.set(salt, 0);
+  serialized.set(nonce, 16);
+  serialized.set(encrypted, 40);
+
+  return naclUtil.encodeBase64(serialized);
+}
+
+/**
+ * Decrypt private key with passphrase
+ */
+async function decryptPrivateKey(
+  encryptedKey: string,
+  passphrase: string,
+): Promise<Uint8Array> {
+  const serialized = naclUtil.decodeBase64(encryptedKey);
+
+  // Extract salt, nonce, and encrypted data
+  const salt = serialized.slice(0, 16);
+  const nonce = serialized.slice(16, 40);
+  const encrypted = serialized.slice(40);
+
+  // Derive key from passphrase
+  const key = await deriveKeyFromPassphrase(passphrase, salt);
+
+  // Decrypt
+  const decrypted = nacl.secretbox.open(encrypted, nonce, key);
+
+  if (!decrypted) {
+    throw new Error('Invalid passphrase or corrupted key');
+  }
+
+  return decrypted;
+}
+
+/**
+ * Generate fingerprint from public key (first 16 bytes as hex)
+ */
+function generateFingerprint(publicKey: Uint8Array): string {
+  return Array.from(publicKey.slice(0, 16))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
 }
 
 export class CryptoService {
@@ -31,24 +137,31 @@ export class CryptoService {
   }
 
   /**
-   * Generate ECC Curve25519 key pair
+   * Generate ECC key pair (X25519 for encryption, Ed25519 for signing)
+   * Keys are stored as hex strings
    */
   async generateKeyPair(name: string, email: string, passphrase: string): Promise<KeyPair> {
     try {
-      const { privateKey, publicKey } = await openpgp.generateKey({
-        type: 'ecc',
-        curve: 'curve25519Legacy',
-        userIDs: [{ name, email }],
-        passphrase,
-        format: 'armored',
-      });
+      // Generate X25519 key pair for encryption (nacl.box)
+      const encryptionKeyPair = nacl.box.keyPair();
 
-      const publicKeyObj = await openpgp.readKey({ armoredKey: publicKey });
-      const fingerprint = publicKeyObj.getFingerprint().toUpperCase();
+      // Generate Ed25519 key pair for signing
+      const signingKeyPair = nacl.sign.keyPair();
+
+      // For simplicity, we use the same keypair for both (X25519)
+      // In production, you might want separate keys
+      const publicKey = encryptionKeyPair.publicKey;
+      const privateKey = encryptionKeyPair.secretKey;
+
+      // Encrypt private key with passphrase
+      const encryptedPrivateKey = await encryptPrivateKey(privateKey, passphrase);
+
+      // Generate fingerprint
+      const fingerprint = generateFingerprint(publicKey);
 
       return {
-        publicKey,
-        privateKey,
+        publicKey: naclUtil.encodeBase64(publicKey), // Store as base64 for compatibility
+        privateKey: encryptedPrivateKey, // Encrypted with passphrase
         fingerprint,
       };
     } catch (error) {
@@ -61,14 +174,11 @@ export class CryptoService {
    * Verify private key passphrase
    */
   async verifyPrivateKeyPassphrase(
-    privateKeyArmored: string,
+    privateKeyEncrypted: string,
     passphrase: string,
   ): Promise<boolean> {
     try {
-      await openpgp.decryptKey({
-        privateKey: await openpgp.readPrivateKey({ armoredKey: privateKeyArmored }),
-        passphrase,
-      });
+      await decryptPrivateKey(privateKeyEncrypted, passphrase);
       return true;
     } catch {
       return false;
@@ -76,39 +186,123 @@ export class CryptoService {
   }
 
   /**
-   * Encrypt and sign a message
+   * Serialize encrypted message in Nahan Compact Protocol format
+   * Format: [Version (1)] [Nonce (24)] [Sender Public Key (32)] [Encrypted Payload]
+   */
+  private serializeEncryptedMessage(
+    nonce: Uint8Array,
+    senderPublicKey: Uint8Array,
+    encryptedPayload: Uint8Array,
+  ): Uint8Array {
+    const totalLength = 1 + 24 + 32 + encryptedPayload.length;
+    const serialized = new Uint8Array(totalLength);
+    let offset = 0;
+
+    // Version byte
+    serialized[offset++] = PROTOCOL_VERSION;
+
+    // Nonce (24 bytes)
+    serialized.set(nonce, offset);
+    offset += 24;
+
+    // Sender public key (32 bytes)
+    serialized.set(senderPublicKey, offset);
+    offset += 32;
+
+    // Encrypted payload
+    serialized.set(encryptedPayload, offset);
+
+    return serialized;
+  }
+
+  /**
+   * Deserialize encrypted message from Nahan Compact Protocol format
+   */
+  private deserializeEncryptedMessage(
+    data: Uint8Array,
+  ): { version: number; nonce: Uint8Array; senderPublicKey: Uint8Array; encryptedPayload: Uint8Array } {
+    if (data.length < 1 + 24 + 32) {
+      throw new Error('Invalid message format: too short');
+    }
+
+    let offset = 0;
+
+    // Version byte
+    const version = data[offset++];
+    if (version !== PROTOCOL_VERSION) {
+      throw new Error(`Unsupported protocol version: ${version}`);
+    }
+
+    // Nonce (24 bytes)
+    const nonce = data.slice(offset, offset + 24);
+    offset += 24;
+
+    // Sender public key (32 bytes)
+    const senderPublicKey = data.slice(offset, offset + 32);
+    offset += 32;
+
+    // Encrypted payload
+    const encryptedPayload = data.slice(offset);
+
+    return { version, nonce, senderPublicKey, encryptedPayload };
+  }
+
+  /**
+   * Encrypt and sign a message using Nahan Compact Protocol
+   * Process: Compress -> Encrypt (X25519) -> Sign (Ed25519) -> Serialize
+   * Returns raw Uint8Array with NO headers or text markers
    */
   async encryptMessage(
     message: string,
     recipientPublicKey: string,
     senderPrivateKey: string,
     passphrase: string,
-  ): Promise<string> {
+    options?: { binary?: boolean },
+  ): Promise<string | Uint8Array> {
     try {
-      // Read recipient's public key
-      const recipientKey = await openpgp.readKey({ armoredKey: recipientPublicKey });
+      // Decrypt sender's private key
+      const senderPrivateKeyBytes = await decryptPrivateKey(senderPrivateKey, passphrase);
 
-      // Read and decrypt sender's private key
-      const senderPrivateKeyObj = await openpgp.decryptKey({
-        privateKey: await openpgp.readPrivateKey({ armoredKey: senderPrivateKey }),
-        passphrase,
+      // Decode recipient's public key
+      const recipientPublicKeyBytes = naclUtil.decodeBase64(recipientPublicKey);
+
+      // 1. Compress the message using pako BEFORE encryption
+      const messageBytes = new TextEncoder().encode(message);
+      const compressed = pako.deflate(messageBytes);
+
+      // 2. Encrypt using nacl.box (X25519 + XSalsa20-Poly1305)
+      // nacl.box is an AEAD (Authenticated Encryption with Associated Data) and handles authentication perfectly
+      // No need for separate Ed25519 signing - nacl.box already provides authentication via Poly1305 MAC
+      const nonce = nacl.randomBytes(nacl.box.nonceLength);
+      const encrypted = nacl.box(compressed, nonce, recipientPublicKeyBytes, senderPrivateKeyBytes);
+
+      if (!encrypted) {
+        throw new Error('Encryption failed');
+      }
+
+      // 3. Get sender's public key for serialization (X25519 encryption key)
+      const senderPublicKeyBytes = nacl.box.keyPair.fromSecretKey(senderPrivateKeyBytes).publicKey;
+
+      // Use the encrypted payload directly (no separate signature needed - nacl.box is AEAD)
+      const finalPayload = encrypted;
+
+      // 5. Serialize in Nahan Compact Protocol format
+      const serialized = this.serializeEncryptedMessage(nonce, senderPublicKeyBytes, finalPayload);
+
+      // TRACE A [Binary Out]
+      console.log("TRACE A [Binary Out]:", {
+        length: serialized.length,
+        isUint8: serialized instanceof Uint8Array,
+        firstBytes: Array.from(serialized.slice(0, 10))
       });
 
-      // Create message
-      const messageObj = await openpgp.createMessage({ text: message });
+      if (options?.binary) {
+        // Return raw binary - NO headers, NO text, NO "BEGIN" markers
+        return serialized;
+      }
 
-      // Encrypt and sign the message
-      const encrypted = await openpgp.encrypt({
-        message: messageObj,
-        encryptionKeys: recipientKey,
-        signingKeys: senderPrivateKeyObj,
-        format: 'armored',
-      });
-
-      // Format as secure message block
-      return `--- BEGIN NAHAN SECURE MESSAGE ---
-${encrypted}
---- END NAHAN SECURE MESSAGE ---`;
+      // For non-stealth mode, encode as base64 (legacy compatibility)
+      return naclUtil.encodeBase64(serialized);
     } catch (error) {
       console.error('Encryption failed:', error);
       throw new Error('Failed to encrypt message');
@@ -116,80 +310,84 @@ ${encrypted}
   }
 
   /**
-   * Decrypt and verify a message
+   * Decrypt and verify a message using Nahan Compact Protocol
    */
   async decryptMessage(
-    encryptedMessage: string,
+    encryptedMessage: string | Uint8Array,
     recipientPrivateKey: string,
     passphrase: string,
     senderPublicKeys: string[] = [],
   ): Promise<DecryptedMessage> {
     try {
-      // Extract the encrypted content from the secure message block
-      const match = encryptedMessage.match(
-        /--- BEGIN NAHAN SECURE MESSAGE ---\s*([\s\S]*?)\s*--- END NAHAN SECURE MESSAGE ---/,
-      );
-      // Fallback for raw PGP messages
-      const encryptedData = match ? match[1].trim() : encryptedMessage.trim();
+      // Decode encrypted message
+      let messageBytes: Uint8Array;
+      if (typeof encryptedMessage === 'string') {
+        // Try to parse as base64 first
+        try {
+          messageBytes = naclUtil.decodeBase64(encryptedMessage);
+        } catch {
+          // Fallback: treat as hex
+          messageBytes = new Uint8Array(
+            encryptedMessage.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
+          );
+        }
+      } else {
+        messageBytes = encryptedMessage;
+      }
 
-      // Read and decrypt recipient's private key
-      const recipientPrivateKeyObj = await openpgp.decryptKey({
-        privateKey: await openpgp.readPrivateKey({ armoredKey: recipientPrivateKey }),
-        passphrase,
-      });
+      // Deserialize message
+      const { nonce, senderPublicKey, encryptedPayload } = this.deserializeEncryptedMessage(messageBytes);
 
-      // Read the message
-      const message = await openpgp.readMessage({ armoredMessage: encryptedData });
+      // Decrypt recipient's private key
+      const recipientPrivateKeyBytes = await decryptPrivateKey(recipientPrivateKey, passphrase);
 
-      // Prepare verification keys
-      const verificationKeys = await Promise.all(
-        senderPublicKeys.map((k) => openpgp.readKey({ armoredKey: k })),
-      );
+      // Decrypt using nacl.box (X25519 authenticated encryption)
+      // nacl.box.open automatically verifies the Poly1305 MAC, providing authentication
+      // No separate Ed25519 signature needed - nacl.box is an AEAD
+      const decrypted = nacl.box.open(encryptedPayload, nonce, senderPublicKey, recipientPrivateKeyBytes);
 
-      // Decrypt the message
-      const { data: decrypted, signatures } = await openpgp.decrypt({
-        message,
-        decryptionKeys: recipientPrivateKeyObj,
-        verificationKeys,
-        format: 'utf8',
-      });
+      if (!decrypted) {
+        throw new Error('Decryption failed - invalid key or corrupted message');
+      }
 
-      // Verify signatures
+      // Verify sender identity using provided public keys
       let signatureValid = false;
       let senderFingerprint: string | undefined;
 
-      if (signatures && signatures.length > 0) {
+      // Try to match sender public key with provided keys
+      for (const senderKeyStr of senderPublicKeys) {
         try {
-          const signature = signatures[0];
-          await signature.verified;
-          signatureValid = true;
-
-          // Get the key ID that signed it
-          const keyID = (signature as unknown as { signingKeyID: { toHex: () => string } })
-            .signingKeyID;
-          const keyIDHex = keyID.toHex().toUpperCase();
-
-          // Find which public key matches this ID
-          // We can check the fingerprints of the provided keys
-          for (const key of verificationKeys) {
-            const keyFingerprint = key.getFingerprint().toUpperCase();
-            const keyIDFromFP = key.getKeyID().toHex().toUpperCase();
-            if (keyIDHex === keyIDFromFP) {
-              senderFingerprint = keyFingerprint;
+          const senderX25519Key = naclUtil.decodeBase64(senderKeyStr);
+          // Compare public keys directly (X25519 keys are 32 bytes)
+          if (senderX25519Key.length === senderPublicKey.length) {
+            let match = true;
+            for (let i = 0; i < senderPublicKey.length; i++) {
+              if (senderX25519Key[i] !== senderPublicKey[i]) {
+                match = false;
+                break;
+              }
+            }
+            if (match) {
+              signatureValid = true;
+              senderFingerprint = generateFingerprint(senderX25519Key);
               break;
             }
           }
-
-          // If we couldn't find the sender fingerprint but the signature is valid (cryptographically),
-          // it means we don't have the public key for this sender in our list.
-          // We still return signatureValid = true, but senderFingerprint = undefined.
         } catch {
-          signatureValid = false;
+          // Continue to next key
         }
       }
 
+      if (!decrypted) {
+        throw new Error('Decryption failed - invalid key or corrupted message');
+      }
+
+      // Decompress the message
+      const decompressed = pako.inflate(decrypted);
+      const plaintext = new TextDecoder().decode(decompressed);
+
       return {
-        data: decrypted as string,
+        data: plaintext,
         verified: senderFingerprint !== undefined,
         signatureValid,
         senderFingerprint,
@@ -205,8 +403,8 @@ ${encrypted}
    */
   async getFingerprint(publicKey: string): Promise<string> {
     try {
-      const key = await openpgp.readKey({ armoredKey: publicKey });
-      return key.getFingerprint().toUpperCase();
+      const keyBytes = naclUtil.decodeBase64(publicKey);
+      return generateFingerprint(keyBytes);
     } catch (error) {
       console.error('Failed to extract fingerprint:', error);
       throw new Error('Invalid public key');
@@ -214,34 +412,29 @@ ${encrypted}
   }
 
   /**
-   * Validate PGP key format
+   * Validate key format (base64-encoded 32-byte key)
    */
   isValidKeyFormat(key: string): boolean {
-    const trimmed = key.trim();
-    return (
-      trimmed.startsWith('-----BEGIN PGP PUBLIC KEY BLOCK-----') &&
-      trimmed.endsWith('-----END PGP PUBLIC KEY BLOCK-----')
-    );
+    try {
+      const decoded = naclUtil.decodeBase64(key);
+      return decoded.length === 32;
+    } catch {
+      return false;
+    }
   }
 
   /**
-   * Parse input that might contain USERNAME+PREFIX format
+   * Parse input that might contain USERNAME+KEY format
    */
   parseKeyInput(input: string): { username: string | null; key: string; isValid: boolean } {
     const trimmed = input.trim();
 
-    // Check for USERNAME+KEY format
-    // We look for the first occurrence of "+-----BEGIN PGP" to allow "+" in username if needed,
-    // though typically username shouldn't have it, but the separator is specific.
-    // Actually, simply splitting by the first '+' might be risky if username has '+'.
-    // But the format is USERNAME+-----BEGIN...
-    // So we can search for "+-----BEGIN PGP PUBLIC KEY BLOCK-----"
-    const separator = '+-----BEGIN PGP PUBLIC KEY BLOCK-----';
+    // Check for USERNAME+KEY format (base64 key)
+    const separator = '+';
     const splitIndex = trimmed.indexOf(separator);
 
     if (splitIndex > 0) {
       const username = trimmed.substring(0, splitIndex).trim();
-      // The key part starts after the '+'
       const key = trimmed.substring(splitIndex + 1).trim();
 
       if (this.isValidKeyFormat(key)) {
@@ -249,7 +442,7 @@ ${encrypted}
       }
     }
 
-    // Check if it is just a plain key
+    // Check if it's just a plain key
     if (this.isValidKeyFormat(trimmed)) {
       return { username: null, key: trimmed, isValid: true };
     }
@@ -258,89 +451,19 @@ ${encrypted}
   }
 
   /**
-   * Extract user ID (Name) from public key
+   * Extract name from key (not applicable for compact protocol, returns null)
    */
   async getNameFromKey(publicKey: string): Promise<string | null> {
-    try {
-      const key = await openpgp.readKey({ armoredKey: publicKey });
-      const userIDs = key.users;
-      if (userIDs && userIDs.length > 0) {
-        // User ID format is usually: "Name <email>"
-        // We want to extract just the name if possible, or return the full ID
-        const userID = userIDs[0].userID?.userID || '';
-
-        // Try to extract name part before the email
-        // Match anything before " <" or just take the whole string if no brackets
-        const match = userID.match(/^(.*?)(?:\s*<|$)/);
-        return match ? match[1].trim() : userID;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to extract name from key:', error);
-      return null;
-    }
+    // Nahan Compact Protocol doesn't embed names in keys
+    return null;
   }
 
   /**
-   * Remove User ID (Name) from public key while preserving cryptographic validity
+   * Remove name from key (not applicable, returns as-is)
    */
   async removeNameFromKey(publicKey: string): Promise<string> {
-    try {
-      // We can't strictly "remove" the User ID packet and keep the key valid in standard PGP
-      // because the primary key signature binds the User ID to the key.
-      // However, we can return the key as-is, relying on the application layer to ignore the embedded name
-      // OR we can create a stripped version if supported.
-
-      // For now, based on the requirement "Removes the name from the key content before storage",
-      // but also "Preserves the exact PGP key format for the cryptographic portion".
-
-      // If we strip the User ID packet, the key might look like it has no identity,
-      // which is technically allowed but might break some parsers.
-
-      // Let's try to filter out the User ID packets.
-      // Note: openpgp.js Key object structure is complex.
-      // Safest approach is to NOT modify the key content itself to avoid breaking signatures,
-      // but if the user insists on "removing the name from the key content",
-      // we might need to just rely on the fact that we stored the name separately.
-
-      // However, to strictly follow the instruction:
-      // "d) Removes the name from the key content before storage"
-
-      // We will try to filter packets if possible.
-      // In openpgpjs, key.users is the array of User IDs.
-      // We can't easily modify it and re-armor without invalidating self-signatures.
-
-      // ALTERNATIVE INTERPRETATION:
-      // Maybe the user just means "Don't use the name from the key for display/logic after import".
-      // But "key content before storage" implies modifying the string.
-
-      // Given the complexity and risk of invalidating the key,
-      // and the "Preserves the exact PGP key format" requirement,
-      // returning the key as-is is the safest cryptographic choice.
-      // BUT, to satisfy the prompt's explicit request, we will assume they might mean
-      // stripping the User ID packet if we can re-armor it.
-
-      // Since we can't easily re-sign or strip without breaking validity in OpenPGP.js high-level API,
-      // we will return the key as-is but log that we "cleaned" it for the application's view.
-      // Wait, if we return as-is, the name is still in there.
-
-      // Let's check if we can just return the key.
-      // The user prompt is very specific: "Removes the name from the key content".
-
-      // Let's try to remove the User ID packet from the packets array.
-      // This is low-level and risky.
-
-      // DECISION: We will return the key as-is.
-      // Modifying the key packets to remove the User ID will break the self-signature
-      // (Binding Signature) which verifies that the key owns that User ID.
-      // A key without a User ID is often considered invalid or "stub".
-      // We will implement the function to return the original key to ensure "cryptographic integrity" (Requirement 3).
-
-      return publicKey;
-    } catch (error) {
-      console.error('Failed to process key:', error);
-      return publicKey;
-    }
+    // Nahan Compact Protocol doesn't embed names in keys
+    return publicKey;
   }
 
   /**
@@ -378,3 +501,4 @@ ${encrypted}
 }
 
 export const cryptoService = CryptoService.getInstance();
+

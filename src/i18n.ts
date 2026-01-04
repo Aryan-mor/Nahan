@@ -4,19 +4,13 @@ import { initReactI18next } from 'react-i18next';
 import enTranslation from './locales/en/translation.json';
 import faTranslation from './locales/fa/translation.json';
 
-// Get language from localStorage if available (nahan-storage is the key used by zustand persist)
+// Get language from localStorage if available
+// Note: Storage is now encrypted (nahan-secure-data) or in UI store (nahan-ui-storage)
+// We can't read encrypted storage here without the passphrase
+// Return default - the store will load the correct language after unlock
 const getSavedLanguage = () => {
-  try {
-    const storage = localStorage.getItem('nahan-storage');
-    if (storage) {
-      const parsed = JSON.parse(storage);
-      if (parsed.state && parsed.state.language) {
-        return parsed.state.language;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to parse language from storage', e);
-  }
+  // Since storage is now encrypted, we can't read it without the passphrase
+  // Return default - the store will load the correct language after unlock
   return 'en';
 };
 

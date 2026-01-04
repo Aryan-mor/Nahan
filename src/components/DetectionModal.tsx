@@ -1,0 +1,181 @@
+/**
+ * Detection Modal - Shows detected Nahan messages or contact IDs
+ * Provides user-friendly actions for detected content
+ */
+
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
+import { MessageSquare, UserPlus, X } from 'lucide-react';
+import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
+import { Contact, storageService } from '../services/storage';
+import { CryptoService } from '../services/crypto';
+
+const cryptoService = CryptoService.getInstance();
+
+interface DetectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  type: 'message' | 'id';
+  contactName: string;
+  contactPublicKey?: string; // For ID type
+  contactFingerprint?: string; // For message type
+  encryptedData?: string; // Base64-encoded encrypted message (for message type)
+}
+
+export function DetectionModal({
+  isOpen,
+  onClose,
+  type,
+  contactName,
+  contactPublicKey,
+  contactFingerprint,
+  encryptedData,
+}: DetectionModalProps) {
+  const {
+    addContact,
+    setActiveChat,
+    contacts,
+    sessionPassphrase,
+  } = useAppStore();
+
+  const { setActiveTab } = useUIStore();
+
+  const handleAddContact = async () => {
+    if (!contactPublicKey) return;
+
+    try {
+      // Generate fingerprint from public key
+      const fingerprint = await cryptoService.getFingerprint(contactPublicKey);
+
+      // Check if contact already exists
+      const existingContact = contacts.find(c => c.fingerprint === fingerprint);
+      if (existingContact) {
+        // Contact already exists - just navigate to chat
+        setActiveChat(existingContact);
+        setActiveTab('chats');
+        onClose();
+        return;
+      }
+
+      // Create new contact
+      const newContact: Omit<Contact, 'id' | 'createdAt' | 'lastUsed'> = {
+        name: contactName,
+        publicKey: contactPublicKey,
+        fingerprint: fingerprint,
+      };
+
+      // Store contact in database first
+      if (!sessionPassphrase) {
+        throw new Error('SecureStorage: Missing key');
+      }
+
+      const storedContact = await storageService.storeContact(newContact, sessionPassphrase);
+
+      // Add contact to store
+      addContact(storedContact);
+
+      // Navigate to chat with new contact
+      setActiveChat(storedContact);
+      setActiveTab('chats');
+      onClose();
+    } catch (error) {
+      console.error('Failed to add contact:', error);
+    }
+  };
+
+  const handleGoToChat = async () => {
+    if (!contactFingerprint) return;
+
+    const contact = contacts.find(c => c.fingerprint === contactFingerprint);
+    if (contact) {
+      setActiveChat(contact);
+      setActiveTab('chats');
+      onClose();
+    }
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      classNames={{
+        base: 'bg-industrial-950 border border-industrial-800',
+        header: 'border-b border-industrial-800',
+        body: 'py-6',
+        footer: 'border-t border-industrial-800',
+      }}
+    >
+      <ModalContent>
+        {() => (
+          <>
+            <ModalHeader className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                {type === 'id' ? (
+                  <UserPlus className="w-5 h-5 text-primary" />
+                ) : (
+                  <MessageSquare className="w-5 h-5 text-primary" />
+                )}
+                <span>
+                  {type === 'id' ? 'New Contact Detected' : 'New Message Detected'}
+                </span>
+              </div>
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                {type === 'id' ? (
+                  <>
+                    <p className="text-sm text-industrial-300">
+                      A new contact <strong className="text-industrial-100">{contactName}</strong> was detected
+                      in your clipboard. Would you like to add them and start a chat?
+                    </p>
+                    <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
+                      <p className="text-xs text-industrial-400">
+                        The contact information was hidden using steganography. No plaintext public keys
+                        were exposed.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-industrial-300">
+                      New message from <strong className="text-industrial-100">{contactName}</strong> received. History updated.
+                    </p>
+                    <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
+                      <p className="text-xs text-industrial-400">
+                        The message was detected from your clipboard and imported successfully.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="light" onPress={onClose} startContent={<X className="w-4 h-4" />}>
+                Dismiss
+              </Button>
+              {type === 'id' ? (
+                <Button
+                  color="primary"
+                  onPress={handleAddContact}
+                  startContent={<UserPlus className="w-4 h-4" />}
+                >
+                  Add & Start Chat
+                </Button>
+              ) : (
+                <Button
+                  color="primary"
+                  onPress={handleGoToChat}
+                  startContent={<MessageSquare className="w-4 h-4" />}
+                >
+                  View Chat
+                </Button>
+              )}
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
+  );
+}
+

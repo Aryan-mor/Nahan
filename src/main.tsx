@@ -5,6 +5,32 @@ import App from './App'
 import './i18n';
 import './index.css'
 
+/**
+ * SECURITY AUDIT: Network API Verification
+ *
+ * This application is designed to be 100% offline. No network-related APIs are used:
+ * - NO fetch() calls
+ * - NO axios or HTTP client libraries
+ * - NO WebSocket connections
+ * - NO XMLHttpRequest
+ * - NO external API calls
+ *
+ * All cryptographic operations use local libraries:
+ * - tweetnacl: Local ECC encryption (X25519, Ed25519)
+ * - pako: Local compression (deflate/inflate)
+ *
+ * Data storage is local-only:
+ * - IndexedDB via Dexie.js (browser-local database)
+ * - LocalStorage via Zustand persist (browser-local storage)
+ *
+ * The only external resource loading is:
+ * - Static assets (images, fonts) bundled at build time
+ * - Service Worker for PWA offline functionality (also local)
+ *
+ * This ensures complete privacy: all encryption/decryption happens on-device,
+ * and no data ever leaves the user's browser.
+ */
+
 // English comment: Forcefully unregister all service workers in development to prevent React hook conflicts
 if (import.meta.env.DEV) {
   if ('serviceWorker' in navigator) {

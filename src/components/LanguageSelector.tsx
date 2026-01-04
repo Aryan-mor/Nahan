@@ -1,9 +1,9 @@
 import { Card, CardBody } from '@heroui/react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 
 export function LanguageSelector() {
-  const { setLanguage } = useAppStore();
+  const { setLanguage } = useUIStore();
   const { t } = useTranslation();
 
   const languages = [

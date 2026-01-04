@@ -35,14 +35,20 @@ import { toast } from 'sonner';
 import { cryptoService } from '../services/crypto';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import { StealthModal } from './StealthModal';
 
 interface MessageEditorProps {
   mode: 'encrypt' | 'decrypt';
 }
 
 export function MessageEditor({ mode }: MessageEditorProps) {
-  const { currentIdentity, contacts } = useAppStore();
+  const { identity, contacts, sessionPassphrase } = useAppStore();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const {
+    isOpen: isStealthOpen,
+    onOpen: onStealthOpen,
+    onOpenChange: onStealthOpenChange,
+  } = useDisclosure();
 
   const [message, setMessage] = useState('');
   const [encryptedMessage, setEncryptedMessage] = useState('');
@@ -54,6 +60,7 @@ export function MessageEditor({ mode }: MessageEditorProps) {
   const [signatureVerified, setSignatureVerified] = useState<boolean | null>(null);
   const [senderInfo, setSenderInfo] = useState<{ name: string; fingerprint: string } | null>(null);
   const [clipboardTimer, setClipboardTimer] = useState<NodeJS.Timeout | null>(null);
+  const [pendingBinary, setPendingBinary] = useState<Uint8Array | null>(null);
 
   const isEncryptMode = mode === 'encrypt';
   const title = isEncryptMode ? 'Encrypt Message' : 'Decrypt Message';
@@ -66,7 +73,7 @@ export function MessageEditor({ mode }: MessageEditorProps) {
       return;
     }
 
-    if (!currentIdentity) {
+    if (!identity) {
       toast.error('No identity configured. Please generate a key first.');
       return;
     }
@@ -101,7 +108,7 @@ export function MessageEditor({ mode }: MessageEditorProps) {
       return;
     }
 
-    if (!currentIdentity) {
+    if (!identity) {
       toast.error('No identity configured. Please generate a key first.');
       return;
     }
@@ -115,6 +122,52 @@ export function MessageEditor({ mode }: MessageEditorProps) {
       console.error(error);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleStealthConfirm = async (finalText: string) => {
+    try {
+      const recipient = contacts.find((c) => c.id === selectedContact);
+      if (!recipient || !identity) return;
+
+      setEncryptedMessage(finalText);
+      setDecryptedMessage('');
+      setSignatureVerified(null);
+      setSenderInfo(null);
+
+      // Store the message
+      if (!sessionPassphrase) {
+        throw new Error('SecureStorage: Missing key');
+      }
+
+      await storageService.storeMessage({
+        senderFingerprint: identity.fingerprint,
+        recipientFingerprint: recipient.fingerprint,
+        content: {
+          plain: message,
+          encrypted: finalText,
+        },
+        isOutgoing: true,
+        read: true,
+        status: 'sent',
+      }, sessionPassphrase);
+
+      toast.success('Message encrypted and hidden successfully!');
+
+      // Clear clipboard after 60 seconds for security
+      if (clipboardTimer) {
+        clearTimeout(clipboardTimer);
+      }
+      const timer = setTimeout(() => {
+        if (isEncryptMode && finalText) {
+          navigator.clipboard.writeText('');
+          toast.info('Clipboard cleared for security');
+        }
+      }, 60000);
+      setClipboardTimer(timer);
+    } catch (error) {
+      console.error('Failed to finalize encryption:', error);
+      toast.error('Failed to save message');
     }
   };
 
@@ -134,36 +187,31 @@ export function MessageEditor({ mode }: MessageEditorProps) {
           return;
         }
 
+        console.log("LOG 4: MessageEditor - Calling encryptMessage with binary: true");
         const encrypted = await cryptoService.encryptMessage(
           message,
           recipient.publicKey,
-          currentIdentity.privateKey,
+          identity.privateKey,
           passphrase,
+          { binary: true },
         );
+        console.log("LOG 5: MessageEditor - Encrypted data type:", typeof encrypted, "isUint8Array:", encrypted instanceof Uint8Array);
 
-        setEncryptedMessage(encrypted);
-        setDecryptedMessage('');
-        setSignatureVerified(null);
-        setSenderInfo(null);
+        // Store binary for stealth modal
+        if (encrypted instanceof Uint8Array) {
+        setPendingBinary(encrypted);
+        } else {
+          throw new Error('Expected Uint8Array in binary mode');
+        }
 
-        // Store the message
-        await storageService.storeMessage({
-          senderFingerprint: currentIdentity.fingerprint,
-          recipientFingerprint: recipient.fingerprint,
-          content: {
-            plain: message,
-            encrypted: encrypted,
-          },
-          isOutgoing: true,
-          read: true,
-          status: 'sent',
-        });
-
-        toast.success('Message encrypted successfully!');
+        // Suggest Stealth Mode immediately
+        console.log("LOG 6: MessageEditor - Opening Stealth Modal. EXECUTING RETURN NOW.");
+        onStealthOpen();
+        return;
       } else {
         const result = await cryptoService.decryptMessage(
           encryptedMessage,
-          currentIdentity.privateKey,
+          identity.privateKey,
           passphrase,
         );
 
@@ -181,9 +229,13 @@ export function MessageEditor({ mode }: MessageEditorProps) {
         }
 
         // Store the message
+        if (!sessionPassphrase) {
+          throw new Error('SecureStorage: Missing key');
+        }
+
         await storageService.storeMessage({
           senderFingerprint: senderInfo?.fingerprint || 'unknown',
-          recipientFingerprint: currentIdentity.fingerprint,
+          recipientFingerprint: identity.fingerprint,
           content: {
             plain: result.data,
             encrypted: encryptedMessage,
@@ -192,7 +244,7 @@ export function MessageEditor({ mode }: MessageEditorProps) {
           read: true,
           isVerified: result.verified,
           status: 'sent',
-        });
+        }, sessionPassphrase!);
 
         toast.success('Message decrypted successfully!');
       }
@@ -282,16 +334,16 @@ export function MessageEditor({ mode }: MessageEditorProps) {
             <Icon className="w-6 h-6 text-industrial-400" />
             <h2 className="text-lg sm:text-xl font-semibold text-industrial-100">{title}</h2>
           </div>
-          {currentIdentity && (
+          {identity && (
             <Chip size="sm" variant="flat" className="bg-industrial-800 text-industrial-300">
-              {currentIdentity.name}
+              {identity.name}
             </Chip>
           )}
         </CardHeader>
 
         <CardBody className="space-y-6 p-4">
           {/* No Identity State */}
-          {!currentIdentity ? (
+          {!identity ? (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
               <div className="w-16 h-16 bg-yellow-900/10 rounded-full flex items-center justify-center mb-2">
                 <Key className="w-8 h-8 text-yellow-500" />
@@ -579,6 +631,12 @@ export function MessageEditor({ mode }: MessageEditorProps) {
           )}
         </ModalContent>
       </Modal>
+      <StealthModal
+        isOpen={isStealthOpen}
+        onOpenChange={onStealthOpenChange}
+        pendingBinary={pendingBinary}
+        onConfirm={handleStealthConfirm}
+      />
     </motion.div>
   );
 }

@@ -67,7 +67,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className={`flex w-full mb-4 ${isOutgoing ? 'justify-end' : 'justify-start'}`}
+      className={`flex w-full ${isOutgoing ? 'justify-end' : 'justify-start'}`}
     >
       <div className={`flex flex-col max-w-[80%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
         <div

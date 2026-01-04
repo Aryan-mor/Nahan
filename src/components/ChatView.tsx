@@ -10,20 +10,43 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, MoreVertical, Shield } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { useAppStore } from '../stores/appStore';
 import { ChatInput } from './ChatInput';
 import { MessageBubble } from './MessageBubble';
 
 export function ChatView() {
-  const { activeChat, messages, setActiveChat } = useAppStore();
+  const { activeChat, messages, setActiveChat, clearChatHistory } = useAppStore();
   const { t, i18n } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
   const isRTL = i18n.language === 'fa';
 
-  // Auto-scroll to bottom
+  // Auto-scroll to show newest messages
+  // With flex-direction: column-reverse, newest messages (first in array) appear at the visual bottom
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = bottomRef.current?.parentElement;
+    if (container) {
+      // Scroll to bottom to show newest messages (which appear at the bottom in reversed layout)
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
+
+  const handleClearHistory = async () => {
+    if (!activeChat) return;
+
+    // Confirm before clearing
+    if (!confirm(t('chat.clear_history_confirm', { name: activeChat.name, defaultValue: `Are you sure you want to clear all messages with ${activeChat.name}? This cannot be undone.` }))) {
+      return;
+    }
+
+    try {
+      await clearChatHistory(activeChat.fingerprint);
+      toast.success(t('chat.clear_history_success', { defaultValue: 'Chat history cleared successfully' }));
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+      toast.error(t('chat.clear_history_error', { defaultValue: 'Failed to clear chat history' }));
+    }
+  };
 
   if (!activeChat) return null;
 
@@ -74,7 +97,12 @@ export function ChatView() {
             <DropdownItem key="verify" startContent={<Shield className="w-4 h-4" />}>
               {t('chat.verify_key')}
             </DropdownItem>
-            <DropdownItem key="clear" className="text-danger" color="danger">
+            <DropdownItem
+              key="clear"
+              className="text-danger"
+              color="danger"
+              onPress={handleClearHistory}
+            >
               {t('chat.clear_history')}
             </DropdownItem>
           </DropdownMenu>
@@ -82,7 +110,7 @@ export function ChatView() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-4 gap-2.5 flex flex-col-reverse scrollbar-hide">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-industrial-500 space-y-4 opacity-50">
             <Shield className="w-16 h-16" />

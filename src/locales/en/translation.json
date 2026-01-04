@@ -78,6 +78,9 @@
     "options": "Chat options",
     "verify_key": "Verify Key",
     "clear_history": "Clear History",
+    "clear_history_confirm": "Are you sure you want to clear all messages with {{name}}? This cannot be undone.",
+    "clear_history_success": "Chat history cleared successfully",
+    "clear_history_error": "Failed to clear chat history",
     "encrypted_notice": "Messages are end-to-end encrypted. Only you and {{name}} can read them.",
     "input": {
       "placeholder": "Type a secure message...",

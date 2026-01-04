@@ -3,46 +3,53 @@
  * The store interface and implementation have been updated to use initializeApp.
  */
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { cryptoService } from '../services/crypto';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { CamouflageService } from '../services/camouflage';
+import { CryptoService } from '../services/crypto';
+import { secureStorage, setPassphrase } from '../services/secureStorage';
 import { Contact, Identity, SecureMessage, storageService } from '../services/storage';
+import { useUIStore } from './uiStore';
+
+const cryptoService = CryptoService.getInstance();
+const camouflageService = CamouflageService.getInstance();
 
 interface AppState {
   // Global
   error: string | null;
-  language: string | null;
 
-  // Identities
-  identities: Identity[];
-  currentIdentity: Identity | null;
+  // Identity (SENSITIVE - must be encrypted)
+  identity: Identity | null;
   isLoading: boolean;
 
-  // Contacts
+  // Contacts (SENSITIVE - must be encrypted)
   contacts: Contact[];
 
-  // Security
-  isLocked: boolean;
-  failedAttempts: number;
+  // Security (in-memory only - never persisted)
   sessionPassphrase: string | null; // In-memory only
 
-  // Chat
+  // Chat (runtime state - never persisted)
   activeChat: Contact | null;
   messages: SecureMessage[];
+  messageInput: string; // Global chat input state
 
-  // Navigation
-  activeTab: 'chats' | 'keys' | 'settings';
-  setActiveTab: (tab: 'chats' | 'keys' | 'settings') => void;
+  // Stealth Mode State
+  isStealthMode: boolean;
+  showStealthModal: boolean;
+  pendingStealthBinary: Uint8Array | null;
+  pendingPlaintext: string | null;
 
   // Actions
-  setLanguage: (lang: string) => void;
+  setStealthMode: (enabled: boolean) => void;
+  setShowStealthModal: (show: boolean) => void;
+  setPendingStealthBinary: (binary: Uint8Array | null) => void;
+  setPendingPlaintext: (text: string | null) => void;
+  confirmStealthSend: (finalOutput: string) => Promise<void>;
+  sendAutoStealthMessage: (text: string) => Promise<string>;
+  setMessageInput: (val: string) => void;
   initializeApp: () => Promise<void>;
-  setCurrentIdentity: (identity: Identity) => void;
   addIdentity: (identity: Identity) => void;
   addContact: (contact: Contact) => void;
   removeContact: (fingerprint: string) => Promise<void>;
-  setLocked: (locked: boolean) => void;
-  incrementFailedAttempts: () => void;
-  resetFailedAttempts: () => void;
   wipeData: () => Promise<void>;
 
   // New Actions
@@ -51,19 +58,11 @@ interface AppState {
   setActiveChat: (contact: Contact | null) => Promise<void>;
   sendMessage: (text: string) => Promise<string>;
   deleteMessage: (id: string) => Promise<void>;
+  clearChatHistory: (fingerprint: string) => Promise<void>;
   refreshMessages: () => Promise<void>;
   processPendingMessages: () => Promise<number>;
-  processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string) => Promise<void>;
+  processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<void>;
   setSessionPassphrase: (passphrase: string) => void;
-
-  // PWA
-  deferredPrompt: any;
-  isStandalone: boolean;
-  isInstallPromptVisible: boolean;
-  setDeferredPrompt: (prompt: any) => void;
-  setStandalone: (isStandalone: boolean) => void;
-  setInstallPromptVisible: (visible: boolean) => void;
-  installPWA: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -71,59 +70,86 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       // Initial State matching AppState interface
       error: null,
-      language: null,
-      activeTab: 'chats',
-      identities: [],
-      currentIdentity: null,
+      identity: null,
       isLoading: true,
       contacts: [],
-      isLocked: false,
-      failedAttempts: 0,
       sessionPassphrase: null,
       activeChat: null,
       messages: [],
-      
-      // PWA Initial State
-      deferredPrompt: null,
-      isStandalone: false,
-      isInstallPromptVisible: false,
+      messageInput: '', // Global chat input state
+
+      // Stealth Mode Initial State
+      isStealthMode: false,
+      showStealthModal: false,
+      pendingStealthBinary: null,
+      pendingPlaintext: null,
 
       initializeApp: async () => {
         set({ isLoading: true });
         try {
+          // Boot Cleanup: Permanently delete old unencrypted data
+          localStorage.removeItem('nahan-storage');
+
           // Initialize DB
           await storageService.initialize();
 
-          const [identities, contacts] = await Promise.all([
-            storageService.getIdentities(),
-            storageService.getContacts(),
-          ]);
+          // Update UI state (non-sensitive) - can be done without passphrase
+          // Check if app is running in standalone mode
+          const isStandaloneMode =
+            window.matchMedia('(display-mode: standalone)').matches ||
+            (window.navigator as any).standalone ||
+            document.referrer.includes('android-app://');
 
-          set({ identities, contacts });
+          // Update UI store (non-sensitive, doesn't require passphrase)
+          useUIStore.getState().setStandalone(!!isStandaloneMode);
 
-          // If we have a current identity, ensure it's up to date
-          const current = get().currentIdentity;
-          if (current) {
-            const updated = identities.find((i) => i.id === current.id);
-            if (updated) {
-              set({ currentIdentity: updated });
-            } else if (identities.length > 0) {
-              set({ currentIdentity: identities[0] });
+          // Check if identity exists (without requiring passphrase for boot detection)
+          const identityExists = await storageService.hasIdentity();
+          const passphrase = get().sessionPassphrase;
+
+          if (!passphrase) {
+            // No passphrase - can't decrypt data, but we can detect if identity exists
+            if (identityExists) {
+              // Identity exists but not unlocked - we need to decrypt the vault entry to get
+              // the identity structure (including encrypted privateKey) for PIN verification.
+              // But we can't decrypt the vault entry without a passphrase.
+              //
+              // Solution: We'll decrypt the vault entry in unlockApp with the PIN attempt.
+              // For boot detection, we set a placeholder to prevent Onboarding from showing.
+              // The unlockApp will decrypt with the PIN attempt to get the identity structure.
+
+              // Set placeholder - unlockApp will decrypt vault entry with PIN attempt
+              set({ identity: { id: 'placeholder' } as Identity, contacts: [] });
+              // Lock the app to force PIN entry
+              useUIStore.getState().setLocked(true);
             } else {
-              set({ currentIdentity: null });
+              // No identity exists - allow Onboarding to show
+              set({ identity: null, contacts: [] });
             }
-          } else if (identities.length > 0) {
-            set({ currentIdentity: identities[0] });
+            set({ isLoading: false });
+            return;
           }
 
-          // Security Check: If we have identities (not onboarding) but no session passphrase
+          // Passphrase available - decrypt and load real data
+          const [identities, contacts] = await Promise.all([
+            storageService.getIdentities(passphrase),
+            storageService.getContacts(passphrase),
+          ]);
+
+          // ALWAYS update state with loaded identity/contacts for UI rendering
+          // The UI needs the identity to be set so it can show the LockScreen
+          // SecureStorage middleware will block any unencrypted writes to disk
+          // Load the first identity found (single-identity architecture)
+          const identity = identities.length > 0 ? identities[0] : null;
+          set({ identity, contacts });
+
+          // Security Check: If we have an identity (not onboarding) but no session passphrase
           // (e.g. after page reload), we MUST lock the app to force password re-entry.
-          // This ensures sessionPassphrase is re-populated for PGP operations.
-          if (identities.length > 0) {
-            const { sessionPassphrase, isLocked } = get();
+          if (identity) {
+            const { sessionPassphrase } = get();
+            const { isLocked } = useUIStore.getState();
             if (!isLocked && !sessionPassphrase) {
-              console.warn('Session passphrase missing on init. Locking app.');
-              set({ isLocked: true });
+              useUIStore.getState().setLocked(true);
             }
           }
         } catch (error) {
@@ -134,19 +160,70 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      setLanguage: (lang) => set({ language: lang }),
-      setActiveTab: (tab) => set({ activeTab: tab }),
+      setStealthMode: (enabled) => set({ isStealthMode: enabled }),
+      setShowStealthModal: (show) => set({ showStealthModal: show }),
+      setPendingStealthBinary: (binary) => set({ pendingStealthBinary: binary }),
+      setPendingPlaintext: (text) => set({ pendingPlaintext: text }),
 
-      setCurrentIdentity: (identity) => {
-        set({ currentIdentity: identity });
-        storageService.updateIdentityLastUsed(identity.fingerprint);
+      setMessageInput: (val) => set({ messageInput: val }),
+
+      confirmStealthSend: async (finalOutput) => {
+        const { activeChat, identity, pendingPlaintext } = get();
+        if (!activeChat || !identity || !pendingPlaintext) {
+          console.error("Missing context for stealth send");
+          return;
+        }
+
+        // TRACE D [Store Final]
+        console.log("TRACE D [Store Final]:", {
+          content: finalOutput.substring(0, 30),
+          length: finalOutput.length
+        });
+
+        // Verify final output contains no PGP markers
+        if (finalOutput.includes('BEGIN') || finalOutput.includes('PGP') || finalOutput.includes('-----')) {
+          console.error('ERROR: PGP markers detected in final output! This should not happen.');
+          throw new Error('Invalid stealth output: PGP markers detected');
+        }
+
+        const isOffline = !navigator.onLine;
+
+        try {
+          const { sessionPassphrase } = get();
+          if (!sessionPassphrase) {
+            throw new Error('SecureStorage: Missing key');
+          }
+
+          const newMessage = await storageService.storeMessage({
+            senderFingerprint: identity.fingerprint,
+            recipientFingerprint: activeChat.fingerprint,
+            content: {
+              plain: pendingPlaintext,
+              encrypted: finalOutput,
+            },
+            isOutgoing: true,
+            read: true,
+            status: isOffline ? 'pending' : 'sent',
+          }, sessionPassphrase);
+
+          set((state) => ({
+            messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+            showStealthModal: false,
+            pendingStealthBinary: null,
+            pendingPlaintext: null,
+            messageInput: '', // Clear input after successful stealth send
+          }));
+        } catch (error) {
+          console.error('Failed to confirm stealth send:', error);
+        }
       },
 
-      addIdentity: (identity) => {
-        set((state) => ({
-          identities: [...state.identities, identity],
-          currentIdentity: identity,
-        }));
+      addIdentity: async (identity) => {
+        set({ identity });
+        const { sessionPassphrase } = get();
+        if (sessionPassphrase) {
+          await storageService.updateIdentityLastUsed(identity.fingerprint, sessionPassphrase);
+        }
       },
 
       addContact: (contact) => {
@@ -157,38 +234,34 @@ export const useAppStore = create<AppState>()(
 
       removeContact: async (fingerprint) => {
         try {
-          await storageService.deleteContact(fingerprint);
-          set((state) => ({
-            contacts: state.contacts.filter((c) => c.fingerprint !== fingerprint),
-          }));
+          const { sessionPassphrase } = get();
+          if (!sessionPassphrase) {
+            throw new Error('SecureStorage: Missing key');
+          }
+
+          // Find contact to get its ID
+          const contact = get().contacts.find((c) => c.fingerprint === fingerprint);
+          if (contact) {
+            await storageService.deleteContactById(contact.id);
+            set((state) => ({
+              contacts: state.contacts.filter((c) => c.fingerprint !== fingerprint),
+            }));
+          }
         } catch (error) {
           console.error('Failed to remove contact:', error);
         }
       },
 
-      setLocked: (locked) => {
-        set({ isLocked: locked });
-        if (locked) {
-          set({ sessionPassphrase: null });
-        }
-      },
-
-      incrementFailedAttempts: () => {
-        set((state) => ({ failedAttempts: state.failedAttempts + 1 }));
-      },
-
-      resetFailedAttempts: () => {
-        set({ failedAttempts: 0 });
-      },
 
       wipeData: async () => {
         await storageService.clearAllData();
+        // Reset UI state (non-sensitive)
+        useUIStore.getState().setLocked(false);
+        useUIStore.getState().resetFailedAttempts();
+        // Reset sensitive state
         set({
-          identities: [],
-          currentIdentity: null,
+          identity: null,
           contacts: [],
-          isLocked: false, // Or true? Usually wipe resets to fresh state.
-          failedAttempts: 0,
           sessionPassphrase: null,
           activeChat: null,
           messages: [],
@@ -198,23 +271,55 @@ export const useAppStore = create<AppState>()(
       },
 
       unlockApp: async (pin: string) => {
-        const { currentIdentity } = get();
-        if (!currentIdentity) return false;
+        // Check if identity exists (even if placeholder)
+        const identityExists = await storageService.hasIdentity();
+        if (!identityExists) return false;
 
         try {
+          // Step 1: Decrypt the vault entry with PIN attempt to get identity structure
+          // This decrypts the vault entry and returns the identity object
+          // The identity.privateKey is already encrypted with the user's PIN
+          const identityWithEncryptedPrivateKey = await storageService.getIdentity(pin);
+          if (!identityWithEncryptedPrivateKey) {
+            return false;
+          }
+
+          // Step 2: Verify PIN via cryptoService using the encrypted privateKey from identity
+          // The privateKey in the identity is already encrypted with the user's PIN
           const isValid = await cryptoService.verifyPrivateKeyPassphrase(
-            currentIdentity.privateKey,
+            identityWithEncryptedPrivateKey.privateKey,
             pin,
           );
-          if (isValid) {
-            set({
-              isLocked: false,
-              sessionPassphrase: pin,
-              failedAttempts: 0,
-            });
-            return true;
+
+          if (!isValid) {
+            return false;
           }
-          return false;
+
+          // Step 3: Set passphrase FIRST to enable encryption layer
+          setPassphrase(pin);
+
+          // Step 4: Re-fetch the decrypted identity and contacts (now that PIN is verified)
+          // The identity we got above is already decrypted (we decrypted the vault entry with PIN)
+          // But we re-fetch to ensure consistency and load contacts
+          const decryptedIdentity = await storageService.getIdentity(pin);
+          const decryptedContacts = await storageService.getContacts(pin);
+
+          if (!decryptedIdentity) {
+            return false;
+          }
+
+          // Step 5: Replace placeholder with real decrypted identity and load contacts
+          set({
+            sessionPassphrase: pin,
+            identity: decryptedIdentity,
+            contacts: decryptedContacts,
+          });
+
+          // Step 6: Update UI lock state in uiStore
+          useUIStore.getState().setLocked(false);
+          useUIStore.getState().resetFailedAttempts();
+
+          return true;
         } catch (error) {
           console.error('Unlock failed:', error);
           return false;
@@ -222,41 +327,173 @@ export const useAppStore = create<AppState>()(
       },
 
       lockApp: () => {
-        set({ isLocked: true, sessionPassphrase: null, activeChat: null, messages: [] });
+        // Update UI state (non-sensitive)
+        useUIStore.getState().setLocked(true);
+        // Clear sensitive in-memory state
+        set({ sessionPassphrase: null, activeChat: null, messages: [] });
       },
 
       setActiveChat: async (contact) => {
         set({ activeChat: contact });
         if (contact) {
+          const { sessionPassphrase } = get();
+          if (!sessionPassphrase) {
+            throw new Error('SecureStorage: Missing key');
+          }
           // Load messages
-          const messages = await storageService.getMessagesByFingerprint(contact.fingerprint);
+          const messages = await storageService.getMessagesByFingerprint(contact.fingerprint, sessionPassphrase);
           set({ messages });
-          storageService.updateContactLastUsed(contact.fingerprint);
+          await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
         } else {
           set({ messages: [] });
         }
       },
 
-      sendMessage: async (text) => {
-        const { activeChat, currentIdentity, sessionPassphrase } = get();
-        if (!activeChat || !currentIdentity || !sessionPassphrase) {
+      /**
+       * Auto-Stealth: Automatically encrypt and embed message with random cover text
+       * This function performs stealth encoding in the background without opening the modal
+       * @param text Plaintext message to send
+       * @returns Stealth-encoded string (ready to copy/share)
+       */
+      sendAutoStealthMessage: async (text: string): Promise<string> => {
+        const { activeChat, identity, sessionPassphrase } = get();
+        const { camouflageLanguage } = useUIStore.getState();
+
+        if (!activeChat || !identity || !sessionPassphrase) {
           throw new Error('Cannot send message: Missing context');
         }
 
         try {
-          // Encrypt message
+          // Step 1: Encrypt message to binary (raw Uint8Array, no headers)
+          const encryptedBinary = await cryptoService.encryptMessage(
+            text,
+            activeChat.publicKey,
+            identity.privateKey,
+            sessionPassphrase,
+            { binary: true }
+          ) as Uint8Array;
+
+          // Step 2: Generate random cover text that meets safety requirements
+          // Use getRecommendedCover which ensures Green Zone (80%+ safety)
+          const coverText = camouflageService.getRecommendedCover(
+            encryptedBinary.length,
+            camouflageLanguage || 'fa'
+          );
+
+          // Step 3: Verify safety ratio meets Green Zone requirement (80%+)
+          // This is critical to prevent data leakage with insufficient cover text
+          const safetyScore = camouflageService.calculateStealthRatio(encryptedBinary.length, coverText);
+          let finalCover = coverText;
+          let finalScore = safetyScore;
+
+          if (safetyScore < 80) {
+            // If safety is below 80%, expand cover text until it meets requirement
+            // This ensures auto-stealth always uses safe cover text
+            let expandedCover = coverText;
+            let attempts = 0;
+            let currentScore = safetyScore;
+
+            while (currentScore < 80 && attempts < 5) {
+              // Expand cover text by getting another recommendation
+              const additionalCover = camouflageService.getRecommendedCover(
+                encryptedBinary.length,
+                camouflageLanguage || 'fa'
+              );
+              expandedCover = expandedCover + ' ' + additionalCover;
+              currentScore = camouflageService.calculateStealthRatio(encryptedBinary.length, expandedCover);
+              if (currentScore >= 80) {
+                finalCover = expandedCover;
+                finalScore = currentScore;
+                break;
+              }
+              attempts++;
+            }
+            // Use expanded cover text if it's longer
+            if (expandedCover.length > coverText.length) {
+              finalCover = expandedCover;
+              finalScore = currentScore;
+            }
+          }
+
+          // Safety check: Prevent sending if safety ratio is still too low
+          // This prevents data leakage with insufficient cover text
+          if (finalScore < 60) {
+            throw new Error(
+              `Safety ratio too low (${finalScore}%). Cannot send message with insufficient cover text. Please use Long Press to manually adjust cover text.`
+            );
+          }
+
+          // Step 4: Embed binary into cover text
+          const finalOutput = camouflageService.embed(encryptedBinary, finalCover, camouflageLanguage || 'fa');
+
+          // Step 5: Store message in database
+          const isOffline = !navigator.onLine;
+          const newMessage = await storageService.storeMessage({
+            senderFingerprint: identity.fingerprint,
+            recipientFingerprint: activeChat.fingerprint,
+            content: {
+              plain: text,
+              encrypted: finalOutput,
+            },
+            isOutgoing: true,
+            read: true,
+            status: isOffline ? 'pending' : 'sent',
+          }, sessionPassphrase);
+
+          // Update state
+          set((state) => ({
+            messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+            messageInput: '', // Clear input after successful auto-stealth send
+          }));
+
+          return finalOutput;
+        } catch (error) {
+          console.error('Failed to send auto-stealth message:', error);
+          throw error;
+        }
+      },
+
+      sendMessage: async (text) => {
+        const { activeChat, identity, sessionPassphrase, isStealthMode } = get();
+
+        if (!activeChat || !identity || !sessionPassphrase) {
+          throw new Error('Cannot send message: Missing context');
+        }
+
+        try {
+          if (isStealthMode) {
+            // Stealth mode: Encrypt to binary and open modal for user customization
+            const encryptedBinary = await cryptoService.encryptMessage(
+              text,
+              activeChat.publicKey,
+              identity.privateKey,
+              sessionPassphrase,
+              { binary: true }
+            ) as Uint8Array;
+
+            // Store pending state and trigger modal
+            set({
+              pendingStealthBinary: encryptedBinary,
+              pendingPlaintext: text,
+              showStealthModal: true
+            });
+
+            return '';
+          }
+
+          // Standard mode: Encrypt message (with headers)
           const encryptedContent = await cryptoService.encryptMessage(
             text,
             activeChat.publicKey,
-            currentIdentity.privateKey,
+            identity.privateKey,
             sessionPassphrase,
-          );
+          ) as string;
 
           const isOffline = !navigator.onLine;
 
           // Store message
           const newMessage = await storageService.storeMessage({
-            senderFingerprint: currentIdentity.fingerprint,
+            senderFingerprint: identity.fingerprint,
             recipientFingerprint: activeChat.fingerprint,
             content: {
               plain: text,
@@ -265,11 +502,12 @@ export const useAppStore = create<AppState>()(
             isOutgoing: true,
             read: true,
             status: isOffline ? 'pending' : 'sent',
-          });
+          }, sessionPassphrase);
 
           // Update state
           set((state) => ({
-            messages: [...state.messages, newMessage],
+            messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+            messageInput: '', // Clear input after successful standard send
           }));
 
           return encryptedContent;
@@ -291,35 +529,79 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      clearChatHistory: async (fingerprint) => {
+        const { sessionPassphrase } = get();
+        if (!sessionPassphrase) {
+          throw new Error('Cannot clear history: Missing passphrase');
+        }
+
+        try {
+          // Delete all messages for this contact from storage
+          await storageService.deleteMessagesByFingerprint(fingerprint, sessionPassphrase);
+
+          // Clear messages from state if this is the active chat
+          const { activeChat } = get();
+          if (activeChat && activeChat.fingerprint === fingerprint) {
+            set({ messages: [] });
+          }
+        } catch (error) {
+          console.error('Failed to clear chat history:', error);
+          throw error;
+        }
+      },
+
       refreshMessages: async () => {
-        const { activeChat } = get();
-        if (activeChat) {
-          const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint);
+        const { activeChat, sessionPassphrase } = get();
+        if (activeChat && sessionPassphrase) {
+          const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint, sessionPassphrase);
           set({ messages });
         }
       },
 
       processPendingMessages: async () => {
-        const pending = await storageService.getPendingMessages();
+        // Ensure database is initialized before accessing it
+        try {
+          await storageService.initialize();
+        } catch (error) {
+          console.error('Failed to initialize database for pending messages:', error);
+          return 0;
+        }
+
+        const { sessionPassphrase } = get();
+        if (!sessionPassphrase) {
+          return 0;
+        }
+
+        const pending = await storageService.getPendingMessages(sessionPassphrase);
         if (pending.length === 0) return 0;
-        
+
         for (const msg of pending) {
-          await storageService.updateMessageStatus(msg.id, 'sent');
+          await storageService.updateMessageStatus(msg.id, 'sent', sessionPassphrase);
         }
 
         const { activeChat } = get();
         if (activeChat) {
-             const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint);
+             const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint, sessionPassphrase);
              set({ messages });
         }
         return pending.length;
       },
 
-      processIncomingMessage: async (encryptedText, targetContactFingerprint) => {
-        const { currentIdentity, sessionPassphrase, contacts } = get();
+      processIncomingMessage: async (encryptedText, targetContactFingerprint, skipNavigation = false) => {
+        const { identity, sessionPassphrase, contacts } = get();
 
-        if (!currentIdentity || !sessionPassphrase) {
+        if (!identity || !sessionPassphrase) {
           throw new Error('Authentication required');
+        }
+
+        // Check if message already exists (deduplication)
+        const exists = await storageService.messageExists(encryptedText, sessionPassphrase);
+        if (exists) {
+          // Message is a duplicate - silently return without processing
+          // This prevents duplicate entries and redundant notifications
+          const duplicateError = new Error('DUPLICATE_MESSAGE');
+          duplicateError.name = 'DuplicateMessageError';
+          throw duplicateError;
         }
 
         try {
@@ -328,7 +610,7 @@ export const useAppStore = create<AppState>()(
 
           const result = await cryptoService.decryptMessage(
             encryptedText,
-            currentIdentity.privateKey,
+            identity.privateKey,
             sessionPassphrase,
             contactKeys,
           );
@@ -342,7 +624,7 @@ export const useAppStore = create<AppState>()(
             if (targetContactFingerprint) {
               senderFingerprint = targetContactFingerprint;
               isVerified = false;
-            } 
+            }
             // 2. Check active chat fallback
             else {
               const { activeChat } = get();
@@ -352,7 +634,7 @@ export const useAppStore = create<AppState>()(
                 isVerified = false; // Mark as unverified
               }
             }
-            
+
             // 3. If still no sender, throw specific error for UI handling
             if (!senderFingerprint) {
               throw new Error('SENDER_UNKNOWN');
@@ -366,9 +648,9 @@ export const useAppStore = create<AppState>()(
           }
 
           // Store the message
-          await storageService.storeMessage({
+          const newMessage = await storageService.storeMessage({
             senderFingerprint: sender.fingerprint,
-            recipientFingerprint: currentIdentity.fingerprint,
+            recipientFingerprint: identity.fingerprint,
             content: {
               plain: result.data,
               encrypted: encryptedText,
@@ -377,14 +659,26 @@ export const useAppStore = create<AppState>()(
             read: false, // Mark as unread initially
             isVerified: isVerified,
             status: 'sent',
-          });
+          }, sessionPassphrase);
 
-          // Navigate to the chat
-          set({ activeChat: sender });
+          // Only navigate if skipNavigation is false (default behavior for backward compatibility)
+          if (!skipNavigation) {
+            // Navigate to the chat
+            set({ activeChat: sender });
 
-          // Refresh messages if we are now in that chat
-          const messages = await storageService.getMessagesByFingerprint(sender.fingerprint);
-          set({ messages });
+            // Refresh messages if we are now in that chat
+            const messages = await storageService.getMessagesByFingerprint(sender.fingerprint, sessionPassphrase);
+            set({ messages });
+          } else {
+            // If skipNavigation is true (auto-import), update state if this is the active chat
+            const { activeChat } = get();
+            if (activeChat && activeChat.fingerprint === sender.fingerprint) {
+              // Prepend new message to maintain descending order (newest first)
+              set((state) => ({
+                messages: [newMessage, ...state.messages],
+              }));
+            }
+          }
         } catch (error) {
           console.error('Failed to process incoming message:', error);
           throw error;
@@ -392,34 +686,19 @@ export const useAppStore = create<AppState>()(
       },
 
       setSessionPassphrase: (passphrase) => set({ sessionPassphrase: passphrase }),
-
-      // PWA Actions
-      setDeferredPrompt: (prompt) => set({ deferredPrompt: prompt }),
-      setStandalone: (isStandalone) => set({ isStandalone }),
-      setInstallPromptVisible: (visible) => set({ isInstallPromptVisible: visible }),
-      installPWA: async () => {
-        const { deferredPrompt } = get();
-        if (!deferredPrompt) return;
-        
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-          set({ deferredPrompt: null, isInstallPromptVisible: false });
-        }
-      },
     }),
     {
-      name: 'nahan-storage',
+      name: 'nahan-secure-data',
+      version: 1,
+      storage: createJSONStorage(() => secureStorage),
       partialize: (state) => ({
-        // Only persist these fields
-        identities: state.identities,
-        currentIdentity: state.currentIdentity,
+        // ONLY persist these two sensitive fields (must be encrypted)
+        identity: state.identity,
         contacts: state.contacts,
-        isLocked: state.isLocked,
-        failedAttempts: state.failedAttempts,
-        language: state.language,
-        // sessionPassphrase, activeChat, messages are NOT persisted
+        // sessionPassphrase is NEVER persisted (in-memory only)
+        // activeChat, messages are NOT persisted
+        // Messages are stored in IndexedDB only (via storageService)
+        // UI state (language, PWA, isLocked, failedAttempts) is in separate unencrypted store
       }),
     },
   ),

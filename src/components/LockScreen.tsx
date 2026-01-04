@@ -6,19 +6,22 @@ import { toast } from 'sonner';
 import { cryptoService } from '../services/crypto';
 import { Identity } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 import { PinPad } from './PinPad';
 
 export function LockScreen() {
   const {
-    identities,
+    identity,
+    wipeData,
+  } = useAppStore();
+
+  const {
+    isLocked,
     setLocked,
-    setCurrentIdentity,
-    currentIdentity,
     failedAttempts,
     incrementFailedAttempts,
     resetFailedAttempts,
-    wipeData,
-  } = useAppStore();
+  } = useUIStore();
   const { t } = useTranslation();
   const [selectedIdentityId, setSelectedIdentityId] = useState<string>('');
   const [passphrase, setPassphrase] = useState('');
@@ -27,18 +30,12 @@ export function LockScreen() {
 
   // Set initial selected identity
   useEffect(() => {
-    if (identities.length > 0) {
-      // Prefer currentIdentity if set, otherwise first one
-      if (currentIdentity) {
-        setSelectedIdentityId(currentIdentity.id);
-      } else {
-        setSelectedIdentityId(identities[0].id);
-      }
+    if (identity) {
+      setSelectedIdentityId(identity.id);
     }
-  }, [identities, currentIdentity]);
+  }, [identity]);
 
   const handleUnlock = async (pin: string) => {
-    const identity = identities.find((i) => i.id === selectedIdentityId);
     if (!identity) {
       toast.error(t('lock.error.select'));
       return;
@@ -52,23 +49,14 @@ export function LockScreen() {
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       // Use unlockApp action to verify and set session state
-      // First ensure current identity matches selected
-      if (currentIdentity?.id !== identity.id) {
-        setCurrentIdentity(identity);
-      }
-
-      const isValid = await cryptoService.verifyPrivateKeyPassphrase(identity.privateKey, pin);
+      const isValid = await useAppStore.getState().unlockApp(pin);
 
       if (isValid) {
         toast.success(t('lock.welcome'));
-        setCurrentIdentity(identity);
         resetFailedAttempts();
-        // Set session passphrase explicitly
-        useAppStore.getState().setSessionPassphrase(pin);
-        setLocked(false);
-        
+
         // Show install prompt if not installed (even if dismissed previously)
-        const { isStandalone, setInstallPromptVisible } = useAppStore.getState();
+        const { isStandalone, setInstallPromptVisible } = useUIStore.getState();
         if (!isStandalone) {
            setInstallPromptVisible(true);
         }
@@ -105,49 +93,6 @@ export function LockScreen() {
         transition={{ duration: 0.3 }}
         className="w-full max-w-md"
       >
-        {identities.length > 1 && (
-          <div className="mb-6 px-6">
-            <Select
-              label={t('lock.select_identity')}
-              selectedKeys={selectedIdentityId ? [selectedIdentityId] : []}
-              onSelectionChange={(keys) => {
-                setSelectedIdentityId(Array.from(keys)[0] as string);
-                setPassphrase('');
-                setError('');
-              }}
-              classNames={{
-                trigger: 'bg-industrial-900 border-industrial-700',
-                popoverContent: 'bg-industrial-900 border-industrial-800',
-              }}
-              renderValue={(items) => {
-                return items.map((item) => (
-                  <div key={item.key} className="flex items-center gap-2">
-                    <Avatar
-                      alt={(item.data as Identity)?.name}
-                      className="w-6 h-6 text-xs"
-                      name={(item.data as Identity)?.name}
-                    />
-                    <span className="text-industrial-100">{(item.data as Identity)?.name}</span>
-                  </div>
-                ));
-              }}
-            >
-              {identities.map((identity) => (
-                <SelectItem key={identity.id} textValue={identity.name}>
-                  <div className="flex items-center gap-2">
-                    <Avatar alt={identity.name} className="w-6 h-6 text-xs" name={identity.name} />
-                    <div className="flex flex-col text-start">
-                      <span className="text-industrial-100">{identity.name}</span>
-                      <span className="text-tiny text-industrial-500 font-mono">
-                        #{identity.fingerprint.slice(-4)}
-                      </span>
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
-        )}
 
         <PinPad
           value={passphrase}

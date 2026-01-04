@@ -3,6 +3,7 @@ import { Download, MoreVertical, Share, Shield, WifiOff, X, Zap } from 'lucide-r
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 
 export function PWAInstallPrompt() {
   const {
@@ -11,7 +12,7 @@ export function PWAInstallPrompt() {
     installPWA,
     isInstallPromptVisible,
     setInstallPromptVisible,
-  } = useAppStore();
+  } = useUIStore();
   const { t } = useTranslation();
 
   const [isIOS, setIsIOS] = useState(false);

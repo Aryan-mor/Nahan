@@ -3,9 +3,12 @@ import { toast } from 'sonner';
 import { useAppStore } from '../stores/appStore';
 
 export function useOfflineSync() {
-  const { processPendingMessages } = useAppStore();
+  const { processPendingMessages, isLoading } = useAppStore();
 
   useEffect(() => {
+    // Don't sync if app is still loading (database might not be initialized)
+    if (isLoading) return;
+
     const handleOnline = async () => {
       // console.log('App is online, syncing pending messages...');
       try {
@@ -20,15 +23,15 @@ export function useOfflineSync() {
 
     window.addEventListener('online', handleOnline);
 
-    // Initial check (debounced/delayed to avoid double toast on load if already handled)
-    // But store doesn't auto-sync on load, so we should trigger it.
-    if (navigator.onLine) {
-        // Use a small timeout to ensure app is fully hydrated
+    // Initial check (debounced/delayed to ensure app is fully initialized)
+    // Wait for app initialization before syncing
+    if (navigator.onLine && !isLoading) {
+        // Use a timeout to ensure app is fully hydrated and database is initialized
         setTimeout(handleOnline, 1000);
     }
 
     return () => {
       window.removeEventListener('online', handleOnline);
     };
-  }, [processPendingMessages]);
+  }, [processPendingMessages, isLoading]);
 }

@@ -7,12 +7,14 @@ import { toast } from 'sonner';
 import { cryptoService } from '../services/crypto';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 import { PinPad } from './PinPad';
 
 type Step = 'create-pin' | 'confirm-pin' | 'warning' | 'identity';
 
 export function Onboarding() {
-  const { addIdentity, setCurrentIdentity, setLocked, setSessionPassphrase } = useAppStore();
+  const { addIdentity, setSessionPassphrase } = useAppStore();
+  const { setLocked } = useUIStore();
   const { t } = useTranslation();
 
   const [step, setStep] = useState<Step>('create-pin');
@@ -80,10 +82,9 @@ export function Onboarding() {
         publicKey: keyPair.publicKey,
         privateKey: keyPair.privateKey,
         fingerprint: keyPair.fingerprint,
-      });
+      }, pin);
 
       addIdentity(identity);
-      setCurrentIdentity(identity);
       setSessionPassphrase(pin); // Set session passphrase for immediate use
       setLocked(false); // Unlock immediately after creation
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useAppStore } from '../stores/appStore';
+import { useUIStore } from '../stores/uiStore';
 
 export function usePWA() {
   const {
@@ -8,7 +8,7 @@ export function usePWA() {
     setStandalone,
     setInstallPromptVisible,
     isStandalone
-  } = useAppStore();
+  } = useUIStore();
 
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -32,7 +32,7 @@ export function usePWA() {
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone ||
         document.referrer.includes('android-app://');
-      
+
       setStandalone(!!isStandaloneMode);
     };
 
@@ -47,7 +47,7 @@ export function usePWA() {
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone ||
         document.referrer.includes('android-app://');
-       
+
        if (!isStandaloneMode && !dismissed) {
          setInstallPromptVisible(true);
        }
@@ -61,11 +61,11 @@ export function usePWA() {
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone ||
         document.referrer.includes('android-app://');
-       
+
        if (!isStandaloneMode && !dismissed) {
          // Small delay to prioritize the native event if it fires
          setTimeout(() => {
-           if (!useAppStore.getState().isInstallPromptVisible) {
+           if (!useUIStore.getState().isInstallPromptVisible) {
              setInstallPromptVisible(true);
            }
          }, 2000);
@@ -79,7 +79,7 @@ export function usePWA() {
       // Only show if not already standalone and not dismissed
       const dismissed = localStorage.getItem('pwa-install-dismissed');
       // We need to check current state of isStandalone, but we have it in dependency or use getState
-      if (!useAppStore.getState().isStandalone && !dismissed) {
+      if (!useUIStore.getState().isStandalone && !dismissed) {
         setInstallPromptVisible(true);
       }
     };

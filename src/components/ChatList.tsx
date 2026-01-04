@@ -74,10 +74,10 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
 
   const handleSelectSender = async (fingerprint: string) => {
     if (!pendingMessage) return;
-    
+
     setIsSenderSelectOpen(false);
     setIsProcessingPaste(true);
-    
+
     try {
       await processIncomingMessage(pendingMessage, fingerprint);
       toast.success('Message assigned and imported');
@@ -92,9 +92,12 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
 
   useEffect(() => {
     const loadLastMessages = async () => {
+      const { sessionPassphrase } = useAppStore.getState();
+      if (!sessionPassphrase) return;
+
       const map: Record<string, SecureMessage | undefined> = {};
       for (const contact of contacts) {
-        map[contact.fingerprint] = await storageService.getLastMessage(contact.fingerprint);
+        map[contact.fingerprint] = await storageService.getLastMessage(contact.fingerprint, sessionPassphrase);
       }
       setLastMessages(map);
     };
@@ -111,8 +114,18 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       // Sort by last message time, then created time
       const msgA = lastMessages[a.fingerprint];
       const msgB = lastMessages[b.fingerprint];
-      const timeA = msgA ? msgA.createdAt.getTime() : a.createdAt.getTime();
-      const timeB = msgB ? msgB.createdAt.getTime() : b.createdAt.getTime();
+
+      // Helper to convert date to timestamp (handles both Date objects and strings)
+      const getTime = (date: Date | string): number => {
+        if (date instanceof Date) {
+          return date.getTime();
+        }
+        const dateObj = new Date(date);
+        return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
+      };
+
+      const timeA = msgA ? getTime(msgA.createdAt) : getTime(a.createdAt);
+      const timeB = msgB ? getTime(msgB.createdAt) : getTime(b.createdAt);
       return timeB - timeA;
     });
 
@@ -122,14 +135,26 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       c.fingerprint.toLowerCase().includes(modalSearch.toLowerCase()),
   );
 
-  const formatTime = (date: Date) => {
+  /**
+   * Format date for display
+   * Handles both Date objects and date strings (from IndexedDB serialization)
+   */
+  const formatTime = (date: Date | string) => {
+    // Convert string to Date if needed (dates from IndexedDB are serialized as strings)
+    const dateObj = date instanceof Date ? date : new Date(date);
+
+    // Validate date
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid date';
+    }
+
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const diff = now.getTime() - dateObj.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (days < 7) return date.toLocaleDateString([], { weekday: 'short' });
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    if (days === 0) return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (days < 7) return dateObj.toLocaleDateString([], { weekday: 'short' });
+    return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
   return (
