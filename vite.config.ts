@@ -5,8 +5,8 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
-  // Set base path: '/' for development (serve), '/nahan/' for production (build)
-  const base = command === 'build' ? '/nahan/' : '/';
+  // Set base path: '/' for development (serve), '/Nahan/' for production (build)
+  const base = command === 'build' ? '/Nahan/' : '/';
 
   return {
     base,
@@ -39,7 +39,7 @@ export default defineConfig(({ command }) => {
         ],
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
-          navigateFallbackDenylist: [/^\/\.well-known/],
+          navigateFallbackDenylist: [/^\/Nahan\/\.well-known/],
           runtimeCaching: [
             {
               urlPattern: ({ request }) =>
