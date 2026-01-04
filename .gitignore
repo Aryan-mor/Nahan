@@ -34,4 +34,6 @@ gradle.properties
 gradlew
 gradlew.bat
 settings.gradle
-
+manifest-checksum.txt
+android.keystore
+.gradle/
