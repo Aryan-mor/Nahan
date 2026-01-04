@@ -79,9 +79,12 @@ export default defineConfig(({ command, mode }) => {
           id: base,
           name: 'Nahan',
           short_name: 'Nahan',
+          description: 'Secure, offline-first encrypted messaging application.',
+          categories: ['social', 'productivity', 'utilities'],
           start_url: base,
           scope: base,
           display: 'standalone',
+          orientation: 'portrait',
           theme_color: '#020617',
           background_color: '#020617',
           icons: [

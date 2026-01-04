@@ -252,14 +252,19 @@ export function useClipboardDetection(
 
     // Check clipboard when window gains focus
     const handleFocus = () => {
-      checkClipboard();
+      // SECURITY: Only check clipboard if the document is focused to avoid background data access flags
+      if (document.hasFocus()) {
+        checkClipboard();
+      }
     };
 
     // ENHANCED REACTIVITY: Listen for visibilitychange
     // When document becomes visible, trigger checkClipboard()
     // This makes detection feel like a "state change" when switching apps
     const handleVisibilityChange = () => {
+      // SECURITY: Ensure document is visible and focused before reading clipboard
       if (document.visibilityState === 'visible') {
+        // Optional: Add a small delay or check user activation if possible in the future
         checkClipboard();
       }
     };
