@@ -4,36 +4,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-  Avatar,
   Button,
   Card,
   CardBody,
-  CardHeader,
-  Chip,
+  Divider,
   Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Tab,
-  Tabs,
   Textarea,
   useDisclosure,
 } from '@heroui/react';
-import {
-  Camera,
-  Copy,
-  Eye,
-  EyeOff,
-  Key,
-  MessageSquare,
-  Share,
-  Trash2,
-  Upload,
-  User,
-  Users,
-} from 'lucide-react';
+import { Camera, Copy, Eye, EyeOff, Key, QrCode, Share, Upload, User } from 'lucide-react';
 import QRCode from 'qrcode';
 import { cryptoService } from '../services/crypto';
 import { generateStealthID } from '../services/stealthId';
@@ -42,13 +26,12 @@ import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
 import { DetectionResult } from '../hooks/useClipboardDetection';
+import { MyQRModal } from './MyQRModal';
 
 export function KeyExchange({
-  defaultTab = 'identity',
   onDetection,
   onNewMessage,
 }: {
-  defaultTab?: 'identity' | 'contacts';
   onDetection?: (result: DetectionResult) => void;
   onNewMessage?: (result: {
     type: 'message' | 'contact';
@@ -62,14 +45,10 @@ export function KeyExchange({
     contacts,
     addContact,
     addIdentity,
-    removeContact,
     setSessionPassphrase,
-    setActiveChat,
     sessionPassphrase,
     handleUniversalInput,
   } = useAppStore();
-
-  const { setActiveTab: setGlobalActiveTab } = useUIStore();
 
   const { camouflageLanguage } = useUIStore();
 
@@ -89,11 +68,11 @@ export function KeyExchange({
     onOpen: onGenerateOpen,
     onOpenChange: onGenerateOpenChange,
   } = useDisclosure();
+  const { isOpen: isQROpen, onOpen: onQROpen, onOpenChange: onQROpenChange } = useDisclosure();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [activeTab, setActiveTab] = useState<'identity' | 'contacts'>(defaultTab);
 
   // QR & Scanning State
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
@@ -148,10 +127,10 @@ export function KeyExchange({
   }, [identity]);
 
   useEffect(() => {
-    if (activeTab === 'identity' && identity) {
+    if (identity) {
       generateQRCode();
     }
-  }, [activeTab, identity, generateQRCode]);
+  }, [identity, generateQRCode]);
 
   const handleGenerateKey = async () => {
     if (!generateForm.name.trim()) {
@@ -257,7 +236,7 @@ export function KeyExchange({
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             title: `NAHAN Identity - ${identity.name}`,
-            text: `Scan this QR code to add ${identity.name} on NAHAN`,
+            text: identity.publicKey,
             files: [file],
           });
         }
@@ -309,25 +288,25 @@ export function KeyExchange({
   const scanFrame = () => {
     if (!mediaStreamRef.current || !mediaStreamRef.current.active) return;
     if (!videoRef.current) {
-        requestAnimationFrame(scanFrame);
-        return;
+      requestAnimationFrame(scanFrame);
+      return;
     }
 
     const video = videoRef.current;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-            if (code) {
-                handleScannedData(code.data);
-                return; 
-            }
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+          handleScannedData(code.data);
+          return;
         }
+      }
     }
     requestAnimationFrame(scanFrame);
   };
@@ -573,238 +552,122 @@ export function KeyExchange({
       transition={{ duration: 0.3 }}
       className="space-y-4 md:space-y-6"
     >
-      <Card className="bg-industrial-900 border-industrial-800 min-h-[500px]">
-        <CardHeader className="p-0">
-          <Tabs
-            aria-label="Identity Options"
-            selectedKey={activeTab}
-            onSelectionChange={(key) => setActiveTab(key as 'identity' | 'contacts')}
-            className="w-full"
-            classNames={{
-              tabList: 'bg-industrial-950 border-b border-industrial-800 rounded-none p-0',
-              cursor: 'bg-industrial-600',
-              tab: 'h-14 data-[selected=true]:text-industrial-100 text-industrial-400',
-              tabContent: 'text-base font-medium',
-            }}
-            variant="underlined"
-          >
-            <Tab key="identity" title="My Identity" />
-            <Tab key="contacts" title="Contacts" />
-          </Tabs>
-        </CardHeader>
-
+      <Card className="bg-industrial-900 border-industrial-800 min-h-[500px] mb-16">
         <CardBody className="p-4 sm:p-6">
-          {activeTab === 'identity' && (
+          {!identity ? (
+            <div className="text-center py-12">
+              <Key className="w-16 h-16 text-industrial-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-industrial-100 mb-2">No Identity Found</h3>
+              <p className="text-industrial-400 mb-6 max-w-sm mx-auto">
+                Create a secure identity to start exchanging messages.
+              </p>
+              <Button color="primary" size="lg" onPress={onGenerateOpen}>
+                Create Identity
+              </Button>
+            </div>
+          ) : (
             <div className="space-y-6">
-              {!identity ? (
-                <div className="text-center py-12">
-                  <Key className="w-16 h-16 text-industrial-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-industrial-100 mb-2">No Identity Found</h3>
-                  <p className="text-industrial-400 mb-6 max-w-sm mx-auto">
-                    Create a secure identity to start exchanging messages.
-                  </p>
-                  <Button color="primary" size="lg" onPress={onGenerateOpen}>
-                    Create Identity
+              {/* My Identity Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-industrial-100">My Identity</h3>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  <Button
+                    size="lg"
+                    variant="flat"
+                    onPress={copyIdentityKey}
+                    className="bg-industrial-800 text-industrial-100 h-24 flex flex-col gap-2 p-2 min-w-0"
+                  >
+                    <Copy className="w-6 h-6 mb-1" />
+                    <span className="text-xs font-medium text-center whitespace-normal leading-tight">
+                      Copy ID
+                    </span>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="flat"
+                    onPress={shareQRCode}
+                    className="bg-industrial-800 text-industrial-100 h-24 flex flex-col gap-2 p-2 min-w-0"
+                  >
+                    <Share className="w-6 h-6 mb-1" />
+                    <span className="text-xs font-medium text-center whitespace-normal leading-tight">
+                      Share ID
+                    </span>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="flat"
+                    onPress={onQROpen}
+                    className="bg-industrial-800 text-industrial-100 h-24 flex flex-col gap-2 p-2 min-w-0"
+                  >
+                    <QrCode className="w-6 h-6 mb-1" />
+                    <span className="text-xs font-medium text-center whitespace-normal leading-tight">
+                      View QR
+                    </span>
                   </Button>
                 </div>
-              ) : (
-                <div className="flex flex-col items-center space-y-6">
-                  {/* Identity Card */}
-                  <div className="w-full max-w-md bg-industrial-950 border border-industrial-800 rounded-xl p-6 text-center relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-industrial-600 to-industrial-400" />
-
-                    <Avatar
-                      name={identity.name}
-                      className="w-20 h-20 text-2xl mx-auto mb-4 bg-industrial-800 text-industrial-100"
-                    />
-
-                    <h2 className="text-2xl font-bold text-industrial-100 mb-1">{identity.name}</h2>
-                    <div className="flex justify-center items-center gap-2 mb-6">
-                      <Chip
-                        size="sm"
-                        variant="flat"
-                        className="bg-industrial-800 text-industrial-400 font-mono"
-                      >
-                        #{identity.fingerprint.slice(-8)}
-                      </Chip>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg inline-block mb-6">
-                      {qrCodeDataUrl ? (
-                        <img src={qrCodeDataUrl} alt="Identity QR" className="w-48 h-48" />
-                      ) : (
-                        <div className="w-48 h-48 bg-gray-200 animate-pulse rounded" />
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        variant="flat"
-                        startContent={<Copy className="w-4 h-4" />}
-                        onPress={copyIdentityKey}
-                        className="bg-industrial-800 text-industrial-200"
-                        title="Copy Stealth ID as Poetry"
-                      >
-                        Copy Stealth ID
-                      </Button>
-                      <Button
-                        variant="flat"
-                        startContent={<Share className="w-4 h-4" />}
-                        onPress={shareQRCode}
-                        className="bg-industrial-800 text-industrial-200"
-                      >
-                        Share
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'contacts' && (
-            <div className="space-y-6">
-              {/* Add Actions */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleFileUpload}
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Button
-                  size="lg"
-                  color="primary"
-                  variant="flat"
-                  startContent={<Camera className="w-5 h-5" />}
-                  onPress={startScanning}
-                  className="h-24 flex flex-col gap-2"
-                >
-                  <span className="font-semibold text-lg">Scan QR</span>
-                  <span className="text-xs opacity-70 font-normal">Use camera</span>
-                </Button>
-                <Button
-                  size="lg"
-                  color="secondary"
-                  variant="flat"
-                  startContent={<Upload className="w-5 h-5" />}
-                  onPress={() => fileInputRef.current?.click()}
-                  className="h-24 flex flex-col gap-2"
-                >
-                  <span className="font-semibold text-lg">Upload QR</span>
-                  <span className="text-xs opacity-70 font-normal">From gallery</span>
-                </Button>
-                <Button
-                  size="lg"
-                  color="default"
-                  variant="flat"
-                  startContent={<User className="w-5 h-5" />}
-                  onPress={onManualOpen}
-                  className="h-24 flex flex-col gap-2"
-                >
-                  <span className="font-semibold text-lg">Manual</span>
-                  <span className="text-xs opacity-70 font-normal">Type details</span>
-                </Button>
               </div>
 
-              {/* Contacts List */}
-              <div className="pt-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-industrial-100">
-                    My Contacts
-                    <span className="ml-2 text-sm font-normal text-industrial-400">
-                      ({contacts.length})
-                    </span>
-                  </h3>
-                </div>
+              <Divider className="my-6 bg-industrial-800" />
 
-                {contacts.length > 0 ? (
-                  <div className="space-y-3">
-                    {contacts.map((contact) => (
-                      <div
-                        key={contact.id}
-                        className="flex items-center justify-between p-4 bg-industrial-950 border border-industrial-800 rounded-lg group hover:border-industrial-700 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <Avatar
-                            name={contact.name}
-                            className="bg-industrial-800 text-industrial-300"
-                          />
-                          <div>
-                            <h4 className="font-medium text-industrial-100">{contact.name}</h4>
-                            <p className="text-xs text-industrial-500 font-mono">
-                              #{contact.fingerprint.slice(-8)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            onPress={() => {
-                              setActiveChat(contact);
-                              setGlobalActiveTab('chats');
-                            }}
-                            className="text-primary-400 hover:text-primary-200"
-                            title="Send Encrypted Message"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            onPress={async () => {
-                              try {
-                                // Generate stealth ID instead of plaintext
-                                const stealthID = generateStealthID(
-                                  contact.name,
-                                  contact.publicKey,
-                                  camouflageLanguage || 'fa',
-                                );
-                                await navigator.clipboard.writeText(stealthID);
-                                toast.success('Secure Stealth ID copied as poetry!');
-                              } catch (error) {
-                                console.error('Failed to generate stealth ID:', error);
-                                toast.error('Failed to copy stealth ID');
-                              }
-                            }}
-                            className="text-industrial-400 hover:text-industrial-200"
-                            title="Copy Stealth ID"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            color="danger"
-                            variant="light"
-                            onPress={async () => {
-                              if (confirm(`Remove ${contact.name}?`)) {
-                                await removeContact(contact.fingerprint);
-                                toast.success('Contact removed');
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-industrial-950/50 rounded-lg border border-dashed border-industrial-800">
-                    <Users className="w-8 h-8 text-industrial-600 mx-auto mb-2" />
-                    <p className="text-industrial-400">No contacts yet</p>
-                  </div>
-                )}
+              {/* Add Contact Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-industrial-100">Add Contact</h3>
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                />
+
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  <Button
+                    size="lg"
+                    color="primary"
+                    variant="flat"
+                    onPress={startScanning}
+                    className="h-24 flex flex-col gap-2 p-2 min-w-0"
+                  >
+                    <Camera className="w-6 h-6 mb-1" />
+                    <span className="text-xs font-medium text-center whitespace-normal leading-tight">
+                      Scan QR
+                    </span>
+                  </Button>
+                  <Button
+                    size="lg"
+                    color="secondary"
+                    variant="flat"
+                    onPress={() => fileInputRef.current?.click()}
+                    className="h-24 flex flex-col gap-2 p-2 min-w-0"
+                  >
+                    <Upload className="w-6 h-6 mb-1" />
+                    <span className="text-xs font-medium text-center whitespace-normal leading-tight">
+                      Upload QR
+                    </span>
+                  </Button>
+                  <Button
+                    size="lg"
+                    color="default"
+                    variant="flat"
+                    onPress={onManualOpen}
+                    className="h-24 flex flex-col gap-2 p-2 min-w-0"
+                  >
+                    <User className="w-6 h-6 mb-1" />
+                    <span className="text-xs font-medium text-center whitespace-normal leading-tight">
+                      Manual
+                    </span>
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </CardBody>
       </Card>
+
+      {/* View QR Code Modal */}
+      <MyQRModal isOpen={isQROpen} onOpenChange={onQROpenChange} />
 
       {/* Generate Identity Modal */}
       <Modal
@@ -992,7 +855,10 @@ export function KeyExchange({
           {() => (
             <>
               <ModalHeader>Scan QR Code</ModalHeader>
-              <ModalBody className="py-0 px-0 items-center justify-center bg-black overflow-hidden relative" style={{ minHeight: '400px' }}>
+              <ModalBody
+                className="py-0 px-0 items-center justify-center bg-black overflow-hidden relative"
+                style={{ minHeight: '400px' }}
+              >
                 <video
                   ref={videoRef}
                   className="w-full h-full object-cover absolute inset-0 z-0"
@@ -1001,9 +867,9 @@ export function KeyExchange({
                   playsInline
                 />
                 <div className="z-10 w-64 h-64 border-2 border-primary/50 border-dashed rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] pointer-events-none relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <Camera className="w-8 h-8 text-primary/50 animate-pulse" />
-                    </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Camera className="w-8 h-8 text-primary/50 animate-pulse" />
+                  </div>
                 </div>
                 <p className="absolute bottom-8 z-20 text-white font-medium bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
                   Point camera at a NAHAN QR code

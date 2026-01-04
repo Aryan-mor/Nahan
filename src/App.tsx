@@ -567,7 +567,6 @@ export default function App() {
             {activeTab === 'keys' && (
               <div className="p-4 md:p-6 overflow-y-auto h-full">
                 <KeyExchange
-                  defaultTab="contacts"
                   onDetection={handleDetection}
                   onNewMessage={handleNewMessage}
                 />
