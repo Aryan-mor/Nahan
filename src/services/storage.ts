@@ -35,6 +35,7 @@ export interface SecureMessage {
   read: boolean;
   isVerified?: boolean;
   status: 'sent' | 'pending' | 'failed';
+  isBroadcast?: boolean;
 }
 
 /**

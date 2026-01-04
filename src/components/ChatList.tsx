@@ -20,7 +20,7 @@ import { useAppStore } from '../stores/appStore';
 import { ManualPasteModal } from './ManualPasteModal';
 
 export function ChatList({ onNewChat }: { onNewChat: () => void }) {
-  const { contacts, setActiveChat, processIncomingMessage } = useAppStore();
+  const { contacts, getContactsWithBroadcast, setActiveChat, processIncomingMessage } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [lastMessages, setLastMessages] = useState<Record<string, SecureMessage | undefined>>({});
 
@@ -35,27 +35,73 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   const processPasteContent = async (content: string) => {
-    // Check if it looks like a PGP message
-    if (content.includes('-----BEGIN PGP MESSAGE-----')) {
-      setIsProcessingPaste(true);
-      try {
-        await processIncomingMessage(content);
-        toast.success('Message decrypted and imported');
-      } catch (error: any) {
-        if (error.message === 'SENDER_UNKNOWN') {
-           setPendingMessage(content);
-           setIsSenderSelectOpen(true);
-        } else {
-           toast.error('Failed to decrypt message');
-           console.error(error);
-           throw error; // Re-throw for modal handling if called from there
+    // Use unified detection logic - same as ChatInput.tsx
+    // This ensures ZWC, PGP, and Base64 messages are all handled consistently
+    setIsProcessingPaste(true);
+    try {
+      // Import required services
+      const { CamouflageService } = await import('../services/camouflage');
+      const camouflageService = CamouflageService.getInstance();
+      const naclUtil = await import('tweetnacl-util');
+
+      let encryptedData: string | null = null;
+
+      // 1. Check if it's a stealth message (ZWC-embedded)
+      if (camouflageService.hasZWC(content)) {
+        try {
+          let binary: Uint8Array;
+          try {
+            binary = camouflageService.decodeFromZWC(content, false);
+          } catch (strictError: unknown) {
+            const error = strictError as Error;
+            if (error.message?.includes('Checksum mismatch') || error.message?.includes('corrupted')) {
+              binary = camouflageService.decodeFromZWC(content, true);
+            } else {
+              throw strictError;
+            }
+          }
+          encryptedData = naclUtil.encodeBase64(binary);
+        } catch (error) {
+          console.error('Failed to extract ZWC message in ChatList:', error);
+          throw new Error('Failed to extract hidden message from cover text');
         }
-      } finally {
-        setIsProcessingPaste(false);
       }
-    } else {
-      toast.info('No PGP message found in content');
-      throw new Error('No PGP message found');
+
+      // 2. Check if it's a PGP message (legacy format)
+      if (!encryptedData && content.includes('-----BEGIN PGP MESSAGE-----')) {
+        encryptedData = content;
+      }
+
+      // 3. Check if it's a Nahan Compact Protocol message (base64)
+      if (!encryptedData) {
+        try {
+          const decoded = naclUtil.decodeBase64(content.trim());
+          if (decoded.length > 0 && (decoded[0] === 0x01 || decoded[0] === 0x02)) {
+            encryptedData = content.trim();
+          }
+        } catch {
+          // Not base64, continue
+        }
+      }
+
+      if (encryptedData) {
+        await processIncomingMessage(encryptedData);
+        toast.success('Message decrypted and imported');
+      } else {
+        toast.info('No encrypted message found in content');
+        throw new Error('No encrypted message found');
+      }
+    } catch (error: any) {
+      if (error.message === 'SENDER_UNKNOWN') {
+        setPendingMessage(content);
+        setIsSenderSelectOpen(true);
+      } else {
+        toast.error('Failed to decrypt message');
+        console.error(error);
+        throw error; // Re-throw for modal handling if called from there
+      }
+    } finally {
+      setIsProcessingPaste(false);
     }
   };
 
@@ -96,15 +142,36 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       if (!sessionPassphrase) return;
 
       const map: Record<string, SecureMessage | undefined> = {};
-      for (const contact of contacts) {
-        map[contact.fingerprint] = await storageService.getLastMessage(contact.fingerprint, sessionPassphrase);
+      // Load messages for all contacts including broadcast
+      const allContacts = getContactsWithBroadcast();
+      for (const contact of allContacts) {
+        // For broadcast contact, we need to aggregate messages from all contacts
+        if (contact.id === 'system_broadcast') {
+          // Get the most recent broadcast message across all contacts
+          let latestBroadcast: SecureMessage | undefined;
+          for (const c of contacts) {
+            const messages = await storageService.getMessagesByFingerprint(c.fingerprint, sessionPassphrase);
+            const broadcastMsgs = messages.filter(m => m.isBroadcast && !m.isOutgoing);
+            if (broadcastMsgs.length > 0) {
+              const latest = broadcastMsgs[0]; // Already sorted descending
+              if (!latestBroadcast || new Date(latest.createdAt) > new Date(latestBroadcast.createdAt)) {
+                latestBroadcast = latest;
+              }
+            }
+          }
+          map[contact.fingerprint] = latestBroadcast;
+        } else {
+          map[contact.fingerprint] = await storageService.getLastMessage(contact.fingerprint, sessionPassphrase);
+        }
       }
       setLastMessages(map);
     };
     loadLastMessages();
-  }, [contacts]);
+  }, [contacts, getContactsWithBroadcast]);
 
-  const filteredContacts = contacts
+  // Get contacts with broadcast at index 0
+  const allContacts = getContactsWithBroadcast();
+  const filteredContacts = allContacts
     .filter(
       (c) =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -129,6 +196,7 @@ export function ChatList({ onNewChat }: { onNewChat: () => void }) {
       return timeB - timeA;
     });
 
+  // Filter out broadcast contact from modal (only show real contacts)
   const modalFilteredContacts = contacts.filter(
     (c) =>
       c.name.toLowerCase().includes(modalSearch.toLowerCase()) ||

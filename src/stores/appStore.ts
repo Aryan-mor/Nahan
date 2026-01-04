@@ -63,6 +63,7 @@ interface AppState {
   processPendingMessages: () => Promise<number>;
   processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<void>;
   setSessionPassphrase: (passphrase: string) => void;
+  getContactsWithBroadcast: () => Contact[];
 }
 
 export const useAppStore = create<AppState>()(
@@ -194,25 +195,50 @@ export const useAppStore = create<AppState>()(
             throw new Error('SecureStorage: Missing key');
           }
 
-          const newMessage = await storageService.storeMessage({
-            senderFingerprint: identity.fingerprint,
-            recipientFingerprint: activeChat.fingerprint,
-            content: {
-              plain: pendingPlaintext,
-              encrypted: finalOutput,
-            },
-            isOutgoing: true,
-            read: true,
-            status: isOffline ? 'pending' : 'sent',
-          }, sessionPassphrase);
+          // Check if we're in broadcast mode
+          if (activeChat.id === 'system_broadcast') {
+            // Broadcast mode: store message with recipientFingerprint: 'BROADCAST'
+            await storageService.storeMessage({
+              senderFingerprint: identity.fingerprint,
+              recipientFingerprint: 'BROADCAST',
+              content: {
+                plain: pendingPlaintext,
+                encrypted: finalOutput,
+              },
+              isOutgoing: true,
+              read: true,
+              status: isOffline ? 'pending' : 'sent',
+              isBroadcast: true,
+            }, sessionPassphrase);
 
-          set((state) => ({
-            messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+            // Update messages for broadcast channel
+            const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
+            set({ messages });
+          } else {
+            // Standard mode: store message for single recipient
+            const newMessage = await storageService.storeMessage({
+              senderFingerprint: identity.fingerprint,
+              recipientFingerprint: activeChat.fingerprint,
+              content: {
+                plain: pendingPlaintext,
+                encrypted: finalOutput,
+              },
+              isOutgoing: true,
+              read: true,
+              status: isOffline ? 'pending' : 'sent',
+            }, sessionPassphrase);
+
+            set((state) => ({
+              messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+            }));
+          }
+
+          set({
             showStealthModal: false,
             pendingStealthBinary: null,
             pendingPlaintext: null,
             messageInput: '', // Clear input after successful stealth send
-          }));
+          });
         } catch (error) {
           console.error('Failed to confirm stealth send:', error);
         }
@@ -340,18 +366,29 @@ export const useAppStore = create<AppState>()(
           if (!sessionPassphrase) {
             throw new Error('SecureStorage: Missing key');
           }
-          // Load messages
-          const messages = await storageService.getMessagesByFingerprint(contact.fingerprint, sessionPassphrase);
-          set({ messages });
-          await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
+
+          // Handle broadcast contact
+          if (contact.id === 'system_broadcast') {
+            // Fetch messages using fixed fingerprint 'BROADCAST'
+            const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
+            set({ messages });
+          } else {
+            // Load messages for regular contact
+            const messages = await storageService.getMessagesByFingerprint(contact.fingerprint, sessionPassphrase);
+            set({ messages });
+            await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
+          }
         } else {
           set({ messages: [] });
         }
       },
 
       /**
-       * Auto-Stealth: Automatically encrypt and embed message with random cover text
+       * Auto-Stealth: Unified entry point for sending messages (both regular and broadcast)
+       * - Regular messages: Encrypts message and embeds into cover text
+       * - Broadcast messages: Signs message and embeds into cover text
        * This function performs stealth encoding in the background without opening the modal
+       * Both flows return stealth-encoded Persian text (ZWC), not Base64
        * @param text Plaintext message to send
        * @returns Stealth-encoded string (ready to copy/share)
        */
@@ -364,25 +401,40 @@ export const useAppStore = create<AppState>()(
         }
 
         try {
-          // Step 1: Encrypt message to binary (raw Uint8Array, no headers)
-          const encryptedBinary = await cryptoService.encryptMessage(
-            text,
-            activeChat.publicKey,
-            identity.privateKey,
-            sessionPassphrase,
-            { binary: true }
-          ) as Uint8Array;
+          let binaryPayload: Uint8Array;
+          let isBroadcast = false;
+
+          // Check if we're in broadcast mode
+          if (activeChat.id === 'system_broadcast') {
+            // Broadcast mode: sign message instead of encrypting
+            binaryPayload = await cryptoService.signMessage(
+              text,
+              identity.privateKey,
+              sessionPassphrase,
+              { binary: true }
+            ) as Uint8Array;
+            isBroadcast = true;
+          } else {
+            // Regular mode: encrypt message to binary (raw Uint8Array, no headers)
+            binaryPayload = await cryptoService.encryptMessage(
+              text,
+              activeChat.publicKey,
+              identity.privateKey,
+              sessionPassphrase,
+              { binary: true }
+            ) as Uint8Array;
+          }
 
           // Step 2: Generate random cover text that meets safety requirements
           // Use getRecommendedCover which ensures Green Zone (80%+ safety)
           const coverText = camouflageService.getRecommendedCover(
-            encryptedBinary.length,
+            binaryPayload.length,
             camouflageLanguage || 'fa'
           );
 
           // Step 3: Verify safety ratio meets Green Zone requirement (80%+)
           // This is critical to prevent data leakage with insufficient cover text
-          const safetyScore = camouflageService.calculateStealthRatio(encryptedBinary.length, coverText);
+          const safetyScore = camouflageService.calculateStealthRatio(binaryPayload.length, coverText);
           let finalCover = coverText;
           let finalScore = safetyScore;
 
@@ -396,11 +448,11 @@ export const useAppStore = create<AppState>()(
             while (currentScore < 80 && attempts < 5) {
               // Expand cover text by getting another recommendation
               const additionalCover = camouflageService.getRecommendedCover(
-                encryptedBinary.length,
+                binaryPayload.length,
                 camouflageLanguage || 'fa'
               );
               expandedCover = expandedCover + ' ' + additionalCover;
-              currentScore = camouflageService.calculateStealthRatio(encryptedBinary.length, expandedCover);
+              currentScore = camouflageService.calculateStealthRatio(binaryPayload.length, expandedCover);
               if (currentScore >= 80) {
                 finalCover = expandedCover;
                 finalScore = currentScore;
@@ -424,27 +476,53 @@ export const useAppStore = create<AppState>()(
           }
 
           // Step 4: Embed binary into cover text
-          const finalOutput = camouflageService.embed(encryptedBinary, finalCover, camouflageLanguage || 'fa');
+          const finalOutput = camouflageService.embed(binaryPayload, finalCover, camouflageLanguage || 'fa');
 
           // Step 5: Store message in database
           const isOffline = !navigator.onLine;
-          const newMessage = await storageService.storeMessage({
-            senderFingerprint: identity.fingerprint,
-            recipientFingerprint: activeChat.fingerprint,
-            content: {
-              plain: text,
-              encrypted: finalOutput,
-            },
-            isOutgoing: true,
-            read: true,
-            status: isOffline ? 'pending' : 'sent',
-          }, sessionPassphrase);
 
-          // Update state
-          set((state) => ({
-            messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
-            messageInput: '', // Clear input after successful auto-stealth send
-          }));
+          if (isBroadcast) {
+            // Broadcast mode: store with recipientFingerprint: 'BROADCAST'
+            await storageService.storeMessage({
+              senderFingerprint: identity.fingerprint,
+              recipientFingerprint: 'BROADCAST',
+              content: {
+                plain: text,
+                encrypted: finalOutput,
+              },
+              isOutgoing: true,
+              read: true,
+              status: isOffline ? 'pending' : 'sent',
+              isBroadcast: true,
+            }, sessionPassphrase);
+          } else {
+            // Regular mode: store for specific recipient
+            const newMessage = await storageService.storeMessage({
+              senderFingerprint: identity.fingerprint,
+              recipientFingerprint: activeChat.fingerprint,
+              content: {
+                plain: text,
+                encrypted: finalOutput,
+              },
+              isOutgoing: true,
+              read: true,
+              status: isOffline ? 'pending' : 'sent',
+            }, sessionPassphrase);
+
+            // Update state
+            set((state) => ({
+              messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
+            }));
+          }
+
+          // Update messages if active chat is broadcast
+          if (isBroadcast) {
+            const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
+            set({ messages });
+          }
+
+          // Clear input after successful auto-stealth send
+          set({ messageInput: '' });
 
           return finalOutput;
         } catch (error) {
@@ -594,8 +672,45 @@ export const useAppStore = create<AppState>()(
           throw new Error('Authentication required');
         }
 
-        // Check if message already exists (deduplication)
-        const exists = await storageService.messageExists(encryptedText, sessionPassphrase);
+        // Step 1: De-camouflage - Check if input contains ZWC (Zero-Width Characters)
+        let extractedBinary: Uint8Array | null = null;
+        let processedText = encryptedText;
+        let isZWC = false;
+
+        if (camouflageService.hasZWC(encryptedText)) {
+          isZWC = true;
+          console.log('TRACE [appStore] ZWC detected in processIncomingMessage');
+          try {
+            // Try strict decoding first
+            try {
+              extractedBinary = camouflageService.decodeFromZWC(encryptedText, false);
+              console.log('TRACE [appStore] ZWC strict decode successful, binary length:', extractedBinary.length);
+            } catch (strictError: unknown) {
+              // If strict fails with checksum error, try lenient mode
+              const error = strictError as Error;
+              if (error.message?.includes('Checksum mismatch') || error.message?.includes('corrupted')) {
+                console.warn('TRACE [appStore] ZWC strict decode failed, trying lenient mode...', error.message);
+                extractedBinary = camouflageService.decodeFromZWC(encryptedText, true);
+                console.log('TRACE [appStore] ZWC lenient decode successful, binary length:', extractedBinary.length);
+              } else {
+                throw strictError; // Re-throw if it's a different error
+              }
+            }
+            // Convert binary to base64 for duplicate check and crypto operations
+            const naclUtil = await import('tweetnacl-util');
+            processedText = naclUtil.encodeBase64(extractedBinary);
+            console.log('TRACE [appStore] processedText (Base64):', processedText.substring(0, 50) + '...', 'length:', processedText.length);
+          } catch (error) {
+            console.error('TRACE [appStore] Failed to decode ZWC message:', error);
+            throw new Error('Failed to extract hidden message from cover text');
+          }
+        } else {
+          console.log('TRACE [appStore] No ZWC detected, using processedText as-is:', processedText.substring(0, 50) + '...');
+        }
+
+        // Step 2: Check if message already exists (deduplication)
+        // Use the extracted binary/base64 for duplicate check, not the original ZWC text
+        const exists = await storageService.messageExists(processedText, sessionPassphrase);
         if (exists) {
           // Message is a duplicate - silently return without processing
           // This prevents duplicate entries and redundant notifications
@@ -605,15 +720,85 @@ export const useAppStore = create<AppState>()(
         }
 
         try {
-          // Attempt to decrypt using all known contact keys for verification
-          const contactKeys = contacts.map((c) => c.publicKey);
+          // Step 3: Check protocol version byte to determine message type
+          // CRITICAL: Check version before attempting decryption to avoid pako errors
+          let messageBytes: Uint8Array;
+          if (extractedBinary) {
+            messageBytes = extractedBinary;
+          } else if (typeof processedText === 'string') {
+            // Decode base64 string to bytes
+            const naclUtil = await import('tweetnacl-util');
+            messageBytes = naclUtil.decodeBase64(processedText);
+          } else {
+            throw new Error('Invalid message format');
+          }
 
-          const result = await cryptoService.decryptMessage(
-            encryptedText,
-            identity.privateKey,
-            sessionPassphrase,
-            contactKeys,
-          );
+          if (messageBytes.length === 0) {
+            throw new Error('Message is empty');
+          }
+
+          // Read version byte (first byte)
+          const version = messageBytes[0];
+          console.log('TRACE [appStore] Version Byte:', `0x${version.toString(16).padStart(2, '0')}`, version === 0x01 ? '(Encrypted)' : version === 0x02 ? '(Signed/Broadcast)' : '(Unknown)');
+
+          const contactKeys = contacts.map((c) => c.publicKey);
+          let result;
+          let isBroadcast = false;
+
+          // Route to correct handler based on version byte
+          if (version === 0x01) {
+            // Version 0x01: Encrypted message - use decryptMessage
+            console.log('TRACE [appStore] Routing to decryptMessage (v0x01)');
+            try {
+              result = await cryptoService.decryptMessage(
+                messageBytes,
+                identity.privateKey,
+                sessionPassphrase,
+                contactKeys,
+              );
+              console.log('TRACE [appStore] decryptMessage succeeded');
+            } catch (decryptError) {
+              console.error('TRACE [appStore] decryptMessage FAILED:', decryptError);
+              throw decryptError;
+            }
+          } else if (version === 0x02) {
+            // Version 0x02: Signed broadcast message - use verifySignedMessage
+            // CRITICAL: Do not call decryptMessage on version 0x02, it will cause pako errors
+            console.log('TRACE [appStore] Routing to verifySignedMessage (v0x02)');
+            try {
+              const signedResult = await cryptoService.verifySignedMessage(messageBytes, contactKeys);
+              console.log('TRACE [appStore] verifySignedMessage result:', {
+                verified: signedResult.verified,
+                senderFingerprint: signedResult.senderFingerprint,
+              });
+
+              if (signedResult.verified && signedResult.senderFingerprint) {
+                // This is a broadcast message (signed, not encrypted)
+                result = {
+                  data: signedResult.data,
+                  verified: signedResult.verified,
+                  signatureValid: true,
+                  senderFingerprint: signedResult.senderFingerprint,
+                };
+                isBroadcast = true;
+                console.log('TRACE [appStore] Broadcast message verified successfully');
+              } else {
+                console.error('TRACE [appStore] Signature verification failed: verified=false or no senderFingerprint');
+                throw new Error('Signature verification failed: Message signature is invalid or sender is unknown');
+              }
+            } catch (verifyError) {
+              // Re-throw with clear error message for UI feedback
+              const err = verifyError as Error;
+              console.error('TRACE [appStore] verifySignedMessage FAILED:', err.message);
+              if (err.message?.includes('verification failed') || err.message?.includes('Invalid signed message')) {
+                throw new Error('Signature verification failed: The broadcast message signature is invalid or corrupted');
+              }
+              throw verifyError;
+            }
+          } else {
+            console.error('TRACE [appStore] Unsupported protocol version:', `0x${version.toString(16).padStart(2, '0')}`);
+            throw new Error(`Unsupported protocol version: 0x${version.toString(16).padStart(2, '0')}`);
+          }
 
           let senderFingerprint = result.senderFingerprint;
           let isVerified = result.verified;
@@ -648,18 +833,29 @@ export const useAppStore = create<AppState>()(
           }
 
           // Store the message
+          // If it's a broadcast, store with recipientFingerprint: 'BROADCAST'
+          const recipientFingerprint = isBroadcast ? 'BROADCAST' : identity.fingerprint;
+
+          // Store the original encryptedText (ZWC text if it was ZWC, or original text if not)
+          // This preserves the original format for display and re-sharing
+          const storedEncrypted = isZWC ? encryptedText : processedText;
+
           const newMessage = await storageService.storeMessage({
             senderFingerprint: sender.fingerprint,
-            recipientFingerprint: identity.fingerprint,
+            recipientFingerprint: recipientFingerprint,
             content: {
               plain: result.data,
-              encrypted: encryptedText,
+              encrypted: storedEncrypted,
             },
             isOutgoing: false,
             read: false, // Mark as unread initially
             isVerified: isVerified,
             status: 'sent',
+            isBroadcast: isBroadcast,
           }, sessionPassphrase);
+
+          // Clear global messageInput after successful processing
+          set({ messageInput: '' });
 
           // Only navigate if skipNavigation is false (default behavior for backward compatibility)
           if (!skipNavigation) {
@@ -686,6 +882,23 @@ export const useAppStore = create<AppState>()(
       },
 
       setSessionPassphrase: (passphrase) => set({ sessionPassphrase: passphrase }),
+
+      /**
+       * Get contacts list with broadcast contact always at index 0
+       */
+      getContactsWithBroadcast: () => {
+        const { contacts } = get();
+        const broadcastContact: Contact = {
+          id: 'system_broadcast',
+          name: 'Broadcast Channel',
+          fingerprint: 'BROADCAST',
+          publicKey: '',
+          createdAt: new Date(),
+          lastUsed: new Date(),
+        };
+        return [broadcastContact, ...contacts];
+      },
+
     }),
     {
       name: 'nahan-secure-data',

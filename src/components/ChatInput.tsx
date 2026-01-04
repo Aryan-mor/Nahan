@@ -20,6 +20,7 @@ export function ChatInput() {
     processIncomingMessage,
     messageInput,
     setMessageInput,
+    activeChat,
   } = useAppStore();
   const { t } = useTranslation();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -28,18 +29,18 @@ export function ChatInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   /**
-   * Handle single click: Auto-stealth mode
-   * Automatically encrypts and embeds message with random cover text
-   * Ensures safety ratio is met before sending
+   * Handle single click: Auto-stealth mode (unified for both regular and broadcast)
+   * sendAutoStealthMessage handles both regular messages (encrypted) and broadcast messages (signed)
+   * Both are encoded into stealth cover text (ZWC) before being returned
    */
   const handleSingleClick = async () => {
     if (!messageInput.trim()) return;
 
     setIsAutoStealthEncoding(true);
     try {
-      // Auto-stealth: encrypt + embed with random cover text
+      // Unified auto-stealth: encrypt (regular) or sign (broadcast) + embed with random cover text
       // sendAutoStealthMessage ensures safety ratio is >= 80% before sending
-      // It also clears messageInput upon success
+      // It also clears messageInput upon success and returns stealth-encoded text (not Base64)
       const stealthOutput = await sendAutoStealthMessage(messageInput);
 
       // Auto-copy stealth message to clipboard
@@ -63,14 +64,14 @@ export function ChatInput() {
    * Handle long press (>500ms): Open Stealth Modal
    * Works for both mouse (long click) and touch (long press)
    * Allows user to customize cover text
+   * In broadcast mode, passes signed broadcast payload instead of encrypted binary
    */
   const handleLongPress = async () => {
     if (!messageInput.trim()) return;
 
     try {
-      // Encrypt message to binary for stealth modal
-      const { activeChat, identity, sessionPassphrase } = useAppStore.getState();
-      if (!activeChat || !identity || !sessionPassphrase) {
+      const { identity, sessionPassphrase } = useAppStore.getState();
+      if (!identity || !sessionPassphrase) {
         toast.error('Cannot send message: Missing context');
         return;
       }
@@ -78,18 +79,40 @@ export function ChatInput() {
       const { CryptoService } = await import('../services/crypto');
       const cryptoService = CryptoService.getInstance();
 
-      const encryptedBinary = await cryptoService.encryptMessage(
-        messageInput,
-        activeChat.publicKey,
-        identity.privateKey,
-        sessionPassphrase,
-        { binary: true }
-      ) as Uint8Array;
+      // Check if we're in broadcast mode
+      if (activeChat?.id === 'system_broadcast') {
+        // Broadcast mode: sign message (no encryption)
+        const signedBinary = await cryptoService.signMessage(
+          messageInput,
+          identity.privateKey,
+          sessionPassphrase,
+          { binary: true }
+        ) as Uint8Array;
 
-      // Open stealth modal with pending binary
-      setPendingStealthBinary(encryptedBinary);
-      setPendingPlaintext(messageInput);
-      setShowStealthModal(true);
+        // Open stealth modal with signed broadcast payload
+        setPendingStealthBinary(signedBinary);
+        setPendingPlaintext(messageInput);
+        setShowStealthModal(true);
+      } else {
+        // Standard mode: encrypt message to binary for stealth modal
+        if (!activeChat) {
+          toast.error('Cannot send message: Missing context');
+          return;
+        }
+
+        const encryptedBinary = await cryptoService.encryptMessage(
+          messageInput,
+          activeChat.publicKey,
+          identity.privateKey,
+          sessionPassphrase,
+          { binary: true }
+        ) as Uint8Array;
+
+        // Open stealth modal with pending binary
+        setPendingStealthBinary(encryptedBinary);
+        setPendingPlaintext(messageInput);
+        setShowStealthModal(true);
+      }
     } catch (error) {
       toast.error('Failed to prepare stealth message');
       console.error(error);
@@ -120,75 +143,143 @@ export function ChatInput() {
       let encryptedData: string | null = null;
 
       // 1. Check if it's a stealth message (ZWC-embedded)
-      if (camouflageService.hasZWC(content)) {
+      const hasZWC = camouflageService.hasZWC(content);
+      console.log('TRACE [ChatInput] ZWC Detection:', { hasZWC, contentLength: content.length });
+
+      if (hasZWC) {
+        console.log('TRACE [ChatInput] ZWC detected, attempting extraction...');
         try {
           // First try strict decoding
           let binary: Uint8Array;
           try {
             binary = camouflageService.decodeFromZWC(content, false);
+            console.log('TRACE [ChatInput] ZWC strict decode successful, binary length:', binary.length);
           } catch (strictError: unknown) {
             // If strict fails with checksum error, try lenient mode
             const error = strictError as Error;
-            if (error.message?.includes('Checksum mismatch')) {
-              console.warn('Strict decode failed, trying lenient mode...');
+            if (error.message?.includes('Checksum mismatch') || error.message?.includes('corrupted')) {
+              console.warn('TRACE [ChatInput] ZWC strict decode failed (checksum), trying lenient mode...', error.message);
               binary = camouflageService.decodeFromZWC(content, true);
+              console.log('TRACE [ChatInput] ZWC lenient decode successful, binary length:', binary.length);
               toast.warning('Some invisible characters may have been lost, but message recovered.');
             } else {
+              console.error('TRACE [ChatInput] ZWC strict decode failed with non-checksum error:', error.message);
               throw strictError; // Re-throw if it's a different error
             }
           }
           // Convert to base64 for decryption (processIncomingMessage expects string)
           encryptedData = naclUtil.encodeBase64(binary);
+          console.log('TRACE [ChatInput] ZWC extraction complete, base64 length:', encryptedData.length);
         } catch (error: unknown) {
-          console.warn('Failed to extract stealth message:', error);
-          // Show user-friendly error
           const err = error as Error;
+          console.error('TRACE [ChatInput] ZWC extraction FAILED:', {
+            error: err.message,
+            errorType: err.name,
+            stack: err.stack,
+          });
+          // Provide specific error log about why ZWC was invalid
           if (err.message?.includes('prefix signature')) {
+            console.error('TRACE [ChatInput] ZWC Error: Missing or invalid prefix signature - message may be incomplete');
             toast.error('Invalid stealth message format. Make sure you copied the entire message.');
-          } else if (err.message?.includes('too many invisible characters')) {
+          } else if (err.message?.includes('too many invisible characters') || err.message?.includes('corrupted')) {
+            console.error('TRACE [ChatInput] ZWC Error: Message corrupted - invisible characters lost during transmission');
             toast.error('Message is too corrupted to recover. Some invisible characters were lost.');
+          } else if (err.message?.includes('Data too short')) {
+            console.error('TRACE [ChatInput] ZWC Error: Message too short - incomplete data');
+            toast.error('Message appears incomplete. Please copy the entire message.');
           } else {
+            console.error('TRACE [ChatInput] ZWC Error: Unknown extraction failure', err.message);
             toast.error('Failed to extract hidden message. The message may be corrupted.');
           }
-          // Continue to try other formats
+          // DO NOT fall back to PGP if ZWC was detected but failed - this is a specific error
+          // Throw error to prevent fallback to other formats
+          throw new Error(`ZWC extraction failed: ${err.message}`);
         }
+      } else {
+        console.log('TRACE [ChatInput] No ZWC detected, checking other formats...');
       }
 
       // 2. Check if it's a PGP message (legacy format)
       if (!encryptedData && content.includes('-----BEGIN PGP MESSAGE-----')) {
+        console.log('TRACE [ChatInput] PGP message detected');
         encryptedData = content;
       }
 
       // 3. Check if it's a Nahan Compact Protocol message (base64)
       if (!encryptedData) {
+        console.log('TRACE [ChatInput] Checking for Base64 Nahan Protocol message...');
         // Try to decode as base64 and check if it has the protocol version byte
         try {
           const decoded = naclUtil.decodeBase64(content.trim());
-          // Nahan Compact Protocol starts with version byte (0x01)
-          if (decoded.length > 0 && decoded[0] === 0x01) {
+          // Nahan Compact Protocol: 0x01 = encrypted, 0x02 = signed broadcast
+          if (decoded.length > 0 && (decoded[0] === 0x01 || decoded[0] === 0x02)) {
+            console.log('TRACE [ChatInput] Base64 Nahan Protocol detected, version:', `0x${decoded[0].toString(16).padStart(2, '0')}`);
             encryptedData = content.trim();
+          } else {
+            console.log('TRACE [ChatInput] Base64 decoded but invalid version byte:', decoded[0]);
           }
         } catch {
+          console.log('TRACE [ChatInput] Not valid base64, skipping...');
           // Not base64, continue
         }
       }
 
+      // Log which detection step succeeded
+      if (encryptedData) {
+        console.log('TRACE [ChatInput] Detection successful, encryptedData length:', encryptedData.length);
+      } else {
+        console.log('TRACE [ChatInput] No encrypted data detected in any format');
+      }
+
       // 4. If we found encrypted data, try to decrypt and add to chat
       if (encryptedData) {
-        await processIncomingMessage(encryptedData);
-        toast.success(t('chat.input.decrypt_success'));
-        setMessageInput(''); // Clear input
-        return;
+        try {
+          await processIncomingMessage(encryptedData);
+          toast.success(t('chat.input.decrypt_success'));
+          setMessageInput(''); // Clear input
+          return;
+        } catch (processError: unknown) {
+          const procErr = processError as Error;
+          // Provide clear feedback based on error type
+          if (procErr.message?.includes('Signature verification failed') || procErr.message?.includes('verify')) {
+            toast.error('Signature verification failed. The message may be corrupted or from an unknown sender.');
+          } else if (procErr.message?.includes('decrypt') || procErr.message?.includes('Decryption failed')) {
+            toast.error('Decryption failed. The message may be corrupted or encrypted for a different recipient.');
+          } else if (procErr.message === 'SENDER_UNKNOWN') {
+            setIsManualPasteOpen(true);
+            toast.error('Unknown sender. Please select the sender manually.');
+            return;
+          } else if (procErr.name === 'DuplicateMessageError') {
+            // Silently ignore duplicates
+            setMessageInput('');
+            return;
+          } else {
+            toast.error(t('chat.input.decrypt_error'));
+          }
+          throw processError; // Re-throw to continue to manual paste modal if needed
+        }
       }
 
       // 5. No encrypted message detected - show modal for manual paste
+      console.log('TRACE [ChatInput] No encrypted data detected in any format, showing manual paste modal');
       throw new Error('No encrypted message detected');
     } catch (err: unknown) {
       // If it's a decryption error or unknown sender, show modal
       const error = err as Error;
-      if (error.message === 'SENDER_UNKNOWN' || error.message === 'No encrypted message detected' || error.message?.includes('decrypt') || error.message?.includes('Failed')) {
+      console.log('TRACE [ChatInput] Error caught in processPasteContent:', {
+        message: error.message,
+        name: error.name,
+      });
+
+      if (error.message === 'SENDER_UNKNOWN' || error.message === 'No encrypted message detected' || error.message?.includes('decrypt') || error.message?.includes('Failed') || error.message?.includes('verify') || error.message?.includes('ZWC extraction failed')) {
         setIsManualPasteOpen(true);
-        toast.error(t('chat.input.decrypt_error'));
+        // Don't show duplicate error toast here - already handled above
+        if (error.name !== 'DuplicateMessageError') {
+          // ZWC errors already have specific toasts, don't show generic error
+          if (!error.message?.includes('ZWC extraction failed')) {
+            toast.error(t('chat.input.decrypt_error'));
+          }
+        }
       } else {
         toast.error(t('chat.input.decrypt_error'));
         console.error(error);

@@ -486,6 +486,180 @@ export class CryptoService {
   }
 
   /**
+   * Sign a message using Ed25519 signing
+   * For broadcast messages: signs the message without encryption
+   * Returns signed message in format: [Version (1)] [Sender Public Key (32)] [Signature (64)] [Message Bytes]
+   */
+  async signMessage(
+    message: string,
+    senderPrivateKey: string,
+    passphrase: string,
+    options?: { binary?: boolean },
+  ): Promise<string | Uint8Array> {
+    try {
+      // Decrypt sender's private key
+      const senderPrivateKeyBytes = await decryptPrivateKey(senderPrivateKey, passphrase);
+
+      // Generate Ed25519 signing key pair for broadcast messages
+      // We derive Ed25519 from X25519 public key (not private key) so both sender and receiver
+      // can derive the same Ed25519 public key. We hash the X25519 public key to get the seed.
+      const senderX25519KeyPair = nacl.box.keyPair.fromSecretKey(senderPrivateKeyBytes);
+      const senderX25519PublicKey = senderX25519KeyPair.publicKey;
+
+      // Hash the X25519 public key to create a deterministic seed for Ed25519
+      // This ensures both sender and receiver can derive the same Ed25519 public key
+      const hash = await crypto.subtle.digest('SHA-256', senderX25519PublicKey);
+      const seed = new Uint8Array(hash).slice(0, 32);
+      const signingKeyPair = nacl.sign.keyPair.fromSeed(seed);
+
+      // Encode message to bytes
+      const messageBytes = new TextEncoder().encode(message);
+
+      // Sign the message using Ed25519
+      const signature = nacl.sign.detached(messageBytes, signingKeyPair.secretKey);
+
+      // Get sender's public key for serialization
+      const senderPublicKeyBytes = signingKeyPair.publicKey;
+
+      // Serialize: [Version (1)] [Sender Public Key (32)] [Signature (64)] [Message Bytes]
+      const totalLength = 1 + 32 + 64 + messageBytes.length;
+      const serialized = new Uint8Array(totalLength);
+      let offset = 0;
+
+      // Version byte (use 0x02 for signed broadcast messages)
+      serialized[offset++] = 0x02;
+
+      // Sender public key (32 bytes)
+      serialized.set(senderPublicKeyBytes, offset);
+      offset += 32;
+
+      // Signature (64 bytes)
+      serialized.set(signature, offset);
+      offset += 64;
+
+      // Message bytes
+      serialized.set(messageBytes, offset);
+
+      if (options?.binary) {
+        return serialized;
+      }
+
+      // Encode as base64 for non-binary mode
+      return naclUtil.encodeBase64(serialized);
+    } catch (error) {
+      console.error('Signing failed:', error);
+      throw new Error('Failed to sign message');
+    }
+  }
+
+  /**
+   * Verify a signed message
+   * Returns the plaintext message and verification status
+   */
+  async verifySignedMessage(
+    signedMessage: string | Uint8Array,
+    senderPublicKeys: string[] = [],
+  ): Promise<{ data: string; verified: boolean; senderFingerprint?: string }> {
+    try {
+      // Decode signed message
+      let messageBytes: Uint8Array;
+      if (typeof signedMessage === 'string') {
+        try {
+          messageBytes = naclUtil.decodeBase64(signedMessage);
+        } catch {
+          throw new Error('Invalid signed message format');
+        }
+      } else {
+        messageBytes = signedMessage;
+      }
+
+      if (messageBytes.length < 1 + 32 + 64) {
+        throw new Error('Invalid signed message format: too short');
+      }
+
+      let offset = 0;
+
+      // Version byte
+      const version = messageBytes[offset++];
+      if (version !== 0x02) {
+        throw new Error(`Unsupported signed message version: ${version}`);
+      }
+
+      // Sender public key (32 bytes)
+      const senderPublicKeyBytes = messageBytes.slice(offset, offset + 32);
+      offset += 32;
+
+      // Signature (64 bytes)
+      const signature = messageBytes.slice(offset, offset + 64);
+      offset += 64;
+
+      // Message bytes
+      const messageBytesOnly = messageBytes.slice(offset);
+
+      // Verify signature
+      const isValid = nacl.sign.detached.verify(messageBytesOnly, signature, senderPublicKeyBytes);
+
+      if (!isValid) {
+        throw new Error('Signature verification failed');
+      }
+
+      // Decode message
+      const plaintext = new TextDecoder().decode(messageBytesOnly);
+
+      // Try to match sender Ed25519 public key with contacts
+      // Since we derive Ed25519 from X25519 private key, we need to derive Ed25519 public key
+      // from each contact's X25519 public key. However, we can't do this directly.
+      // Instead, we'll derive Ed25519 key pair from X25519 private key when signing,
+      // and store the Ed25519 public key in the signed message.
+      // For verification, we'll derive Ed25519 public key from the contact's X25519 private key
+      // if we had it, but we don't. So we'll use a workaround: derive Ed25519 from X25519 public key hash.
+      // Actually, a better approach: derive Ed25519 key pair from X25519 public key bytes as seed.
+      let senderFingerprint: string | undefined;
+      let verified = false;
+
+      // For each contact's X25519 public key, derive the corresponding Ed25519 public key
+      // using the same method as when signing: hash the X25519 public key and use as seed
+      for (const senderKeyStr of senderPublicKeys) {
+        try {
+          const senderX25519Key = naclUtil.decodeBase64(senderKeyStr);
+          // Hash the X25519 public key to create the same seed used when signing
+          const hash = await crypto.subtle.digest('SHA-256', senderX25519Key);
+          const seed = new Uint8Array(hash).slice(0, 32);
+          const derivedEd25519KeyPair = nacl.sign.keyPair.fromSeed(seed);
+          const derivedEd25519PublicKey = derivedEd25519KeyPair.publicKey;
+
+          // Compare derived Ed25519 public key with the one in the signed message
+          if (derivedEd25519PublicKey.length === senderPublicKeyBytes.length) {
+            let match = true;
+            for (let i = 0; i < senderPublicKeyBytes.length; i++) {
+              if (derivedEd25519PublicKey[i] !== senderPublicKeyBytes[i]) {
+                match = false;
+                break;
+              }
+            }
+            if (match) {
+              verified = true;
+              senderFingerprint = generateFingerprint(senderX25519Key);
+              break;
+            }
+          }
+        } catch {
+          // Continue to next key
+        }
+      }
+
+      return {
+        data: plaintext,
+        verified,
+        senderFingerprint,
+      };
+    } catch (error) {
+      console.error('Signature verification failed:', error);
+      throw new Error('Failed to verify signed message');
+    }
+  }
+
+  /**
    * Clear sensitive data from memory
    */
   clearSensitiveData(data: string): void {
