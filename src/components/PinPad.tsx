@@ -13,6 +13,7 @@ interface PinPadProps {
   isLoading?: boolean;
 }
 
+/* eslint-disable max-lines-per-function */
 export const PinPad: React.FC<PinPadProps> = ({
   value,
   onChange,
@@ -84,7 +85,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         {subLabel && <p className="text-industrial-400 text-sm mb-6">{subLabel}</p>}
 
         {/* Dots Display or Loading Spinner */}
-        <div className="flex justify-center gap-4 mb-4 min-h-[1rem] items-center">
+        <div dir="ltr" className="flex justify-center gap-4 mb-4 min-h-[1rem] items-center">
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin text-industrial-100" />
           ) : (
@@ -110,7 +111,7 @@ export const PinPad: React.FC<PinPadProps> = ({
       </div>
 
       {/* Keypad */}
-      <div className="grid grid-cols-3 gap-6 w-full max-w-[300px]">
+      <div dir="ltr" className="grid grid-cols-3 gap-6 w-full max-w-[300px]">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
           <button
             key={num}
@@ -123,12 +124,12 @@ export const PinPad: React.FC<PinPadProps> = ({
         ))}
 
         <button
-          onClick={handleDelete}
+          onClick={handleEnter}
           disabled={isLoading || value.length === 0}
           className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={t('pinpad.backspace')}
+          aria-label={t('pinpad.enter')}
         >
-          <Delete className="w-8 h-8" />
+          <CornerDownLeft className="w-8 h-8" />
         </button>
 
         <button
@@ -140,12 +141,12 @@ export const PinPad: React.FC<PinPadProps> = ({
         </button>
 
         <button
-          onClick={handleEnter}
+          onClick={handleDelete}
           disabled={isLoading || value.length === 0}
           className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={t('pinpad.enter')}
+          aria-label={t('pinpad.backspace')}
         >
-          <CornerDownLeft className="w-8 h-8" />
+          <Delete className="w-8 h-8" />
         </button>
       </div>
     </div>

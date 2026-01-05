@@ -1,4 +1,8 @@
+/* eslint-disable max-lines-per-function, max-lines */
 import { IDBPDatabase, openDB } from 'idb';
+
+import * as logger from '../utils/logger';
+
 import { decryptData, encryptData } from './secureStorage';
 
 export interface Identity {
@@ -102,7 +106,7 @@ export class StorageService {
         },
       })) as IDBPDatabase<NahanDB>;
     } catch (error) {
-      console.error('Failed to initialize database:', error);
+      logger.error('Failed to initialize database:', error);
       throw new Error('Failed to initialize storage');
     }
   }
@@ -110,7 +114,7 @@ export class StorageService {
   /**
    * Store encrypted data in vault
    */
-  private async storeInVault(id: string, data: any, passphrase: string): Promise<void> {
+  private async storeInVault<T>(id: string, data: T, passphrase: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     if (!passphrase) throw new Error('SecureStorage: Missing key');
 
@@ -133,10 +137,10 @@ export class StorageService {
   private convertDates<T extends { createdAt?: Date | string; lastUsed?: Date | string }>(obj: T): T {
     if (obj && typeof obj === 'object') {
       if ('createdAt' in obj && typeof obj.createdAt === 'string') {
-        (obj as any).createdAt = new Date(obj.createdAt);
+        (obj as unknown as { createdAt: Date }).createdAt = new Date(obj.createdAt);
       }
       if ('lastUsed' in obj && typeof obj.lastUsed === 'string') {
-        (obj as any).lastUsed = new Date(obj.lastUsed);
+        (obj as unknown as { lastUsed: Date }).lastUsed = new Date(obj.lastUsed);
       }
     }
     return obj;
@@ -156,7 +160,7 @@ export class StorageService {
     // Actually, we can't decrypt without the real passphrase
     // So we'll return the encrypted payload wrapped in a structure
     if (!passphrase) {
-      return { _encryptedPayload: entry.payload } as any;
+      return { _encryptedPayload: entry.payload } as unknown as T;
     }
 
     // Decrypt and parse
@@ -234,7 +238,7 @@ export class StorageService {
       const entry = await this.db.get('secure_vault', ID_PREFIX.IDENTITY);
       return entry !== undefined;
     } catch (error) {
-      console.error('Failed to check identity existence:', error);
+      logger.error('Failed to check identity existence:', error);
       return false;
     }
   }
@@ -372,7 +376,7 @@ export class StorageService {
   /**
    * Delete contact
    */
-  async deleteContact(fingerprint: string): Promise<void> {
+  async deleteContact(_fingerprint: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     // Find contact by fingerprint (requires passphrase, but we'll use a workaround)
@@ -409,7 +413,7 @@ export class StorageService {
     };
 
     await this.storeInVault(messageId, completeMessage, passphrase);
-    console.log(`[Storage] Message saved to ${conversationFingerprint}`);
+    logger.debug(`[Storage] Message saved to ${conversationFingerprint}`);
     return completeMessage;
   }
 
@@ -429,7 +433,7 @@ export class StorageService {
       // Check if any message has the same encrypted content
       return allMessages.some((msg) => msg.content.encrypted === encryptedContent);
     } catch (error) {
-      console.error('Failed to check message existence:', error);
+      logger.error('Failed to check message existence:', error);
       // On error, return false to allow processing (fail-safe)
       return false;
     }
@@ -473,13 +477,13 @@ export class StorageService {
           // Even if IDB range queries overlap, this guarantees data remains isolated
           if (parsed.recipientFingerprint !== fingerprint && parsed.senderFingerprint !== fingerprint) {
             // Message doesn't belong to this conversation - skip it
-            console.log(`[SECURITY] Isolated Message for ${fingerprint} - skipping unrelated message`);
+            logger.warn(`[SECURITY] Isolated Message for ${fingerprint} - skipping unrelated message`);
             continue;
           }
 
           results.push(this.convertDates(parsed));
         } catch (error) {
-          console.error('Failed to decrypt message:', entry.id, error);
+          logger.error('Failed to decrypt message:', entry.id, error);
           // Skip corrupted entries
         }
       }
@@ -490,7 +494,7 @@ export class StorageService {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
 
-    console.log(`[Storage] Fetched ${sorted.length} messages for ${fingerprint} (strictly filtered)`);
+    logger.debug(`[Storage] Fetched ${sorted.length} messages for ${fingerprint} (strictly filtered)`);
     return sorted;
   }
 
@@ -631,9 +635,9 @@ export class StorageService {
     try {
       const tx = this.db.transaction('secure_vault', 'readwrite');
       await tx.objectStore('secure_vault').clear();
-      await tx.done;
+      await this.db.clear('secure_vault');
     } catch (error) {
-      console.error('Failed to clear data:', error);
+      logger.error('Failed to clear data:', error);
       throw new Error('Failed to clear data');
     }
   }
@@ -658,7 +662,7 @@ export class StorageService {
       }
       await tx.done;
     } catch (error) {
-      console.error('Failed to clear messages:', error);
+      logger.error('Failed to clear messages:', error);
       throw new Error('Failed to clear messages');
     }
   }

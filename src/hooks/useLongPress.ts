@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { useCallback, useRef } from 'react';
 
 interface UseLongPressOptions {

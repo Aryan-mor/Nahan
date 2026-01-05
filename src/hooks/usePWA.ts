@@ -1,21 +1,24 @@
+/* eslint-disable max-lines-per-function */
 import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+
 import { useUIStore } from '../stores/uiStore';
+import * as logger from '../utils/logger';
 
 export function usePWA() {
   const {
     setDeferredPrompt,
     setStandalone,
     setInstallPromptVisible,
-    isStandalone
+    isStandalone: _isStandalone
   } = useUIStore();
 
   const {
-    needRefresh: [needRefresh, setNeedRefresh],
+    needRefresh: [needRefresh, _setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(swUrl, r) {
-      console.log(`Service Worker at: ${swUrl}`);
+      logger.info(`Service Worker at: ${swUrl}`);
       // Check for updates every hour
       if (r) {
         setInterval(() => {
@@ -30,7 +33,7 @@ export function usePWA() {
     const checkStandalone = () => {
       const isStandaloneMode =
         window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone ||
         document.referrer.includes('android-app://');
 
       setStandalone(!!isStandaloneMode);
@@ -42,12 +45,12 @@ export function usePWA() {
     // Don't show install prompt in dev mode
     if (!import.meta.env.DEV) {
     // Check iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream;
     if (isIOS) {
        const dismissed = localStorage.getItem('pwa-install-dismissed');
        const isStandaloneMode =
         window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone ||
         document.referrer.includes('android-app://');
 
        if (!isStandaloneMode && !dismissed) {
@@ -61,7 +64,7 @@ export function usePWA() {
        const dismissed = localStorage.getItem('pwa-install-dismissed');
        const isStandaloneMode =
         window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone ||
         document.referrer.includes('android-app://');
 
        if (!isStandaloneMode && !dismissed) {
@@ -78,7 +81,8 @@ export function usePWA() {
     // Handle beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setDeferredPrompt(e as any);
       // Don't show install prompt in dev mode
       if (!import.meta.env.DEV) {
       // Only show if not already standalone and not dismissed

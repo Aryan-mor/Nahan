@@ -1,12 +1,14 @@
-import { Avatar, Select, SelectItem } from '@heroui/react';
+/* eslint-disable max-lines-per-function */
+import { } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { cryptoService } from '../services/crypto';
-import { Identity } from '../services/storage';
+
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
+import * as logger from '../utils/logger';
+
 import { PinPad } from './PinPad';
 
 export function LockScreen() {
@@ -16,16 +18,12 @@ export function LockScreen() {
   } = useAppStore();
 
   const {
-    isLocked,
-    setLocked,
     failedAttempts,
     incrementFailedAttempts,
     resetFailedAttempts,
   } = useUIStore();
   const { t } = useTranslation();
-  const [selectedIdentityId, setSelectedIdentityId] = useState<string>('');
   const [passphrase, setPassphrase] = useState('');
-  const [isUnlocking, setIsUnlocking] = useState(false);
   const [error, setError] = useState('');
   const isMounted = useRef(true);
 
@@ -37,9 +35,7 @@ export function LockScreen() {
 
   // Set initial selected identity
   useEffect(() => {
-    if (identity) {
-      setSelectedIdentityId(identity.id);
-    }
+    // Identity check is handled by store
   }, [identity]);
 
   const handleUnlock = async (pin: string) => {
@@ -48,13 +44,10 @@ export function LockScreen() {
       return;
     }
 
-    setIsUnlocking(true);
+    // No loading state to keep UI responsive
     setError('');
 
     try {
-      // Small delay to make UI feel responsive and preventing spam
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
       // Use unlockApp action to verify and set session state
       const isValid = await useAppStore.getState().unlockApp(pin);
 
@@ -65,9 +58,9 @@ export function LockScreen() {
         // Show install prompt if not installed (even if dismissed previously)
         // Don't show in dev mode
         if (!import.meta.env.DEV) {
-        const { isStandalone, setInstallPromptVisible } = useUIStore.getState();
-        if (!isStandalone) {
-           setInstallPromptVisible(true);
+          const { isStandalone, setInstallPromptVisible } = useUIStore.getState();
+          if (!isStandalone) {
+            setInstallPromptVisible(true);
           }
         }
       } else {
@@ -87,14 +80,11 @@ export function LockScreen() {
         toast.warning(msg);
       }
     } catch (error) {
-      console.error(error);
+      logger.error('Unlock failed:', error);
       if (isMounted.current) {
         setError(t('lock.error.verify'));
         toast.error(t('lock.error.verify_toast'));
-      }
-    } finally {
-      if (isMounted.current) {
-        setIsUnlocking(false);
+        setPassphrase('');
       }
     }
   };
@@ -115,7 +105,6 @@ export function LockScreen() {
           label={t('lock.enter_pin')}
           subLabel={t('lock.sublabel')}
           error={error}
-          isLoading={isUnlocking}
         />
       </motion.div>
     </div>

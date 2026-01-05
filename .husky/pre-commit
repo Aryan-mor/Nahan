@@ -1,0 +1,28 @@
+#!/bin/sh
+# Robust pre-commit hook that works across Windows (Git Bash), macOS, and Linux
+# Bypasses npm/npx wrappers to avoid "Program Files" space issues and shebang errors
+
+# Function to find and run lint-staged
+run_hook() {
+  # Check if node is available
+  if ! command -v node >/dev/null 2>&1; then
+    echo "Error: 'node' not found in PATH."
+    echo "Please ensure Node.js is installed and added to your PATH."
+    exit 1
+  fi
+
+  # Define path to lint-staged binary
+  LINT_STAGED_BIN="node_modules/lint-staged/bin/lint-staged.js"
+
+  # Check if lint-staged exists locally
+  if [ ! -f "$LINT_STAGED_BIN" ]; then
+    echo "Error: lint-staged not found at $LINT_STAGED_BIN"
+    echo "Please run 'npm install' to restore dependencies."
+    exit 1
+  fi
+
+  # Execute lint-staged directly with node
+  node "$LINT_STAGED_BIN"
+}
+
+run_hook

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+/* eslint-disable max-lines-per-function */
 import {
   Avatar,
   Button,
@@ -14,10 +16,13 @@ import {
 import { motion } from 'framer-motion';
 import { ClipboardPaste, MessageSquare, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
 import { DetectionResult } from '../hooks/useClipboardDetection';
-import { SecureMessage, storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import * as logger from '../utils/logger';
+
 import { ManualPasteModal } from './ManualPasteModal';
 import { MyQRModal } from './MyQRModal';
 import { NewMessageModal } from './NewMessageModal';
@@ -29,6 +34,7 @@ export function ChatList({
   onNewChat: () => void;
   onDetection?: (result: DetectionResult) => void;
 }) {
+  const { t } = useTranslation();
   const {
     contacts,
     getContactsWithBroadcast,
@@ -94,16 +100,16 @@ export function ChatList({
               contactPublicKey: contactPublicKey,
             });
           } else {
-            toast.info('Contact key detected');
+            toast.info(t('chat.list.contact_key_detected'));
             onNewChat(); // Fallback: Navigate to keys tab if handler not available
           }
         } else {
-          toast.info('Contact key detected');
+          toast.info(t('chat.list.contact_key_detected'));
           onNewChat(); // Fallback: Navigate to keys tab if handler not available
         }
       } else {
-        toast.error('Failed to process input');
-        console.error('[UniversalInput] Error:', error);
+        toast.error(t('chat.list.process_error'));
+        logger.error('[UniversalInput] Error:', error);
         // If clipboard access failed, open manual input
         if (err.message?.includes('Clipboard')) {
           setIsManualPasteOpen(true);
@@ -145,16 +151,16 @@ export function ChatList({
               contactPublicKey: contactPublicKey,
             });
           } else {
-            toast.info('Contact key detected');
+            toast.info(t('chat.list.contact_key_detected'));
             onNewChat(); // Fallback: Navigate to keys tab if handler not available
           }
         } else {
-          toast.info('Contact key detected');
+          toast.info(t('chat.list.contact_key_detected'));
           onNewChat(); // Fallback: Navigate to keys tab if handler not available
         }
       } else {
-        console.error('[UniversalInput] Error:', error);
-        toast.error('Failed to import message');
+        logger.error('[UniversalInput] Error:', error);
+        toast.error(t('chat.list.import_error'));
       }
     } finally {
       setIsProcessingPaste(false);
@@ -195,16 +201,16 @@ export function ChatList({
               contactPublicKey: contactPublicKey,
             });
           } else {
-            toast.info('Contact key detected');
+            toast.info(t('chat.list.contact_key_detected'));
             onNewChat(); // Fallback: Navigate to keys tab if handler not available
           }
         } else {
-          toast.info('Contact key detected');
+          toast.info(t('chat.list.contact_key_detected'));
           onNewChat(); // Fallback: Navigate to keys tab if handler not available
         }
       } else {
-        toast.error('Failed to process input');
-        console.error('[UniversalInput] Error:', error);
+        toast.error(t('chat.list.process_error'));
+        logger.error('[UniversalInput] Error:', error);
       }
     } finally {
       setIsProcessingPaste(false);
@@ -276,7 +282,7 @@ export function ChatList({
   // Log sorting result
   const broadcastCount = filteredContacts.filter((c) => c.fingerprint === 'BROADCAST').length;
   const regularContactsCount = filteredContacts.length - broadcastCount;
-  console.log(
+  logger.debug(
     `[UI] Chat list sorted: Broadcast pinned, ${regularContactsCount} contacts chronological`,
   );
 
@@ -314,7 +320,7 @@ export function ChatList({
       {/* Header */}
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-industrial-100">Chats</h1>
+          <h1 className="text-2xl font-bold text-industrial-100">{t('chat.list.title')}</h1>
           <div className="flex items-center gap-2">
             <Button
               isIconOnly
@@ -322,7 +328,7 @@ export function ChatList({
               className="rounded-full bg-industrial-800 text-industrial-300"
               onPress={handlePaste}
               isLoading={isProcessingPaste}
-              title="Paste Encrypted Message"
+              title={t('chat.list.paste_encrypted')}
             >
               <ClipboardPaste className="w-5 h-5" />
             </Button>
@@ -338,7 +344,7 @@ export function ChatList({
           </div>
         </div>
         <Input
-          placeholder="Search chats..."
+          placeholder={t('chat.list.search_placeholder')}
           startContent={<Search className="w-4 h-4 text-industrial-400" />}
           value={searchQuery}
           onValueChange={setSearchQuery}
@@ -353,9 +359,9 @@ export function ChatList({
         {filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-industrial-500 opacity-50">
             <MessageSquare className="w-12 h-12 mb-2" />
-            <p>No chats found</p>
+            <p>{t('chat.list.no_chats')}</p>
             <Button size="sm" variant="light" onPress={onOpen} className="mt-2 text-primary-400">
-              Start a new chat
+              {t('chat.list.start_chat')}
             </Button>
           </div>
         ) : (
@@ -389,7 +395,7 @@ export function ChatList({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <h3 className="font-medium text-industrial-100 truncate pr-2">
-                          {contact.name}
+                          {isBroadcast ? t('broadcast_channel') : contact.name}
                         </h3>
                         {lastMsg && (
                           <span className="text-[10px] text-industrial-500 flex-shrink-0">
@@ -402,7 +408,7 @@ export function ChatList({
                           {lastMsg ? (
                             lastMsg.content.plain
                           ) : (
-                            <span className="italic text-industrial-600">No messages yet</span>
+                            <span className="italic text-industrial-600">{t('chat.list.no_messages')}</span>
                           )}
                         </p>
                       </div>
@@ -415,7 +421,7 @@ export function ChatList({
                   <div className="mt-3 mb-2 px-2">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-px bg-industrial-800"></div>
-                      <span className="text-xs text-industrial-500 px-2">Recent Conversations</span>
+                      <span className="text-xs text-industrial-500 px-2">{t('chat.list.recent_conversations')}</span>
                       <div className="flex-1 h-px bg-industrial-800"></div>
                     </div>
                   </div>
@@ -443,10 +449,10 @@ export function ChatList({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">New Chat</ModalHeader>
+              <ModalHeader className="flex flex-col gap-1">{t('chat.list.new_chat.title')}</ModalHeader>
               <ModalBody>
                 <Input
-                  placeholder="Search contacts..."
+                  placeholder={t('chat.list.search_contacts_placeholder')}
                   startContent={<Search className="w-4 h-4 text-industrial-400" />}
                   value={modalSearch}
                   onValueChange={setModalSearch}
@@ -458,7 +464,7 @@ export function ChatList({
                 <div className="max-h-[300px] overflow-y-auto space-y-2">
                   {modalFilteredContacts.length === 0 ? (
                     <div className="text-center py-8 text-industrial-500">
-                      <p>No contacts found</p>
+                      <p>{t('chat.list.no_contacts')}</p>
                       <Button
                         size="sm"
                         variant="light"
@@ -468,7 +474,7 @@ export function ChatList({
                           onNewChat(); // Go to keys tab
                         }}
                       >
-                        Add Contact
+                        {t('chat.list.add_contact')}
                       </Button>
                     </div>
                   ) : (
@@ -499,7 +505,7 @@ export function ChatList({
               </ModalBody>
               <ModalFooter>
                 <Button color="danger" variant="light" onPress={onClose}>
-                  Cancel
+                  {t('chat.list.cancel')}
                 </Button>
                 <Button
                   color="primary"
@@ -508,7 +514,7 @@ export function ChatList({
                     onNewChat();
                   }}
                 >
-                  Add New Contact
+                  {t('chat.list.add_new_contact')}
                 </Button>
               </ModalFooter>
             </>
@@ -533,14 +539,14 @@ export function ChatList({
           {(onClose) => (
             <>
               <ModalHeader className="flex flex-col gap-1">
-                Select Sender
+                {t('chat.list.select_sender.title')}
                 <p className="text-sm font-normal text-industrial-400">
-                  This message is unsigned or from an unknown key. Who sent it?
+                  {t('chat.list.select_sender.desc')}
                 </p>
               </ModalHeader>
               <ModalBody>
                 <Input
-                  placeholder="Search contacts..."
+                  placeholder={t('chat.list.search_contacts_placeholder')}
                   startContent={<Search className="w-4 h-4 text-industrial-400" />}
                   value={modalSearch}
                   onValueChange={setModalSearch}
@@ -552,7 +558,7 @@ export function ChatList({
                 <div className="max-h-[300px] overflow-y-auto space-y-2">
                   {modalFilteredContacts.length === 0 ? (
                     <div className="text-center py-8 text-industrial-500">
-                      <p>No contacts found</p>
+                      <p>{t('chat.list.no_contacts')}</p>
                     </div>
                   ) : (
                     modalFilteredContacts.map((contact) => (
@@ -578,7 +584,7 @@ export function ChatList({
               </ModalBody>
               <ModalFooter>
                 <Button color="danger" variant="light" onPress={onClose}>
-                  Cancel
+                  {t('chat.list.cancel')}
                 </Button>
               </ModalFooter>
             </>
@@ -590,7 +596,7 @@ export function ChatList({
         isOpen={isManualPasteOpen}
         onClose={() => setIsManualPasteOpen(false)}
         onSubmit={handleManualPaste}
-        title="Import Message or Key"
+        title={t('chat.list.import_title')}
       />
 
       {/* New Message Modal */}

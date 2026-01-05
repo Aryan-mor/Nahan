@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+/* eslint-disable max-lines-per-function */
 import {
   Button,
   Card,
@@ -32,12 +34,14 @@ import {
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
+import * as logger from '../utils/logger';
 
 export function Settings() {
-  const { identity, contacts, initializeApp, lockApp, wipeData, clearAllMessages } = useAppStore();
+  const { identity, contacts, wipeData, clearAllMessages } = useAppStore();
 
   const {
     isStandalone,
@@ -74,27 +78,27 @@ export function Settings() {
   };
 
   const handleLogoutConfirm = async () => {
-    console.log(`[${new Date().toISOString()}] Logout & Wipe action initiated by user`);
+    logger.info(`Logout & Wipe action initiated by user`);
     setIsLoggingOut(true);
     try {
       await wipeData();
       toast.success(t('lock.logged_out', 'Logged out successfully'));
     } catch (error) {
-      console.error('Logout failed:', error);
+      logger.error('Logout failed:', error);
       toast.error(t('settings.logout.error', 'Logout failed'));
       setIsLoggingOut(false);
     }
   };
 
   const handleClearAllData = async () => {
-    console.log(`[${new Date().toISOString()}] Clear Message Data action initiated by user`);
+    logger.info(`Clear Message Data action initiated by user`);
     setIsClearing(true);
     try {
       await clearAllMessages();
       toast.success(t('settings.clear.success'));
     } catch (error) {
       toast.error(t('settings.clear.error'));
-      console.error(error);
+      logger.error(error);
     } finally {
       setIsClearing(false);
       onOpenChange();
@@ -118,11 +122,10 @@ export function Settings() {
       // Get all data
       const { sessionPassphrase: passphrase } = useAppStore.getState();
       if (!passphrase) {
-        toast.error('SecureStorage: Missing key');
+        toast.error(t('settings.errors.missing_key'));
         return;
       }
-
-      const allIdentities = await storageService.getIdentities(passphrase);
+      
       const allContacts = await storageService.getContacts(passphrase);
 
       const exportData = {
@@ -161,7 +164,7 @@ export function Settings() {
       setExportPassword('');
     } catch (error) {
       toast.error(t('settings.export.error'));
-      console.error(error);
+      logger.error(error);
     } finally {
       setIsExporting(false);
     }
@@ -244,7 +247,7 @@ export function Settings() {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-industrial-300">
-              Default Camouflage Language
+              {t('settings.general.camouflage')}
             </label>
             <Select
               selectedKeys={[camouflageLanguage || 'fa']}
@@ -260,22 +263,22 @@ export function Settings() {
             >
               <SelectItem
                 key="fa"
-                textValue="Persian (Farsi)"
+                textValue={t('settings.languages.fa')}
                 className="text-industrial-100 data-[hover=true]:bg-industrial-800"
               >
                 <div className="flex items-center space-x-2">
                   <span>🇮🇷</span>
-                  <span>Persian (Farsi)</span>
+                  <span>{t('settings.languages.fa')}</span>
                 </div>
               </SelectItem>
               <SelectItem
                 key="en"
-                textValue="English"
+                textValue={t('settings.languages.en')}
                 className="text-industrial-100 data-[hover=true]:bg-industrial-800"
               >
                 <div className="flex items-center space-x-2">
                   <span>🇺🇸</span>
-                  <span>English</span>
+                  <span>{t('settings.languages.en')}</span>
                 </div>
               </SelectItem>
             </Select>

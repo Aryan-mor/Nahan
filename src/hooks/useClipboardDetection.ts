@@ -5,8 +5,11 @@
  * Uses unified handleUniversalInput for all detection logic
  */
 
+/* eslint-disable max-lines-per-function */
 import { useEffect, useRef, useState } from 'react';
+
 import { useAppStore } from '../stores/appStore';
+import * as logger from '../utils/logger';
 
 type PermissionState = 'prompt' | 'granted' | 'denied' | 'unsupported';
 
@@ -44,7 +47,7 @@ export function useClipboardPermission(): ClipboardPermissionStatus {
             result.onchange = () => {
               setPermissionState(result.state as PermissionState);
             };
-          } catch (permError) {
+          } catch {
             // Permissions API might not support 'clipboard-read' name (e.g. Firefox)
             // In this case, we mark as unsupported to avoid prompting users
             // where background clipboard reading is not possible
@@ -54,7 +57,7 @@ export function useClipboardPermission(): ClipboardPermissionStatus {
           // Permissions API not available - assume unsupported
           setPermissionState('unsupported');
         }
-      } catch (error) {
+      } catch {
         // Fallback: assume unsupported on error
         setPermissionState('unsupported');
       }
@@ -78,8 +81,9 @@ export async function requestClipboardPermission(): Promise<boolean> {
     // Attempt to read clipboard - this will trigger permission prompt if not granted
     await navigator.clipboard.readText();
     return true;
-  } catch (error: any) {
-    if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+  } catch (error: unknown) {
+    const err = error as Error;
+    if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
       return false;
     }
     // Other errors (e.g., clipboard empty) are okay - permission was granted
@@ -160,12 +164,12 @@ export function useClipboardDetection(
           // handleUniversalInput already stored the message, so we just need to notify the UI
           // Call onNewMessage IMMEDIATELY after handleUniversalInput succeeds
           if (result && result.type === 'message') {
-            console.log('[Detector] Message detected, signaling App.tsx', result);
+            logger.log('[Detector] Message detected, signaling App.tsx', result);
             // Call onNewMessage for the new unified modal (primary) - IMMEDIATELY
             if (onNewMessage) {
               onNewMessage(result);
             } else {
-              console.warn('[Detector] onNewMessage callback not provided');
+              logger.warn('[Detector] onNewMessage callback not provided');
             }
 
             // Also call onDetection for backward compatibility with DetectionModal
@@ -188,29 +192,33 @@ export function useClipboardDetection(
 
           // Update last checked clipboard to prevent duplicate processing
           setLastCheckedClipboard(clipboardText);
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const err = error as Error;
           // STRICT ERROR HANDLING: Update ref for ALL known errors to prevent looping
           // This ensures that even "invalid" text is marked as processed
           lastProcessedRef.current = clipboardText;
 
           // Handle specific errors silently (they're expected)
-          if (error.message === 'DUPLICATE_MESSAGE') {
+          if (err.message === 'DUPLICATE_MESSAGE') {
             // Duplicate message - silently ignore
             setLastCheckedClipboard(clipboardText);
             return;
-          } else if (error.message === 'SENDER_UNKNOWN') {
+          } else if (err.message === 'SENDER_UNKNOWN') {
             // Unknown sender - mark as processed to prevent loop
             setLastCheckedClipboard(clipboardText);
-            console.debug('[UniversalInput] Unknown sender detected in clipboard');
+            logger.log('[UniversalInput] Unknown sender detected in clipboard');
             return;
-          } else if (error.message === 'CONTACT_INTRO_DETECTED') {
+          } else if (err.message === 'CONTACT_INTRO_DETECTED') {
             // CRITICAL: Handle CONTACT_INTRO_DETECTED - map to DetectionResult and call onDetection
-            console.log('[Detector] Contact intro detected, signaling App.tsx');
-            if (onDetection && error.keyData) {
+            logger.log('[Detector] Contact intro detected, signaling App.tsx');
+            const contactError = error as Error & {
+              keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+            };
+            if (onDetection && contactError.keyData) {
               // Map error.keyData to DetectionResult format
               // Support both formats: { name, publicKey } and { username, key }
-              const contactName = error.keyData.name || error.keyData.username || 'Unknown';
-              const contactPublicKey = error.keyData.publicKey || error.keyData.key;
+              const contactName = contactError.keyData.name || contactError.keyData.username || 'Unknown';
+              const contactPublicKey = contactError.keyData.publicKey || contactError.keyData.key;
 
               if (contactPublicKey) {
                 onDetection({
@@ -219,15 +227,15 @@ export function useClipboardDetection(
                   contactPublicKey: contactPublicKey,
                 });
               } else {
-                console.warn('[Detector] CONTACT_INTRO_DETECTED missing public key');
+                logger.warn('[Detector] CONTACT_INTRO_DETECTED missing public key');
               }
             } else {
-              console.warn('[Detector] onDetection callback not provided or keyData missing');
+              logger.warn('[Detector] onDetection callback not provided or keyData missing');
             }
             // Mark as processed to prevent loop
             setLastCheckedClipboard(clipboardText);
             return;
-          } else if (error.message === 'Authentication required') {
+          } else if (err.message === 'Authentication required') {
             // App is locked - mark as processed to prevent loop
             setLastCheckedClipboard(clipboardText);
             return;
@@ -235,13 +243,14 @@ export function useClipboardDetection(
             // Other errors (invalid format, etc.) - mark as processed to prevent loop
             // This is expected for non-Nahan clipboard content
             setLastCheckedClipboard(clipboardText);
-            console.debug('[UniversalInput] Clipboard content is not a Nahan message:', error.message);
+            logger.log('[UniversalInput] Clipboard content is not a Nahan message:', err.message);
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Permission denied or clipboard empty - silently ignore
-        if (error.name !== 'NotAllowedError' && error.name !== 'SecurityError') {
-          console.debug('[UniversalInput] Clipboard check failed:', error);
+        const err = error as Error;
+        if (err.name !== 'NotAllowedError' && err.name !== 'SecurityError') {
+          logger.log('[UniversalInput] Clipboard check failed:', err);
         }
       }
     };
@@ -278,4 +287,3 @@ export function useClipboardDetection(
     };
   }, [enabled, handleUniversalInput, identity, lastCheckedClipboard, onDetection, onNewMessage]);
 }
-

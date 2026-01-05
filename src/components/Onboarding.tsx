@@ -1,13 +1,17 @@
+/* eslint-disable max-lines-per-function */
 import { Button, Card, CardBody, Checkbox, Input } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, ArrowLeft, ArrowRight, ShieldCheck, User } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
 import { cryptoService } from '../services/crypto';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
+import * as logger from '../utils/logger';
+
 import { PinPad } from './PinPad';
 
 type Step = 'create-pin' | 'confirm-pin' | 'warning' | 'identity';
@@ -94,7 +98,7 @@ export function Onboarding() {
 
       toast.success(t('auth.welcome'));
     } catch (error) {
-      console.error(error);
+      logger.error('Identity generation failed:', error);
       toast.error(t('auth.error.generate'));
     } finally {
       setIsGenerating(false);

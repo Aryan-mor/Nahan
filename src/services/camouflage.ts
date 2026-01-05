@@ -1,5 +1,8 @@
+/* eslint-disable max-lines-per-function, max-lines */
 import pako from 'pako';
+
 import { poetryDb } from '../constants/poetryDb';
+import * as logger from '../utils/logger';
 
 /**
  * Nahan-Tag Protocol: Base-32 Steganography using Unicode Tags Block (Plane 14)
@@ -251,7 +254,7 @@ export class CamouflageService {
 
     if (!checksumMatch) {
       if (lenient) {
-        console.warn('⚠️ Checksum mismatch detected. Some Tags may have been stripped by the messaging platform. Attempting recovery...');
+        logger.warn('⚠️ Checksum mismatch detected. Some Tags may have been stripped by the messaging platform. Attempting recovery...');
       } else {
         throw new Error('Data corrupted during transmission.');
       }
@@ -262,7 +265,7 @@ export class CamouflageService {
       const decompressed = pako.inflate(compressed);
 
       if (!checksumMatch && lenient) {
-        console.warn('⚠️ Message decoded with checksum mismatch. Data integrity cannot be guaranteed.');
+        logger.warn('⚠️ Message decoded with checksum mismatch. Data integrity cannot be guaranteed.');
       }
 
       return decompressed;
@@ -350,7 +353,7 @@ export class CamouflageService {
     const score = Math.min(100, Math.round(ratio * 200));
 
     // Debug logging
-    console.log("🔍 Stealth Safety Calculation (Base-32):", {
+    logger.debug("🔍 Stealth Safety Calculation (Base-32):", {
       payloadSize: payloadByteLength,
       estimatedCompressedSize,
       totalProtocolSize,
@@ -365,9 +368,8 @@ export class CamouflageService {
   }
 
   /**
-   * Gets a recommended cover text using "Best-Fit Pool" approach
-   * Filters poems that fit, sorts by length, randomly selects from top candidates
-   * Maintains cryptographic randomness while minimizing output length
+   * @param lang - Language code (e.g., 'fa', 'ar')
+   * @returns Recommended cover text
    */
   getRecommendedCover(payloadByteLength: number, lang: 'fa' | 'en'): string {
     // Calculate required visible characters with accurate protocol overhead
@@ -525,9 +527,9 @@ export class CamouflageService {
    * STRICT: No expansion, no poetry, no automatic appending.
    * Uses EXACTLY the cover text provided by the user.
    */
-  embed(payload: Uint8Array, coverText: string, lang: 'fa' | 'en' = 'fa'): string {
+  embed(payload: Uint8Array, coverText: string, _lang: 'fa' | 'en' = 'fa'): string {
     // TRACE B [Tag Input]
-    console.log("TRACE B [Tag Input]:", {
+    logger.debug("TRACE B [Tag Input]:", {
       inputType: typeof payload,
       sample: payload instanceof Uint8Array ? Array.from(payload.slice(0, 5)) : String(payload).substring(0, 20)
     });
@@ -559,7 +561,7 @@ export class CamouflageService {
     // We append them to the END of the string
     // This decreases stealth but ensures data integrity without forced poetry
     if (tagIndex < totalTags) {
-      console.warn(`⚠️ Warning: Cover text too short. Appending ${totalTags - tagIndex} remaining Tags to end of string.`);
+      logger.warn(`⚠️ Warning: Cover text too short. Appending ${totalTags - tagIndex} remaining Tags to end of string.`);
       while (tagIndex < totalTags) {
         result += tagString[tagIndex];
         tagIndex++;

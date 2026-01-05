@@ -8,6 +8,11 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { devtools } from 'zustand/middleware';
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 interface UIState {
   // Language & UI Preferences
   language: string | null;
@@ -21,7 +26,7 @@ interface UIState {
   activeTab: 'chats' | 'keys' | 'settings';
 
   // PWA State (non-sensitive)
-  deferredPrompt: any;
+  deferredPrompt: BeforeInstallPromptEvent | null;
   isStandalone: boolean;
   isInstallPromptVisible: boolean;
 
@@ -32,7 +37,7 @@ interface UIState {
   incrementFailedAttempts: () => void;
   resetFailedAttempts: () => void;
   setActiveTab: (tab: 'chats' | 'keys' | 'settings') => void;
-  setDeferredPrompt: (prompt: any) => void;
+  setDeferredPrompt: (prompt: BeforeInstallPromptEvent | null) => void;
   setStandalone: (isStandalone: boolean) => void;
   setInstallPromptVisible: (visible: boolean) => void;
   installPWA: () => Promise<void>;

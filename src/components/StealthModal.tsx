@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+/* eslint-disable max-lines-per-function */
 import {
   Button,
   Modal,
@@ -11,9 +13,12 @@ import {
 } from '@heroui/react';
 import { AlertTriangle, Copy, RefreshCw, Shield } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
 import { camouflageService } from '../services/camouflage';
 import { useUIStore } from '../stores/uiStore';
+import * as logger from '../utils/logger';
 
 interface StealthModalProps {
   isOpen: boolean;
@@ -28,6 +33,7 @@ export function StealthModal({
   pendingBinary,
   onConfirm,
 }: StealthModalProps) {
+  const { t } = useTranslation();
   const { camouflageLanguage } = useUIStore();
   const [coverText, setCoverText] = useState('');
   const [isCustomText, setIsCustomText] = useState(false);
@@ -68,7 +74,7 @@ export function StealthModal({
 
     // Debug logging for large payloads
     if (payloadSize > 1024) {
-      console.log("📊 Large Payload Stealth Analysis:", {
+      logger.debug("📊 Large Payload Stealth Analysis:", {
         payloadSize,
         coverTextLength: coverText.length,
         safetyScore: score,
@@ -82,14 +88,14 @@ export function StealthModal({
 
       // Check Telegram message limit (4096 chars, use 4000 as safe threshold)
       if (output.length > 4000) {
-        console.warn("⚠️ Payload too large for Telegram:", {
+        logger.warn("⚠️ Payload too large for Telegram:", {
           finalLength: output.length,
           payloadSize: payloadSize,
           coverTextLength: coverText.length
         });
       }
     } catch (error) {
-      console.error('Embedding failed:', error);
+      logger.error('Embedding failed:', error);
       setFinalOutput('');
     }
   }, [coverText, pendingBinary]);
@@ -101,27 +107,27 @@ export function StealthModal({
 
     // Warning only - do not block
     if (stealthScore < threshold) {
-      toast.warning(`Stealth ratio is low (${stealthScore}%). Recommendation: ${threshold}%`);
+      toast.warning(t('stealth_modal.toast.low_ratio', { score: stealthScore, threshold }));
     }
 
     // Show warning for Telegram splitting risk but don't block
     if (finalOutput.length > 4000) {
-      toast.warning(`Telegram Splitting Risk: Message is ${finalOutput.length} chars (limit: 4096). Message may be split into multiple parts.`, {
+      toast.warning(t('stealth_modal.toast.telegram_risk', { length: finalOutput.length }), {
         duration: 5000
       });
     }
 
     // TRACE C [Final ZWC Output]
-    console.log("TRACE C [Final ZWC Output]:", {
+    logger.debug("TRACE C [Final ZWC Output]:", {
       text: finalOutput.substring(0, 50),
       hasHeaders: finalOutput.includes("BEGIN")
     });
 
     try {
       await navigator.clipboard.writeText(finalOutput);
-      toast.success('Stealth message copied to clipboard!');
+      toast.success(t('stealth_modal.toast.success'));
     } catch {
-      console.warn('Failed to copy to clipboard');
+      logger.warn('Failed to copy to clipboard');
       // Non-blocking error
     }
 
@@ -147,9 +153,9 @@ export function StealthModal({
   };
 
   const getSafetyLabel = (score: number) => {
-    if (score >= 80) return 'Green Zone (Safe)';
-    if (score >= 60) return 'Orange Zone (Moderate)';
-    return 'Red Zone (Risky)';
+    if (score >= 80) return t('stealth_modal.safety_levels.safe');
+    if (score >= 60) return t('stealth_modal.safety_levels.moderate');
+    return t('stealth_modal.safety_levels.risky');
   };
 
   // Dynamic threshold: 30% for large payloads (>1KB), 61% for small payloads
@@ -170,7 +176,7 @@ export function StealthModal({
       scrollBehavior="inside"
       isDismissable={false}
       isKeyboardDismissDisabled={true}
-      shouldCloseOnInteractOutside={(e) => false}
+      shouldCloseOnInteractOutside={() => false}
       classNames={{
         base: 'bg-industrial-900 border border-industrial-800 max-h-[90vh]',
         header: 'border-b border-industrial-800 flex-shrink-0',
@@ -205,17 +211,17 @@ export function StealthModal({
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center space-x-2">
                 <Shield className="w-5 h-5 text-green-500 shrink-0" />
-                <span className="text-industrial-100">Stealth Mode</span>
+                <span className="text-industrial-100">{t('stealth_modal.title')}</span>
               </div>
               <p className="text-sm font-normal text-industrial-400">
-                Hide your encrypted message inside a cover text using invisible characters.
+                {t('stealth_modal.subtitle')}
               </p>
             </ModalHeader>
             <ModalBody className="py-4 sm:py-6 space-y-4 sm:space-y-6 overflow-y-auto">
               {/* Safety Meter - Using Slider */}
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-industrial-300">Stealth Safety</span>
+                  <span className="text-industrial-300">{t('stealth_modal.safety')}</span>
                   <span className={`font-medium text-${getSafetyColor(stealthScore)}-500`}>
                     {getSafetyLabel(stealthScore)} ({stealthScore}%)
                   </span>
@@ -233,7 +239,7 @@ export function StealthModal({
                     filler: 'h-3',
                     thumb: 'hidden',
                   }}
-                  aria-label="Stealth Safety Level"
+                  aria-label={t('stealth_modal.safety')}
                 />
                 <p className="text-xs text-industrial-400">
                   {(() => {
@@ -241,14 +247,14 @@ export function StealthModal({
                     const threshold = payloadSize > 1024 ? 30 : 61;
 
                     if (exceedsTelegramLimit) {
-                      return `⚠️ Telegram Splitting Risk: ${finalOutput.length} chars (limit: 4096). Message may be split.`;
+                      return t('stealth_modal.status.telegram_risk', { length: finalOutput.length });
                     }
 
                     return stealthScore < threshold
-                      ? `Text is too short for the payload size (${payloadSize} bytes). Minimum safety: ${threshold}%. Please use longer cover text.`
+                      ? t('stealth_modal.status.too_short', { size: payloadSize, threshold })
                       : stealthScore >= 80
-                        ? 'Excellent! The message is well hidden with a safe ratio.'
-                        : 'Good length ratio. The message is reasonably hidden.';
+                        ? t('stealth_modal.status.excellent')
+                        : t('stealth_modal.status.good');
                   })()}
                 </p>
               </div>
@@ -256,7 +262,7 @@ export function StealthModal({
               {/* Cover Text Input */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <label className="text-sm font-medium text-industrial-300">Cover Text</label>
+                  <label className="text-sm font-medium text-industrial-300">{t('stealth_modal.cover_text')}</label>
                   <div className="flex items-center space-x-2 w-full sm:w-auto">
                     <Button
                       size="sm"
@@ -265,8 +271,8 @@ export function StealthModal({
                       startContent={<RefreshCw className="w-3 h-3" />}
                       className="flex-1 sm:flex-none"
                     >
-                      <span className="hidden sm:inline">Reset Suggestion</span>
-                      <span className="sm:hidden">Reset</span>
+                      <span className="hidden sm:inline">{t('stealth_modal.reset_suggestion')}</span>
+                      <span className="sm:hidden">{t('stealth_modal.reset')}</span>
                     </Button>
                     <div className="flex items-center space-x-2 bg-industrial-950 rounded-lg p-1 border border-industrial-800">
                       <span
@@ -275,7 +281,7 @@ export function StealthModal({
                         }`}
                         onClick={() => setIsCustomText(false)}
                       >
-                        Auto
+                        {t('stealth_modal.mode.auto')}
                       </span>
                       <Switch
                         size="sm"
@@ -289,7 +295,7 @@ export function StealthModal({
                         }`}
                         onClick={() => setIsCustomText(true)}
                       >
-                        Custom
+                        {t('stealth_modal.mode.custom')}
                       </span>
                     </div>
                   </div>
@@ -308,7 +314,7 @@ export function StealthModal({
                     setIsCustomText(true);
                   }}
                   minRows={3}
-                  placeholder="Type or paste a cover text..."
+                  placeholder={t('stealth_modal.placeholder')}
                   classNames={{
                     input: 'font-sans text-base text-industrial-100 bg-industrial-950',
                     inputWrapper: `bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-${getSafetyColor(
@@ -323,14 +329,12 @@ export function StealthModal({
                 <div className="flex items-start space-x-3">
                   <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
                   <div className="text-sm text-industrial-300 space-y-1">
-                    <p className="font-medium text-industrial-100">How it works</p>
+                    <p className="font-medium text-industrial-100">{t('stealth_modal.how_it_works.title')}</p>
                     <p>
-                      The encrypted data is encoded into Zero-Width Characters and embedded into the
-                      cover text. The output looks exactly like the cover text but contains the
-                      hidden message.
+                      {t('stealth_modal.how_it_works.desc')}
                     </p>
                     <p className="text-xs text-industrial-500 mt-2">
-                      Payload Size: {pendingBinary?.length || 0} bytes
+                      {t('stealth_modal.how_it_works.payload_size', { size: pendingBinary?.length || 0 })}
                     </p>
                   </div>
                 </div>
@@ -343,7 +347,7 @@ export function StealthModal({
                 onPress={onClose}
                 className="w-full sm:w-auto"
               >
-                Cancel
+                {t('stealth_modal.buttons.cancel')}
               </Button>
               <Button
                 color={isSafeToCopy ? 'success' : 'danger'}
@@ -360,10 +364,10 @@ export function StealthModal({
                 }
               >
                 {exceedsTelegramLimit
-                  ? 'Too Large for Telegram'
+                  ? t('stealth_modal.buttons.too_large')
                   : isSafeToCopy
-                    ? 'Confirm & Copy'
-                    : 'Confirm (Low Safety)'}
+                    ? t('stealth_modal.buttons.confirm_copy')
+                    : t('stealth_modal.buttons.confirm_low_safety')}
               </Button>
             </ModalFooter>
           </>

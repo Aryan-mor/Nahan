@@ -1,5 +1,6 @@
 import { Card, CardBody } from '@heroui/react';
 import { useTranslation } from 'react-i18next';
+
 import { useUIStore } from '../stores/uiStore';
 
 export function LanguageSelector() {

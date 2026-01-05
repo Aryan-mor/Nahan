@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+
 import { useAppStore } from '../stores/appStore';
+import * as logger from '../utils/logger';
 
 export function useOfflineSync() {
   const { processPendingMessages, isLoading } = useAppStore();
@@ -10,14 +12,14 @@ export function useOfflineSync() {
     if (isLoading) return;
 
     const handleOnline = async () => {
-      // console.log('App is online, syncing pending messages...');
+      // App is online, syncing pending messages...
       try {
         const count = await processPendingMessages();
         if (count > 0) {
           toast.success(`${count} offline message${count > 1 ? 's' : ''} sent`);
         }
       } catch (error) {
-        console.error('Sync failed:', error);
+        logger.error('Sync failed:', error);
       }
     };
 

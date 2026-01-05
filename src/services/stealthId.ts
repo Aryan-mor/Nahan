@@ -12,9 +12,12 @@
  */
 
 import pako from 'pako';
-import { CamouflageService } from './camouflage';
 import * as naclUtil from 'tweetnacl-util';
+
 import { poetryDb } from '../constants/poetryDb';
+import * as logger from '../utils/logger';
+
+import { CamouflageService } from './camouflage';
 
 const camouflageService = CamouflageService.getInstance();
 
@@ -103,7 +106,7 @@ export function parseStealthID(binary: Uint8Array): { name: string; publicKey: s
 
     return { name, publicKey };
   } catch (error) {
-    console.error('Failed to parse stealth ID:', error);
+    logger.error('Failed to parse stealth ID:', error);
     return null;
   }
 }

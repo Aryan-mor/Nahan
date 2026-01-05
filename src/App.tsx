@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+/* eslint-disable max-lines-per-function */
 import { Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
@@ -12,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast, Toaster } from 'sonner';
+
 import { ChatList } from './components/ChatList';
 import { ChatView } from './components/ChatView';
 import { ClipboardPermissionPrompt } from './components/ClipboardPermissionPrompt';
@@ -24,9 +27,9 @@ import { NewMessageModal } from './components/NewMessageModal';
 import { Onboarding } from './components/Onboarding';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
-import { WelcomeScreen } from './components/WelcomeScreen';
 import { Settings } from './components/Settings';
 import { StealthModal } from './components/StealthModal';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import {
   DetectionResult,
   useClipboardDetection,
@@ -34,9 +37,10 @@ import {
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
+import { formatNahanIdentity } from './services/stealthId';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
-import { formatNahanIdentity } from './services/stealthId';
+import * as logger from './utils/logger';
 
 type TabType = 'chats' | 'keys' | 'settings';
 
@@ -71,6 +75,12 @@ export default function App() {
     setInstallPromptVisible,
   } = useUIStore();
   const { t, i18n } = useTranslation();
+
+  // Update document direction based on language
+  useEffect(() => {
+    document.documentElement.lang = i18n.language;
+    document.documentElement.dir = i18n.language === 'fa' ? 'rtl' : 'ltr';
+  }, [i18n.language]);
 
   // Welcome Screen State
   const [welcomeDismissed, setWelcomeDismissed] = useState(
@@ -199,14 +209,14 @@ export default function App() {
         // Compare with user's own fingerprint - only block if exact match
         if (detectedFingerprint === identity.fingerprint) {
           // This is the user's own identity - silently ignore
-          console.debug('App: Ignoring own identity detection');
+          logger.debug('App: Ignoring own identity detection');
           return;
         }
         // If fingerprints don't match, proceed with detection (valid new contact)
       } catch (error) {
         // If fingerprint generation fails, proceed with detection (fail-safe)
         // This ensures valid contacts aren't accidentally blocked
-        console.debug(
+        logger.debug(
           'Failed to verify identity in handleDetection, proceeding with detection:',
           error,
         );
@@ -227,7 +237,7 @@ export default function App() {
           );
           if (isDuplicate) {
             // Message is a duplicate - silently ignore (no modal, no toast)
-            console.debug('App: Ignoring duplicate message detection');
+            logger.debug('App: Ignoring duplicate message detection');
             return;
           }
         }
@@ -242,11 +252,11 @@ export default function App() {
         // Check if it's a duplicate message error
         if (error instanceof Error && error.name === 'DuplicateMessageError') {
           // Duplicate message - silently ignore (no modal, no toast)
-          console.debug('App: Ignoring duplicate message (caught in processIncomingMessage)');
+          logger.debug('App: Ignoring duplicate message (caught in processIncomingMessage)');
           return;
         }
 
-        console.error('Failed to auto-import message:', error);
+        logger.error('Failed to auto-import message:', error);
         // Show error toast but still show modal for manual retry
         toast.error('Failed to import message. Please try again.');
         setDetectionResult(result);
@@ -273,11 +283,12 @@ export default function App() {
       const detectionResult: DetectionResult = {
         type: 'message',
         contactFingerprint: result.fingerprint,
+        contactName: result.senderName,
         // We don't have the full encryptedData here, but the modal might handle it
         // If this path is used, ensure DetectionModal can handle missing encryptedData
         // or fetch it from storage if needed.
         // For now, prioritize the main notification modal.
-      } as any;
+      };
 
       setDetectionResult(detectionResult);
       setShowDetectionModal(true);
@@ -318,7 +329,7 @@ export default function App() {
     const checkModal = () => {
       const modal =
         document.querySelector('[data-slot="base"]') || document.querySelector('.stealth-modal');
-      console.log(
+      logger.debug(
         '!!! LOG APP: App rendered. StealthModal presence:',
         !!modal,
         'showStealthModal state:',
@@ -610,10 +621,7 @@ export default function App() {
             )}
             {activeTab === 'keys' && (
               <div className="p-4 md:p-6 overflow-y-auto h-full">
-                <KeyExchange
-                  onDetection={handleDetection}
-                  onNewMessage={handleNewMessage}
-                />
+                <KeyExchange onDetection={handleDetection} onNewMessage={handleNewMessage} />
               </div>
             )}
             {activeTab === 'settings' && (

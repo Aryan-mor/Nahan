@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Production-Safe Logger Utility
  * Only logs in development mode (import.meta.env.DEV)
@@ -9,16 +10,26 @@ const isDev = import.meta.env.DEV;
 /**
  * Log a message (only in development)
  */
-export function log(...args: any[]): void {
+export function log(...args: unknown[]): void {
   if (isDev) {
     console.log(...args);
   }
 }
 
 /**
+ * Alias for log (for compatibility)
+ */
+export const info = log;
+
+/**
+ * Alias for log (for compatibility)
+ */
+export const debug = log;
+
+/**
  * Log a warning (only in development)
  */
-export function warn(...args: any[]): void {
+export function warn(...args: unknown[]): void {
   if (isDev) {
     console.warn(...args);
   }
@@ -28,7 +39,7 @@ export function warn(...args: any[]): void {
  * Log an error (always logs, even in production)
  * Errors are critical and should be visible in production
  */
-export function error(...args: any[]): void {
+export function error(...args: unknown[]): void {
   console.error(...args);
 }
 
@@ -53,9 +64,8 @@ export function groupEnd(): void {
 /**
  * Log a trace with a label (only in development)
  */
-export function trace(label: string, ...args: any[]): void {
+export function trace(label: string, ...args: unknown[]): void {
   if (isDev) {
     console.log(`[TRACE: ${label}]`, ...args);
   }
 }
-

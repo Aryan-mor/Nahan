@@ -1,9 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register';
+
 import App from './App'
 import './i18n';
 import './index.css'
+import * as logger from './utils/logger';
 
 /**
  * SECURITY AUDIT: Network API Verification
@@ -37,7 +39,7 @@ if (import.meta.env.DEV) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       for (const registration of registrations) {
         registration.unregister();
-        console.log('Nahan Dev: Rogue Service Worker killed.');
+        logger.info('Nahan Dev: Rogue Service Worker killed.');
       }
     });
   }
@@ -46,13 +48,13 @@ if (import.meta.env.DEV) {
 // Force dark mode for the industrial theme
 document.documentElement.classList.add('dark');
 
-console.log('Attempting to register Service Worker...');
-const updateSW = registerSW({
+logger.info('Attempting to register Service Worker...');
+const _updateSW = registerSW({
   onNeedRefresh() {
-    console.log('[PWA] New content available, please refresh.');
+    logger.info('[PWA] New content available, please refresh.');
   },
   onOfflineReady() {
-    console.log('[PWA] App is ready to work offline.');
+    logger.info('[PWA] App is ready to work offline.');
   },
   immediate: true,
 });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import {
   Avatar,
   Button,
@@ -11,7 +12,10 @@ import { ArrowLeft, MoreVertical, Shield } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
 import { useAppStore } from '../stores/appStore';
+import * as logger from '../utils/logger';
+
 import { ChatInput } from './ChatInput';
 import { MessageBubble } from './MessageBubble';
 
@@ -35,16 +39,16 @@ export function ChatView() {
     if (!activeChat) return;
 
     // Confirm before clearing
-    if (!confirm(t('chat.clear_history_confirm', { name: activeChat.name, defaultValue: `Are you sure you want to clear all messages with ${activeChat.name}? This cannot be undone.` }))) {
+    if (!confirm(t('chat.clear_history_confirm', { name: activeChat.name }))) {
       return;
     }
 
     try {
       await clearChatHistory(activeChat.fingerprint);
-      toast.success(t('chat.clear_history_success', { defaultValue: 'Chat history cleared successfully' }));
+      toast.success(t('chat.clear_history_success'));
     } catch (error) {
-      console.error('Failed to clear history:', error);
-      toast.error(t('chat.clear_history_error', { defaultValue: 'Failed to clear chat history' }));
+      logger.error('Failed to clear history:', error);
+      toast.error(t('chat.clear_history_error'));
     }
   };
 
@@ -72,11 +76,13 @@ export function ChatView() {
 
           <div className="flex items-center gap-3">
             <Avatar
-              name={activeChat.name}
+              name={activeChat.fingerprint === 'BROADCAST' ? t('broadcast_channel') : activeChat.name}
               className="w-10 h-10 text-sm bg-primary-900 text-primary-200"
             />
             <div>
-              <h2 className="font-semibold text-industrial-100 leading-tight">{activeChat.name}</h2>
+              <h2 className="font-semibold text-industrial-100 leading-tight">
+                {activeChat.fingerprint === 'BROADCAST' ? t('broadcast_channel') : activeChat.name}
+              </h2>
               <p className="text-xs text-industrial-400 font-mono">
                 #{activeChat.fingerprint.slice(-8)}
               </p>

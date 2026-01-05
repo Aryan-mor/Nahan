@@ -5,10 +5,13 @@
 
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { MessageSquare, UserPlus, X } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
+
+import { CryptoService } from '../services/crypto';
+import { Contact, storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
-import { Contact, storageService } from '../services/storage';
-import { CryptoService } from '../services/crypto';
+import * as logger from '../utils/logger';
 
 const cryptoService = CryptoService.getInstance();
 
@@ -22,6 +25,7 @@ interface DetectionModalProps {
   encryptedData?: string; // Base64-encoded encrypted message (for message type)
 }
 
+/* eslint-disable max-lines-per-function */
 export function DetectionModal({
   isOpen,
   onClose,
@@ -29,7 +33,6 @@ export function DetectionModal({
   contactName,
   contactPublicKey,
   contactFingerprint,
-  encryptedData,
 }: DetectionModalProps) {
   const {
     addContact,
@@ -39,6 +42,7 @@ export function DetectionModal({
   } = useAppStore();
 
   const { setActiveTab } = useUIStore();
+  const { t } = useTranslation();
 
   const handleAddContact = async () => {
     if (!contactPublicKey) return;
@@ -79,7 +83,7 @@ export function DetectionModal({
       setActiveTab('chats');
       onClose();
     } catch (error) {
-      console.error('Failed to add contact:', error);
+      logger.error('Failed to add contact:', error);
     }
   };
 
@@ -101,7 +105,7 @@ export function DetectionModal({
       size="md"
       isDismissable={false}
       isKeyboardDismissDisabled={true}
-      shouldCloseOnInteractOutside={(e) => false}
+      shouldCloseOnInteractOutside={() => false}
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
         header: 'border-b border-industrial-800',
@@ -120,7 +124,7 @@ export function DetectionModal({
                   <MessageSquare className="w-5 h-5 text-primary" />
                 )}
                 <span>
-                  {type === 'id' ? 'New Contact Detected' : 'New Message Detected'}
+                  {type === 'id' ? t('detection.new_contact') : t('detection.new_message')}
                 </span>
               </div>
             </ModalHeader>
@@ -129,24 +133,30 @@ export function DetectionModal({
                 {type === 'id' ? (
                   <>
                     <p className="text-sm text-industrial-300">
-                      A new contact <strong className="text-industrial-100">{contactName}</strong> was detected
-                      in your clipboard. Would you like to add them and start a chat?
+                      <Trans
+                        i18nKey="detection.contact_found"
+                        values={{ name: contactName }}
+                        components={{ strong_text: <strong className="text-industrial-100" /> }}
+                      />
                     </p>
                     <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
                       <p className="text-xs text-industrial-400">
-                        The contact information was hidden using steganography. No plaintext public keys
-                        were exposed.
+                        {t('detection.steganography_info')}
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
                     <p className="text-sm text-industrial-300">
-                      New message from <strong className="text-industrial-100">{contactName}</strong> received. History updated.
+                      <Trans
+                        i18nKey="detection.message_found"
+                        values={{ name: contactName }}
+                        components={{ strong_text: <strong className="text-industrial-100" /> }}
+                      />
                     </p>
                     <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
                       <p className="text-xs text-industrial-400">
-                        The message was detected from your clipboard and imported successfully.
+                        {t('detection.message_info')}
                       </p>
                     </div>
                   </>
@@ -155,7 +165,7 @@ export function DetectionModal({
             </ModalBody>
             <ModalFooter>
               <Button variant="light" onPress={onClose} startContent={<X className="w-4 h-4" />}>
-                Dismiss
+                {t('detection.dismiss')}
               </Button>
               {type === 'id' ? (
                 <Button
@@ -163,7 +173,7 @@ export function DetectionModal({
                   onPress={handleAddContact}
                   startContent={<UserPlus className="w-4 h-4" />}
                 >
-                  Add & Start Chat
+                  {t('detection.add_chat')}
                 </Button>
               ) : (
                 <Button
@@ -171,7 +181,7 @@ export function DetectionModal({
                   onPress={handleGoToChat}
                   startContent={<MessageSquare className="w-4 h-4" />}
                 >
-                  View Chat
+                  {t('detection.view_chat')}
                 </Button>
               )}
             </ModalFooter>
@@ -181,4 +191,3 @@ export function DetectionModal({
     </Modal>
   );
 }
-

@@ -1,7 +1,13 @@
+import * as logger from '../utils/logger';
+
+/* eslint-disable max-lines-per-function */
 /**
  * SecureStorage - Encrypted localStorage wrapper for Zustand persist middleware
  * Uses AES-GCM encryption with key derived from user PIN (sessionPassphrase)
  */
+
+let _encryptionLock = false;
+let _isEncrypting = false;
 
 /**
  * Encrypted storage format:
@@ -179,7 +185,7 @@ export async function decryptData(encryptedData: string, passphrase: string): Pr
     }
 
     // Log the original error for debugging
-    console.error('[secureStorage] Decryption error:', error);
+    logger.error('[secureStorage] Decryption error:', error);
 
     // Clear key cache on decryption failure to prevent stale keys
     // This ensures fresh keys are derived on retry
@@ -252,8 +258,6 @@ export function getPassphrase(): string | null {
  * - setItem: Returns early if no passphrase (NEVER stores plaintext)
  * - Uses synchronous lock to prevent race conditions during unlock-then-save flow
  */
-let isEncrypting = false;
-let encryptionLock = false;
 
 
 export const secureStorage = {
@@ -270,7 +274,7 @@ export const secureStorage = {
           // If marker is recent (< 100ms), encryption is likely in progress - return null to prevent reading incomplete data
           // If marker is old (> 1000ms), encryption likely failed - return null to prevent reading stale marker
           if (markerAge < 100 || markerAge > 1000) {
-            console.warn('SecureStorage: Detected encryption marker - encryption may be in progress or failed');
+            logger.warn('SecureStorage: Detected encryption marker - encryption may be in progress or failed');
             return null;
           }
           // Marker is between 100ms and 1000ms old - encryption should have completed, but return null to be safe
@@ -283,7 +287,7 @@ export const secureStorage = {
       // Return raw data (encrypted or unencrypted) - decryption happens in migrate
       return raw;
     } catch (error) {
-      console.error('SecureStorage getItem failed:', error);
+      logger.error('SecureStorage getItem failed:', error);
       return null;
     }
   },
@@ -297,7 +301,7 @@ export const secureStorage = {
     // NEVER write plaintext to localStorage
     if (!passphrase) {
       // Debug log only - this is expected during normal boot-up when app is locked
-      console.debug('SecureStorage: Save aborted - no passphrase available');
+      logger.debug('SecureStorage: Save aborted - no passphrase available');
       return;
     }
 
@@ -314,8 +318,8 @@ export const secureStorage = {
     }
 
     // Set lock to prevent concurrent writes
-    encryptionLock = true;
-    isEncrypting = true;
+    _encryptionLock = true;
+    _isEncrypting = true;
 
     // Store a temporary marker BEFORE encryption starts
     // This marker will be replaced by encrypted data once encryption completes
@@ -337,15 +341,11 @@ export const secureStorage = {
       .then((encrypted) => {
         // Store ONLY encrypted data (replaces the marker)
         localStorage.setItem(name, encrypted);
-        encryptionLock = false;
-        isEncrypting = false;
       })
       .catch((err) => {
-        console.error('Failed to encrypt storage:', err);
+        logger.error('Failed to encrypt storage:', err);
         // Remove the marker if encryption fails (prevent reading stale marker)
         localStorage.removeItem(name);
-        encryptionLock = false;
-        isEncrypting = false;
       });
   },
 

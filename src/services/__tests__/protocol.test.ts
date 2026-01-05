@@ -5,9 +5,11 @@
  */
 
 import pako from 'pako';
+/* eslint-disable max-lines-per-function */
 import nacl from 'tweetnacl';
 import * as naclUtil from 'tweetnacl-util';
 import { describe, expect, it } from 'vitest';
+
 import { CamouflageService } from '../camouflage';
 import { detectPacketType, generateStealthID, parseStealthID } from '../stealthId';
 

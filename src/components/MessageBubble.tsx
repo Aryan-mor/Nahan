@@ -1,9 +1,11 @@
+/* eslint-disable max-lines-per-function */
 import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { Copy, Lock, MoreVertical, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
 import { SecureMessage } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 
@@ -215,7 +217,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           onOpenChange={(open) => !open && setMenuPosition(null)}
           placement="bottom-start"
           triggerScaleOnOpen={false}
-          // @ts-ignore - HeroUI supports virtual elements but types might be strict
+          // @ts-expect-error - HeroUI supports virtual elements but types might be strict
           triggerRef={{ current: virtualElement }}
         >
           {/* Invisible trigger to satisfy Dropdown requirement */}
@@ -226,7 +228,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             />
           </DropdownTrigger>
           <DropdownMenu
-            aria-label="Message Actions"
+            aria-label={t('chat.message.options')}
             className="bg-industrial-900 border border-industrial-800 text-industrial-200"
           >
             <DropdownItem

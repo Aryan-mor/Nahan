@@ -1,12 +1,16 @@
+/* eslint-disable max-lines-per-function */
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { Check, Copy, Download, Share } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
+import { dataURItoBlob } from '../lib/utils';
+import { formatNahanIdentity } from '../services/stealthId';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
-import { formatNahanIdentity } from '../services/stealthId';
-import { dataURItoBlob } from '../lib/utils';
+import * as logger from '../utils/logger';
 
 interface MyQRModalProps {
   isOpen: boolean;
@@ -18,32 +22,33 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
   const { camouflageLanguage } = useUIStore();
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
+    const generateQRCode = async () => {
+      if (!identity) return;
+      try {
+        // Format: Stealth ID (Poetry with embedded data)
+        const qrData = formatNahanIdentity(identity, camouflageLanguage || 'fa');
+        const dataUrl = await QRCode.toDataURL(qrData, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#e2e8f0', // industrial-200
+            light: '#020617', // industrial-950
+          },
+        });
+        setQrCodeDataUrl(dataUrl);
+      } catch (err) {
+        logger.error('QR Generation failed', err);
+        toast.error(t('my_qr.error.generate'));
+      }
+    };
+
     if (isOpen && identity) {
       generateQRCode();
     }
-  }, [isOpen, identity]);
-
-  const generateQRCode = async () => {
-    if (!identity) return;
-    try {
-      // Format: Stealth ID (Poetry with embedded data)
-      const qrData = formatNahanIdentity(identity, camouflageLanguage || 'fa');
-      const dataUrl = await QRCode.toDataURL(qrData, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#e2e8f0', // industrial-200
-          light: '#020617', // industrial-950
-        },
-      });
-      setQrCodeDataUrl(dataUrl);
-    } catch (err) {
-      console.error('QR Generation failed', err);
-      toast.error('Failed to generate QR code');
-    }
-  };
+  }, [isOpen, identity, camouflageLanguage, t]);
 
   const copyToClipboard = async () => {
     if (!identity) return;
@@ -51,10 +56,10 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
       const data = formatNahanIdentity(identity, camouflageLanguage || 'fa');
       await navigator.clipboard.writeText(data);
       setIsCopied(true);
-      toast.success('Identity copied to clipboard');
+      toast.success(t('my_qr.success.copied'));
       setTimeout(() => setIsCopied(false), 2000);
     } catch {
-      toast.error('Failed to copy to clipboard');
+      toast.error(t('my_qr.error.copy'));
     }
   };
 
@@ -76,8 +81,8 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `NAHAN Identity - ${identity.name}`,
-          text: `Scan to add ${identity.name} on NAHAN`,
+          title: t('my_qr.share_title', { name: identity.name }),
+          text: t('my_qr.share_text', { name: identity.name }),
           files: [file],
         });
       } else {
@@ -105,9 +110,9 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
         {() => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              My Identity QR
+              {t('my_qr.title')}
               <span className="text-sm font-normal text-industrial-400">
-                Share this code to connect
+                {t('my_qr.subtitle')}
               </span>
             </ModalHeader>
             <ModalBody className="py-6 flex flex-col items-center gap-6">
@@ -115,7 +120,7 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
                 <div className="p-4 bg-white rounded-xl shadow-lg shadow-black/50">
                   <img
                     src={qrCodeDataUrl}
-                    alt="Identity QR Code"
+                    alt={t('my_qr.title')}
                     className="w-64 h-64 object-contain"
                   />
                 </div>
@@ -141,21 +146,21 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
                 }
                 color={isCopied ? 'success' : 'default'}
               >
-                {isCopied ? 'Copied' : 'Copy String'}
+                {isCopied ? t('my_qr.copied') : t('my_qr.copy_string')}
               </Button>
               <Button
                 variant="flat"
                 onPress={downloadQR}
                 startContent={<Download className="w-4 h-4" />}
               >
-                Save
+                {t('my_qr.save')}
               </Button>
               <Button
                 color="primary"
                 onPress={shareQR}
                 startContent={<Share className="w-4 h-4" />}
               >
-                Share
+                {t('my_qr.share')}
               </Button>
             </ModalFooter>
           </>

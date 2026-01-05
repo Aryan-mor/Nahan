@@ -2,9 +2,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Download, MoreVertical, Share, Shield, WifiOff, X, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useAppStore } from '../stores/appStore';
+
 import { useUIStore } from '../stores/uiStore';
 
+/* eslint-disable max-lines-per-function */
 export function PWAInstallPrompt() {
   const {
     isStandalone,

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { RefreshCw, ShieldAlert } from 'lucide-react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { usePWA } from '../hooks/usePWA';
 
 export function PWAUpdateNotification() {

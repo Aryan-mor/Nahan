@@ -3,10 +3,14 @@
  * Provides "View Chat" action button to navigate to the conversation
  */
 
+/* eslint-disable max-lines-per-function */
 import { Avatar, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { MessageSquare, Radio } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
+import * as logger from '../utils/logger';
 
 interface NewMessageModalProps {
   isOpen: boolean;
@@ -23,8 +27,9 @@ export function NewMessageModal({
   senderFingerprint,
   isBroadcast,
 }: NewMessageModalProps) {
-  const { setActiveChat, getContactsWithBroadcast } = useAppStore();
+  const { setActiveChat } = useAppStore();
   const { setActiveTab } = useUIStore();
+  const { t } = useTranslation();
 
   const handleViewChat = async () => {
     try {
@@ -39,7 +44,7 @@ export function NewMessageModal({
       }
       onClose();
     } catch (error) {
-      console.error('[NewMessageModal] Failed to navigate to chat:', error);
+      logger.error('[NewMessageModal] Failed to navigate to chat:', error);
       // Still close modal even if navigation fails
       onClose();
     }
@@ -52,7 +57,7 @@ export function NewMessageModal({
       size="md"
       isDismissable={false}
       isKeyboardDismissDisabled={true}
-      shouldCloseOnInteractOutside={(e) => false}
+      shouldCloseOnInteractOutside={() => false}
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
         header: 'border-b border-industrial-800',
@@ -71,7 +76,7 @@ export function NewMessageModal({
                   <MessageSquare className="w-5 h-5 text-primary" />
                 )}
                 <span>
-                  {isBroadcast ? 'New Broadcast Detected' : 'New Message Detected'}
+                  {isBroadcast ? t('new_message.title_broadcast') : t('new_message.title_private')}
                 </span>
               </div>
             </ModalHeader>
@@ -84,7 +89,7 @@ export function NewMessageModal({
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-industrial-100 truncate">
-                      {isBroadcast ? `Broadcast from ${senderName}` : senderName}
+                      {isBroadcast ? t('new_message.broadcast_from', { name: senderName }) : senderName}
                     </p>
                     <p className="text-sm text-industrial-500 truncate">
                       {senderFingerprint.slice(-8)}
@@ -93,17 +98,17 @@ export function NewMessageModal({
                 </div>
                 <p className="text-sm text-industrial-400">
                   {isBroadcast
-                    ? 'A new broadcast message has been received and stored.'
-                    : 'A new private message has been received and stored.'}
+                    ? t('new_message.desc_broadcast')
+                    : t('new_message.desc_private')}
                 </p>
               </div>
             </ModalBody>
             <ModalFooter>
               <Button color="danger" variant="light" onPress={onClose}>
-                Dismiss
+                {t('new_message.dismiss')}
               </Button>
               <Button color="primary" onPress={handleViewChat}>
-                View Chat
+                {t('new_message.view_chat')}
               </Button>
             </ModalFooter>
           </>
