@@ -14,13 +14,16 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { useAppStore } from '../stores/appStore';
+import { useSteganographyStore } from '../stores/steganographyStore';
 import * as logger from '../utils/logger';
 
 import { ChatInput } from './ChatInput';
 import { MessageBubble } from './MessageBubble';
+import { TemporarySteganographyMessage } from './steganography/TemporarySteganographyMessage';
 
 export function ChatView() {
   const { activeChat, messages, setActiveChat, clearChatHistory } = useAppStore();
+  const { encodingStatus } = useSteganographyStore();
   const { t, i18n } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
   const isRTL = i18n.language === 'fa';
@@ -76,7 +79,9 @@ export function ChatView() {
 
           <div className="flex items-center gap-3">
             <Avatar
-              name={activeChat.fingerprint === 'BROADCAST' ? t('broadcast_channel') : activeChat.name}
+              name={
+                activeChat.fingerprint === 'BROADCAST' ? t('broadcast_channel') : activeChat.name
+              }
               className="w-10 h-10 text-sm bg-primary-900 text-primary-200"
             />
             <div>
@@ -117,7 +122,8 @@ export function ChatView() {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 gap-2.5 flex flex-col-reverse scrollbar-hide">
-        {messages.length === 0 ? (
+        {encodingStatus !== 'idle' && <TemporarySteganographyMessage />}
+        {messages.length === 0 && encodingStatus === 'idle' ? (
           <div className="flex flex-col items-center justify-center h-full text-industrial-500 space-y-4 opacity-50">
             <Shield className="w-16 h-16" />
             <p className="text-center max-w-xs text-sm">

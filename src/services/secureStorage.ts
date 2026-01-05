@@ -115,7 +115,19 @@ export async function encryptData(data: string, passphrase: string): Promise<str
   const tag = encryptedArray.slice(-16); // Last 16 bytes (authentication tag)
 
   // Convert to base64 for storage
-  const ciphertextBase64 = btoa(String.fromCharCode(...ciphertext));
+  // Use chunked conversion to avoid stack overflow with large arrays
+  const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
+    let binary = '';
+    const len = bytes.byteLength;
+    const CHUNK_SIZE = 0x8000; // 32KB chunks
+    for (let i = 0; i < len; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, len));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  };
+
+  const ciphertextBase64 = uint8ArrayToBase64(ciphertext);
   const saltBase64 = btoa(String.fromCharCode(...salt));
   const ivBase64 = btoa(String.fromCharCode(...iv));
   const tagBase64 = btoa(String.fromCharCode(...tag));

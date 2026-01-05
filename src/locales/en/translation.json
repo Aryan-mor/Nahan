@@ -563,5 +563,26 @@
       "success": "All data cleared successfully",
       "error": "Failed to clear data"
     }
+  },
+  "steganography": {
+    "preview_title": "Encrypted Image Ready",
+    "decode_title": "Hidden Message",
+    "preview_subtitle": "Your message is hidden inside this image",
+    "decode_subtitle": "Content extracted from the image",
+    "decoding": "Extracting hidden message...",
+    "warning_file_transfer": "You MUST send this image as a FILE. Sending it as a standard photo will corrupt the hidden data.",
+    "download_image": "Download as File",
+    "copy_image": "Copy Image",
+    "image_copied": "Image copied to clipboard",
+    "copy_failed": "Failed to copy image",
+    "decode_error": "Failed to decode image",
+    "unknown_sender": "Decoded from unknown sender",
+    "message_saved": "Message saved to chat"
+  },
+  "common": {
+    "send": "Send Now",
+    "close": "Close",
+    "download_image": "Download Image",
+    "image_preview": "Image Preview"
   }
 }

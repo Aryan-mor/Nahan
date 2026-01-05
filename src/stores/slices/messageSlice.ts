@@ -41,7 +41,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
   setMessageInput: (val) => set({ messageInput: val }),
 
-  sendMessage: async (text) => {
+  sendMessage: async (text, image, type = 'text') => {
     const { activeChat, identity, sessionPassphrase, isStealthMode } = get();
 
     if (!activeChat || !identity || !sessionPassphrase) {
@@ -50,6 +50,9 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
     try {
       if (isStealthMode) {
+        if (image) {
+          throw new Error('Images cannot be sent in stealth mode yet');
+        }
         // Stealth mode: Encrypt to binary and open modal for user customization
         const encryptedBinary = await cryptoService.encryptMessage(
           text,
@@ -69,29 +72,56 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         return '';
       }
 
-      // Standard mode: Encrypt message (with headers)
-      const encryptedContent = await cryptoService.encryptMessage(
-        text,
-        activeChat.publicKey,
-        identity.privateKey,
-        sessionPassphrase,
-      ) as string;
+      // Standard mode: Encrypt/Sign message
+      // If image is present, create a composite payload
+      let payloadToEncrypt = text;
+      
+      // Determine actual message type
+      const messageType = type === 'image_stego' ? 'image_stego' : (image ? 'image' : 'text');
+      
+      if (image) {
+        payloadToEncrypt = JSON.stringify({
+          nahan_type: messageType, // Use specific type (image or image_stego)
+          text: text,
+          image: image
+        });
+      }
+
+      let encryptedContent: string;
+      const isBroadcast = activeChat.id === 'system_broadcast';
+
+      if (isBroadcast) {
+        // Broadcast: Sign only (no encryption for specific recipient)
+        encryptedContent = await cryptoService.signMessage(
+          payloadToEncrypt,
+          identity.privateKey,
+          sessionPassphrase
+        ) as string;
+      } else {
+        // Private Chat: Encrypt for recipient
+        if (!activeChat.publicKey) {
+          throw new Error('Missing recipient public key');
+        }
+        encryptedContent = await cryptoService.encryptMessage(
+          payloadToEncrypt,
+          activeChat.publicKey,
+          identity.privateKey,
+          sessionPassphrase,
+        ) as string;
+      }
 
       const isOffline = !navigator.onLine;
 
-      // CRITICAL: Ensure private messages are stored with contact's fingerprint, not BROADCAST
-      // Double-check that we're not in broadcast mode
-      if (activeChat.id === 'system_broadcast') {
-        throw new Error('Cannot send standard encrypted message to broadcast channel');
-      }
-
       // Store message
+      // For Broadcast, recipient is 'BROADCAST'
       const newMessage = await storageService.storeMessage({
         senderFingerprint: identity.fingerprint,
-        recipientFingerprint: activeChat.fingerprint,
+        recipientFingerprint: isBroadcast ? 'BROADCAST' : activeChat.fingerprint,
+        type: messageType,
         content: {
           plain: text,
           encrypted: encryptedContent,
+          image: image,
         },
         isOutgoing: true,
         read: true,

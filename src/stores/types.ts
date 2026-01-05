@@ -26,9 +26,10 @@ export interface MessageSlice {
   chatSummaries: Record<string, SecureMessage | undefined>;
   messageInput: string;
   lastStorageUpdate: number;
+
   setActiveChat: (contact: Contact | null) => Promise<void>;
   setMessageInput: (val: string) => void;
-  sendMessage: (text: string) => Promise<string>;
+  sendMessage: (text: string, image?: string, type?: 'text' | 'image' | 'image_stego') => Promise<string>;
   deleteMessage: (id: string) => Promise<void>;
   clearChatHistory: (fingerprint: string) => Promise<void>;
   refreshMessages: () => Promise<void>;

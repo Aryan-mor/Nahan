@@ -10,7 +10,6 @@ import {
   deserializeEncryptedMessage,
   serializeEncryptedMessage,
 } from './serialization';
-import { DecryptedMessage } from './types';
 
 /**
  * Encrypt and sign a message using Nahan Compact Protocol
@@ -18,7 +17,7 @@ import { DecryptedMessage } from './types';
  * Returns raw Uint8Array with NO headers or text markers
  */
 export async function encryptMessage(
-  message: string,
+  message: string | Uint8Array,
   recipientPublicKey: string,
   senderPrivateKey: string,
   passphrase: string,
@@ -29,10 +28,24 @@ export async function encryptMessage(
     const senderPrivateKeyBytes = await decryptPrivateKey(senderPrivateKey, passphrase);
 
     // Decode recipient's public key
-    const recipientPublicKeyBytes = naclUtil.decodeBase64(recipientPublicKey);
+    let recipientPublicKeyBytes: Uint8Array;
+    try {
+      recipientPublicKeyBytes = naclUtil.decodeBase64(recipientPublicKey);
+    } catch (_e) {
+      logger.error('Invalid public key format (base64 decode failed)', recipientPublicKey);
+      throw new Error('Invalid public key format');
+    }
+
+    if (recipientPublicKeyBytes.length !== nacl.box.publicKeyLength) {
+      logger.error(`Invalid public key length: ${recipientPublicKeyBytes.length}, expected ${nacl.box.publicKeyLength}`);
+      throw new Error(`Invalid public key length: ${recipientPublicKeyBytes.length}`);
+    }
 
     // 1. Compress the message using pako BEFORE encryption
-    const messageBytes = new TextEncoder().encode(message);
+    const messageBytes = typeof message === 'string' 
+      ? new TextEncoder().encode(message) 
+      : message;
+      
     const compressed = pako.deflate(messageBytes);
 
     // 2. Encrypt using nacl.box (X25519 + XSalsa20-Poly1305)
@@ -82,7 +95,11 @@ export async function decryptMessage(
   recipientPrivateKey: string,
   passphrase: string,
   senderPublicKeys: string[] = [],
-): Promise<DecryptedMessage> {
+  options?: { 
+    binary?: boolean;
+    forcePeerPublicKey?: string; // Use this public key instead of the one in the header for decryption (needed for sender to decrypt own message)
+  },
+): Promise<{ data: string | Uint8Array; verified: boolean; signatureValid: boolean; senderFingerprint?: string; senderPublicKey?: string }> {
   try {
     // Decode encrypted message
     let messageBytes: Uint8Array;
@@ -106,16 +123,27 @@ export async function decryptMessage(
     // Decrypt recipient's private key
     const recipientPrivateKeyBytes = await decryptPrivateKey(recipientPrivateKey, passphrase);
 
+    // Determine which public key to use for the shared secret calculation
+    // Default: Use the sender public key embedded in the message header (Standard Receiver flow)
+    // Override: Use a forced peer key (Sender flow - decrypting own message sent to someone else)
+    let peerPublicKeyBytes = senderPublicKey;
+    if (options?.forcePeerPublicKey) {
+      try {
+        peerPublicKeyBytes = naclUtil.decodeBase64(options.forcePeerPublicKey);
+      } catch (e) {
+        logger.warn('Invalid forcePeerPublicKey format', e);
+      }
+    }
+
     // Log for debugging decryption issues
-    logger.log('[DEBUG-CRYPTO] Sender Key:', senderPublicKey, 'Nonce:', nonce);
+    logger.log('[DEBUG-CRYPTO] Peer Key:', peerPublicKeyBytes, 'Nonce:', nonce);
 
     // Decrypt using nacl.box (X25519 authenticated encryption)
     // nacl.box.open automatically verifies the Poly1305 MAC, providing authentication
-    // No separate Ed25519 signature needed - nacl.box is an AEAD
     const decrypted = nacl.box.open(
       encryptedPayload,
       nonce,
-      senderPublicKey,
+      peerPublicKeyBytes,
       recipientPrivateKeyBytes,
     );
 
@@ -163,13 +191,16 @@ export async function decryptMessage(
 
     // Decompress the message
     const decompressed = pako.inflate(decrypted);
-    const plaintext = new TextDecoder().decode(decompressed);
+    const data = options?.binary 
+      ? decompressed 
+      : new TextDecoder().decode(decompressed);
 
     return {
-      data: plaintext,
+      data,
       verified: senderFingerprint !== undefined,
       signatureValid,
       senderFingerprint,
+      senderPublicKey: naclUtil.encodeBase64(senderPublicKey),
     };
   } catch (error) {
     logger.error('Decryption failed:', error);

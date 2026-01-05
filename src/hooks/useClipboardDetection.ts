@@ -5,9 +5,11 @@
  * Uses unified handleUniversalInput for all detection logic
  */
 
-/* eslint-disable max-lines-per-function */
+/* eslint-disable max-lines-per-function, max-lines */
 import { useEffect, useRef, useState } from 'react';
 
+import { steganographyService } from '../services/steganography';
+import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import * as logger from '../utils/logger';
 
@@ -91,6 +93,27 @@ export async function requestClipboardPermission(): Promise<boolean> {
   }
 }
 
+// Helper to hash blob for deduplication
+const getImageHash = async (blob: Blob) => {
+  const buffer = await blob.arrayBuffer();
+  const view = new Uint8Array(buffer);
+  // Simple hash: length + sum of first 100 bytes + sum of last 100 bytes
+  let sum = 0;
+  for (let i = 0; i < Math.min(100, view.length); i++) sum += view[i];
+  for (let i = Math.max(0, view.length - 100); i < view.length; i++) sum += view[i];
+  return `${blob.size}-${blob.type}-${sum}`;
+};
+
+// Helper to convert blob to base64
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 /**
  * Detection result for clipboard content
  * Note: This interface is kept for backward compatibility with App.tsx
@@ -115,12 +138,13 @@ export function useClipboardDetection(
   onDetection: (result: DetectionResult) => void,
   onNewMessage?: (result: { type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string }) => void
 ) {
-  const { handleUniversalInput, identity } = useAppStore();
+  const { handleUniversalInput, identity, sessionPassphrase, contacts } = useAppStore();
   const [lastCheckedClipboard, setLastCheckedClipboard] = useState<string>('');
 
   // SYNC BLOCKING: Use ref to track last processed clipboard text synchronously
   // This prevents the "quick re-open" loop by blocking re-detection within the same event cycle
   const lastProcessedRef = useRef<string>('');
+  const lastProcessedImageRef = useRef<string>('');
 
   useEffect(() => {
     if (!enabled) return;
@@ -128,7 +152,12 @@ export function useClipboardDetection(
     const checkClipboard = async () => {
       try {
         // Read clipboard content
-        const clipboardText = await navigator.clipboard.readText();
+        let clipboardText = '';
+        try {
+          clipboardText = await navigator.clipboard.readText();
+        } catch {
+          // Ignore readText errors (might be image only)
+        }
 
         // DEDUPLICATION: Clear tracking if clipboard is empty
         // This allows re-detection if clipboard was cleared and refilled with the same text
@@ -137,115 +166,163 @@ export function useClipboardDetection(
             lastProcessedRef.current = '';
             setLastCheckedClipboard('');
           }
-          return;
-        }
+          // Fall through to check image
+        } else {
+          // SYNC BLOCKING: Check ref first to prevent re-detection in same event cycle
+          // Skip if we already processed this exact content synchronously
+          if (clipboardText !== lastProcessedRef.current && clipboardText !== lastCheckedClipboard) {
+            
+            // SYNC BLOCKING: Update ref immediately before calling handleUniversalInput
+            lastProcessedRef.current = clipboardText;
 
-        // SYNC BLOCKING: Check ref first to prevent re-detection in same event cycle
-        // Skip if we already processed this exact content synchronously
-        if (clipboardText === lastProcessedRef.current) {
-          return;
-        }
+            // Use unified handleUniversalInput for all detection
+            try {
+              const result = await handleUniversalInput(clipboardText, undefined, true);
 
-        // Also check state for async deduplication
-        if (clipboardText === lastCheckedClipboard) {
-          return;
-        }
+              // CRITICAL: Always trigger UI modals when a message is detected
+              if (result && result.type === 'message') {
+                logger.log('[Detector] Message detected, signaling App.tsx', result);
+                if (onNewMessage) {
+                  onNewMessage(result);
+                } else {
+                  logger.warn('[Detector] onNewMessage callback not provided');
+                }
 
-        // SYNC BLOCKING: Update ref immediately before calling handleUniversalInput
-        // This synchronously blocks re-detection within the same event cycle
-        lastProcessedRef.current = clipboardText;
-
-        // Use unified handleUniversalInput for all detection
-        // skipNavigation=true to avoid auto-navigation on clipboard detection
-        try {
-          const result = await handleUniversalInput(clipboardText, undefined, true);
-
-          // CRITICAL: Always trigger UI modals when a message is detected
-          // handleUniversalInput already stored the message, so we just need to notify the UI
-          // Call onNewMessage IMMEDIATELY after handleUniversalInput succeeds
-          if (result && result.type === 'message') {
-            logger.log('[Detector] Message detected, signaling App.tsx', result);
-            // Call onNewMessage for the new unified modal (primary) - IMMEDIATELY
-            if (onNewMessage) {
-              onNewMessage(result);
-            } else {
-              logger.warn('[Detector] onNewMessage callback not provided');
-            }
-
-            // Also call onDetection for backward compatibility with DetectionModal
-            // This ensures both modals can be triggered if needed
-            if (onDetection) {
-              const { contacts } = useAppStore.getState();
-              const sender = contacts.find(c => c.fingerprint === result.fingerprint);
-              if (sender) {
-                // Use clipboard text as encryptedData (it's already processed by handleUniversalInput)
-                // The DetectionModal will handle it appropriately
-                onDetection({
-                  type: 'message',
-                  contactName: result.senderName,
-                  contactFingerprint: result.fingerprint,
-                  encryptedData: clipboardText.trim(),
-                });
+                if (onDetection) {
+                  const { contacts } = useAppStore.getState();
+                  const sender = contacts.find(c => c.fingerprint === result.fingerprint);
+                  if (sender) {
+                    onDetection({
+                      type: 'message',
+                      contactName: result.senderName,
+                      contactFingerprint: result.fingerprint,
+                      encryptedData: clipboardText.trim(),
+                    });
+                  }
+                }
               }
-            }
-          }
 
-          // Update last checked clipboard to prevent duplicate processing
-          setLastCheckedClipboard(clipboardText);
-        } catch (error: unknown) {
-          const err = error as Error;
-          // STRICT ERROR HANDLING: Update ref for ALL known errors to prevent looping
-          // This ensures that even "invalid" text is marked as processed
-          lastProcessedRef.current = clipboardText;
+              setLastCheckedClipboard(clipboardText);
+            } catch (error: unknown) {
+              const err = error as Error;
+              lastProcessedRef.current = clipboardText;
 
-          // Handle specific errors silently (they're expected)
-          if (err.message === 'DUPLICATE_MESSAGE') {
-            // Duplicate message - silently ignore
-            setLastCheckedClipboard(clipboardText);
-            return;
-          } else if (err.message === 'SENDER_UNKNOWN') {
-            // Unknown sender - mark as processed to prevent loop
-            setLastCheckedClipboard(clipboardText);
-            logger.log('[UniversalInput] Unknown sender detected in clipboard');
-            return;
-          } else if (err.message === 'CONTACT_INTRO_DETECTED') {
-            // CRITICAL: Handle CONTACT_INTRO_DETECTED - map to DetectionResult and call onDetection
-            logger.log('[Detector] Contact intro detected, signaling App.tsx');
-            const contactError = error as Error & {
-              keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
-            };
-            if (onDetection && contactError.keyData) {
-              // Map error.keyData to DetectionResult format
-              // Support both formats: { name, publicKey } and { username, key }
-              const contactName = contactError.keyData.name || contactError.keyData.username || 'Unknown';
-              const contactPublicKey = contactError.keyData.publicKey || contactError.keyData.key;
+              if (err.message === 'DUPLICATE_MESSAGE') {
+                setLastCheckedClipboard(clipboardText);
+              } else if (err.message === 'SENDER_UNKNOWN') {
+                setLastCheckedClipboard(clipboardText);
+                logger.log('[UniversalInput] Unknown sender detected in clipboard');
+              } else if (err.message === 'CONTACT_INTRO_DETECTED') {
+                logger.log('[Detector] Contact intro detected, signaling App.tsx');
+                const contactError = error as Error & {
+                  keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+                };
+                if (onDetection && contactError.keyData) {
+                  const contactName = contactError.keyData.name || contactError.keyData.username || 'Unknown';
+                  const contactPublicKey = contactError.keyData.publicKey || contactError.keyData.key;
 
-              if (contactPublicKey) {
-                onDetection({
-                  type: 'id',
-                  contactName: contactName,
-                  contactPublicKey: contactPublicKey,
-                });
+                  if (contactPublicKey) {
+                    onDetection({
+                      type: 'id',
+                      contactName: contactName,
+                      contactPublicKey: contactPublicKey,
+                    });
+                  } else {
+                    logger.warn('[Detector] CONTACT_INTRO_DETECTED missing public key');
+                  }
+                } else {
+                  logger.warn('[Detector] onDetection callback not provided or keyData missing');
+                }
+                setLastCheckedClipboard(clipboardText);
+              } else if (err.message === 'Authentication required') {
+                setLastCheckedClipboard(clipboardText);
               } else {
-                logger.warn('[Detector] CONTACT_INTRO_DETECTED missing public key');
+                setLastCheckedClipboard(clipboardText);
+                logger.log('[UniversalInput] Clipboard content is not a Nahan message:', err.message);
               }
-            } else {
-              logger.warn('[Detector] onDetection callback not provided or keyData missing');
             }
-            // Mark as processed to prevent loop
-            setLastCheckedClipboard(clipboardText);
-            return;
-          } else if (err.message === 'Authentication required') {
-            // App is locked - mark as processed to prevent loop
-            setLastCheckedClipboard(clipboardText);
-            return;
-          } else {
-            // Other errors (invalid format, etc.) - mark as processed to prevent loop
-            // This is expected for non-Nahan clipboard content
-            setLastCheckedClipboard(clipboardText);
-            logger.log('[UniversalInput] Clipboard content is not a Nahan message:', err.message);
           }
         }
+
+        // Image Detection Logic
+        if (navigator.clipboard.read) {
+          try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              const imageType = item.types.find(t => t.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                const hash = await getImageHash(blob);
+
+                if (hash === lastProcessedImageRef.current) continue;
+                lastProcessedImageRef.current = hash;
+
+                if (identity && sessionPassphrase) {
+                  try {
+                    const file = new File([blob], "clipboard_image", { type: blob.type });
+                    const result = await steganographyService.decode(
+                      file,
+                      identity.privateKey,
+                      sessionPassphrase,
+                      contacts.map(c => c.publicKey)
+                    );
+
+                    if (result.senderPublicKey) {
+                      const sender = contacts.find(c => c.publicKey === result.senderPublicKey);
+                      if (sender) {
+                        const base64 = await blobToBase64(blob);
+                        
+                        await storageService.storeMessage({
+                          senderFingerprint: sender.fingerprint,
+                          recipientFingerprint: identity.fingerprint,
+                          content: {
+                            plain: '',
+                            encrypted: '',
+                            image: base64
+                          },
+                          type: 'image_stego',
+                          isOutgoing: false,
+                          read: false,
+                          isVerified: true,
+                          status: 'sent'
+                        }, sessionPassphrase);
+
+                        logger.log('[Detector] Stego Image detected and stored');
+
+                        if (onNewMessage) {
+                          onNewMessage({
+                            type: 'message',
+                            fingerprint: sender.fingerprint,
+                            isBroadcast: false,
+                            senderName: sender.name
+                          });
+                        }
+                        
+                        // Also trigger legacy detection modal for visual feedback
+                        if (onDetection) {
+                          onDetection({
+                             type: 'message',
+                             contactName: sender.name,
+                             contactFingerprint: sender.fingerprint,
+                             encryptedData: 'image_stego'
+                          });
+                        }
+                      } else {
+                        logger.log('[Detector] Stego Image detected but sender unknown');
+                      }
+                    }
+                  } catch (_e) {
+                    // Not a valid stego image or decode failed
+                    // logger.log('Image decode failed (not stego?)', e);
+                  }
+                }
+              }
+            }
+          } catch (_e) {
+            // Ignore clipboard read errors
+          }
+        }
+
       } catch (error: unknown) {
         // Permission denied or clipboard empty - silently ignore
         const err = error as Error;
@@ -285,5 +362,6 @@ export function useClipboardDetection(
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, handleUniversalInput, identity, lastCheckedClipboard, onDetection, onNewMessage]);
 }

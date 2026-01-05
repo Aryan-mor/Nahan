@@ -30,7 +30,7 @@ const getCrypto = () => {
  * Returns signed message in format: [Version (1)] [Sender Public Key (32)] [Signature (64)] [Message Bytes]
  */
 export async function signMessage(
-  message: string,
+  message: string | Uint8Array,
   senderPrivateKey: string,
   passphrase: string,
   options?: { binary?: boolean },
@@ -62,7 +62,9 @@ export async function signMessage(
     const signingKeyPair = nacl.sign.keyPair.fromSeed(seed);
 
     // Encode message to bytes
-    const messageBytes = new TextEncoder().encode(message);
+    const messageBytes = typeof message === 'string'
+      ? new TextEncoder().encode(message)
+      : message;
 
     // Sign the message using Ed25519
     // Ensure we have valid Uint8Arrays for nacl
@@ -101,7 +103,8 @@ export async function signMessage(
 export async function verifySignedMessage(
   signedMessage: string | Uint8Array,
   senderPublicKeys: string[] = [],
-): Promise<{ data: string; verified: boolean; senderFingerprint?: string }> {
+  options?: { binary?: boolean },
+): Promise<{ data: string | Uint8Array; verified: boolean; senderFingerprint?: string; senderPublicKey?: string }> {
   try {
     // Decode signed message
     let messageBytes: Uint8Array;
@@ -138,7 +141,9 @@ export async function verifySignedMessage(
     }
 
     // Decode message
-    const plaintext = new TextDecoder().decode(messageBytesOnly);
+    const data = options?.binary 
+      ? messageBytesOnly 
+      : new TextDecoder().decode(messageBytesOnly);
 
     // Try to match sender Ed25519 public key with contacts
     // Since we derive Ed25519 from X25519 private key, we need to derive Ed25519 public key
@@ -186,9 +191,10 @@ export async function verifySignedMessage(
     }
 
     return {
-      data: plaintext,
+      data,
       verified,
       senderFingerprint,
+      senderPublicKey: naclUtil.encodeBase64(senderPublicKeyBytes),
     };
   } catch (error) {
     logger.error('Signature verification failed:', error);

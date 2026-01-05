@@ -30,9 +30,11 @@ export interface SecureMessage {
   id: string;
   senderFingerprint: string;
   recipientFingerprint: string;
+  type?: 'text' | 'image' | 'image_stego';
   content: {
     plain: string;
     encrypted: string;
+    image?: string;
   };
   createdAt: Date;
   isOutgoing: boolean;

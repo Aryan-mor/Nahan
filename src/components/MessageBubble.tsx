@@ -1,27 +1,111 @@
-/* eslint-disable max-lines-per-function */
-import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/react';
+/* eslint-disable max-lines-per-function, max-lines */
+import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Image, Modal, ModalBody, ModalContent, ModalHeader } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { Copy, Lock, MoreVertical, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Copy, Lock, MoreVertical, Trash2, Download, Maximize2, ImageDown } from 'lucide-react';
+import { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
+import { ImageSteganographyService } from '../services/steganography';
 import { SecureMessage } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import { useSteganographyStore } from '../stores/steganographyStore';
+
+const steganographyService = ImageSteganographyService.getInstance();
 
 interface MessageBubbleProps {
   message: SecureMessage;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  const { deleteMessage } = useAppStore();
+  const { deleteMessage, identity, sessionPassphrase, activeChat } = useAppStore();
+  const {
+    setViewMode,
+    setPreviewOpen,
+    setEncodedCarrierUrl,
+    setDecodingStatus,
+    setDecodedImageUrl,
+    decodingStatus,
+    decodingCarrierUrl
+  } = useSteganographyStore();
   const { t } = useTranslation();
   const isOutgoing = message.isOutgoing;
 
+  const [decodedSrc, setDecodedSrc] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const hasImage = message.type === 'image' || !!message.content.image;
+  const imageUrl = message.content.image;
+  const isDecoding = decodingStatus === 'processing' && decodingCarrierUrl === imageUrl;
+
+  // Auto-decode steganography images for chat view
+  useEffect(() => {
+    let isMounted = true;
+    if (message.type === 'image_stego' && imageUrl && !decodedSrc && identity && sessionPassphrase) {
+      const decode = async () => {
+        try {
+          const senderKey = isOutgoing ? identity.publicKey : activeChat?.publicKey;
+          // If WE sent the message, we encrypted it for the recipient (activeChat.publicKey).
+          // To decrypt it using OUR private key, we must treat the Recipient's Public Key as the "Peer Key"
+          // because nacl.box uses SharedKey = MyPriv * RecipientPub.
+          const decryptionPeerKey = isOutgoing ? activeChat?.publicKey : undefined;
+
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const file = new File([blob], "carrier.png", { type: "image/png" });
+          
+          const { url: resultUrl } = await steganographyService.decode(
+            file,
+            identity.privateKey,
+            sessionPassphrase,
+            senderKey ? [senderKey] : [],
+            decryptionPeerKey
+          );
+          
+          if (isMounted) {
+            setDecodedSrc(resultUrl);
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Auto-decode failed:', error);
+          // Fallback to carrier image is automatic (decodedSrc remains null)
+        }
+      };
+      decode();
+    }
+    return () => { isMounted = false; };
+  }, [message.type, imageUrl, decodedSrc, identity, sessionPassphrase, isOutgoing, activeChat]);
+
+  const handleDownloadImage = () => {
+    if (imageUrl) {
+      const a = document.createElement('a');
+      a.href = imageUrl;
+      a.download = `nahan_image_${message.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success('Image downloaded');
+      setMenuPosition(null);
+    }
+  };
+
+  const handleSteganographyClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!imageUrl) return;
+
+    // Show the ENCODED carrier in the drawer as requested
+    setViewMode('encode');
+    setEncodedCarrierUrl(imageUrl);
+    setPreviewOpen(true);
+    
+    // Reset decoding state
+    setDecodingStatus('idle');
+    setDecodedImageUrl(null);
+  };
 
   const smartCopy = () => {
     const textToCopy = isOutgoing ? message.content.encrypted : message.content.plain;
@@ -127,8 +211,50 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             // Prevent default context menu on long press
             onContextMenu={(e) => e.preventDefault()}
           >
+            {/* Image Content */}
+            {hasImage && imageUrl && (
+              <div className="mb-2 relative group/image">
+                <Image
+                  src={decodedSrc || imageUrl}
+                  alt={decodedSrc ? "Decoded Image" : "Encrypted Image"}
+                  classNames={{
+                    wrapper: "bg-black/20 rounded-lg overflow-hidden cursor-pointer",
+                    img: "max-w-full max-h-[300px] object-cover"
+                  }}
+                  onClick={(e) => {
+                    if (message.type === 'image_stego') {
+                      handleSteganographyClick(e);
+                    } else {
+                      setIsImageModalOpen(true);
+                    }
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors flex items-center justify-center gap-4 opacity-0 group-hover/image:opacity-100">
+                  <button 
+                    onClick={() => setIsImageModalOpen(true)}
+                    className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                    title={t('common.view', 'View')}
+                  >
+                    <Maximize2 className="w-6 h-6 drop-shadow-lg" />
+                  </button>
+                  {message.type === 'image_stego' && (
+                    <button 
+                      onClick={handleSteganographyClick}
+                      disabled={isDecoding}
+                      className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors disabled:opacity-50"
+                      title={t('steganography.view_carrier', 'View Encoded Carrier')}
+                    >
+                      <ImageDown className={`w-6 h-6 drop-shadow-lg ${isDecoding ? 'animate-pulse' : ''}`} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Message Content */}
-            <div className="whitespace-pre-wrap">{message.content.plain}</div>
+            {message.content.plain && (
+              <div className="whitespace-pre-wrap">{message.content.plain}</div>
+            )}
 
             {/* Context Menu (Desktop Hover - Visible on Hover) */}
             <div
@@ -238,6 +364,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             >
               {isOutgoing ? t('chat.message.copy_encrypted') : t('chat.message.copy_text')}
             </DropdownItem>
+            {hasImage && (
+              <DropdownItem
+                key="download-image"
+                startContent={<Download className="w-4 h-4" />}
+                onPress={handleDownloadImage}
+              >
+                {t('common.download_image', 'Download Image')}
+              </DropdownItem>
+            )}
             {!isOutgoing ? (
               <DropdownItem
                 key="copy-enc"
@@ -267,6 +402,37 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </DropdownMenu>
         </Dropdown>
       )}
+
+      {/* Image Preview Modal */}
+      <Modal 
+        isOpen={isImageModalOpen} 
+        onOpenChange={setIsImageModalOpen}
+        size="5xl"
+        classNames={{
+          base: "bg-industrial-950/90 border border-industrial-800 backdrop-blur-xl",
+          closeButton: "hover:bg-industrial-800 text-white z-50",
+        }}
+        backdrop="blur"
+      >
+        <ModalContent>
+          {() => (
+            <>
+              <ModalHeader className="flex flex-col gap-1 text-white">{t('common.image_preview', 'Image Preview')}</ModalHeader>
+              <ModalBody className="flex items-center justify-center p-0 overflow-hidden h-[80vh]">
+                {imageUrl && (
+                   <Image
+                    src={imageUrl}
+                    alt="Full Preview"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                )}
+              </ModalBody>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* SteganographyPreviewSheet removed, using global one in ChatInput via store */}
     </>
   );
 }

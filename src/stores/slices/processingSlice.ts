@@ -150,7 +150,10 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
             senderFingerprint: sender.fingerprint,
             recipientFingerprint: identity.fingerprint,
             content: {
-              plain: signedResult.data,
+              plain:
+                typeof signedResult.data === 'string'
+                  ? signedResult.data
+                  : new TextDecoder().decode(signedResult.data as Uint8Array),
               encrypted: storedEncrypted,
             },
             isOutgoing: false,
@@ -329,14 +332,34 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
       const recipientFingerprint = identity.fingerprint;
       const storedEncrypted = isZWC ? encryptedText : processedText;
+      
+      // Parse payload to check for image content
+      let finalPlain = typeof result.data === 'string' ? result.data : new TextDecoder().decode(result.data as Uint8Array);
+      let finalImage: string | undefined = undefined;
+      let finalType: 'text' | 'image' = 'text';
+
+      try {
+        if (finalPlain.startsWith('{') && finalPlain.includes('"nahan_type":"image"')) {
+          const parsed = JSON.parse(finalPlain);
+          if (parsed.nahan_type === 'image') {
+            finalType = 'image';
+            finalPlain = parsed.text || '';
+            finalImage = parsed.image;
+          }
+        }
+      } catch (_e) {
+        // Not a JSON payload, treat as regular text
+      }
 
       const newMessage = await storageService.storeMessage(
         {
           senderFingerprint: sender.fingerprint,
           recipientFingerprint: recipientFingerprint,
+          type: finalType,
           content: {
-            plain: result.data,
+            plain: finalPlain,
             encrypted: storedEncrypted,
+            image: finalImage,
           },
           isOutgoing: false,
           read: false,

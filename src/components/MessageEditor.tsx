@@ -222,7 +222,11 @@ export function MessageEditor({ mode }: MessageEditorProps) {
           passphrase,
         );
 
-        setDecryptedMessage(result.data);
+        setDecryptedMessage(
+          typeof result.data === 'string'
+            ? result.data
+            : new TextDecoder().decode(result.data as Uint8Array),
+        );
         setSignatureVerified(result.signatureValid);
 
         // Try to identify sender
@@ -244,7 +248,10 @@ export function MessageEditor({ mode }: MessageEditorProps) {
           senderFingerprint: senderInfo?.fingerprint || 'unknown',
           recipientFingerprint: identity!.fingerprint,
           content: {
-            plain: result.data,
+            plain:
+              typeof result.data === 'string'
+                ? result.data
+                : new TextDecoder().decode(result.data as Uint8Array),
             encrypted: encryptedMessage,
           },
           isOutgoing: false,

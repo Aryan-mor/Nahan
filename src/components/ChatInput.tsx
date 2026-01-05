@@ -1,6 +1,6 @@
 /* eslint-disable max-lines */
 import { Button, Textarea, Tooltip } from '@heroui/react';
-import { ClipboardPaste, Lock, Send } from 'lucide-react';
+import { ClipboardPaste, Lock, Paperclip, Send } from 'lucide-react';
 /* eslint-disable max-lines-per-function */
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,12 +9,16 @@ import * as naclUtil from 'tweetnacl-util';
 
 import { useLongPress } from '../hooks/useLongPress';
 import { CamouflageService } from '../services/camouflage';
+import { ImageSteganographyService } from '../services/steganography';
 import { useAppStore } from '../stores/appStore';
+import { useSteganographyStore } from '../stores/steganographyStore';
 import * as logger from '../utils/logger';
 
 import { ManualPasteModal } from './ManualPasteModal';
+import { SteganographyPreviewSheet } from './steganography/SteganographyPreviewSheet';
 
 const camouflageService = CamouflageService.getInstance();
+const steganographyService = ImageSteganographyService.getInstance();
 
 export function ChatInput() {
   const {
@@ -23,15 +27,176 @@ export function ChatInput() {
     setPendingStealthBinary,
     setPendingPlaintext,
     processIncomingMessage,
+    sendMessage,
     messageInput,
     setMessageInput,
     activeChat,
+    sessionPassphrase,
+    identity,
   } = useAppStore();
   const { t } = useTranslation();
+
+  // Steganography Store
+  const {
+    setEncodingStatus,
+    setOriginalPreviewUrl,
+    setEncodingError,
+    setPendingMessageId,
+    resetEncoding,
+    encodedCarrierUrl,
+    decodedImageUrl,
+    viewMode,
+    isPreviewOpen,
+    setPreviewOpen,
+  } = useSteganographyStore();
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
   const [isAutoStealthEncoding, setIsAutoStealthEncoding] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageSendSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!activeChat || !sessionPassphrase || !identity) {
+      toast.error(t('chat.input.error.missing_context'));
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image is too large (max 5MB)');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Image = reader.result as string;
+          await sendMessage(messageInput, base64Image);
+          toast.success('Image sent successfully');
+          setMessageInput('');
+        } catch (error) {
+          logger.error('Failed to send image:', error);
+          toast.error('Failed to send image');
+        } finally {
+          setIsProcessing(false);
+          if (imageInputRef.current) {
+            imageInputRef.current.value = '';
+          }
+        }
+      };
+      reader.onerror = () => {
+        setIsProcessing(false);
+        toast.error('Failed to read image file');
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setIsProcessing(false);
+      logger.error('Image processing error:', error);
+    }
+  };
+
+  // Steganography: Handle Image Selection
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!activeChat || !sessionPassphrase || !identity) {
+      toast.error(t('chat.input.error.missing_context'));
+      return;
+    }
+
+    // Reset previous state
+    resetEncoding();
+
+    // Create a temporary ID for the skeleton message
+    const tempId = `temp_${Date.now()}`;
+    setPendingMessageId(tempId);
+    setEncodingStatus('processing');
+
+    // Show original preview (optional, maybe not needed for skeleton, but good for debug)
+    const objectUrl = URL.createObjectURL(file);
+    setOriginalPreviewUrl(objectUrl);
+
+    try {
+      // Determine recipient public key (null for Broadcast/Public mode)
+      const recipientPublicKey =
+        activeChat.fingerprint === 'BROADCAST' ? undefined : activeChat.publicKey;
+
+      // Encode
+      const carrierBlob = await steganographyService.encode(
+        file,
+        identity.privateKey,
+        sessionPassphrase,
+        recipientPublicKey,
+      );
+
+      // Auto-send the carrier
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Image = reader.result as string;
+          await sendMessage('', base64Image, 'image_stego');
+          toast.success(t('chat.input.send_success', 'Sent successfully'));
+          resetEncoding();
+        } catch (error) {
+          logger.error('Failed to send steganography image:', error);
+          toast.error('Failed to send image');
+          setEncodingStatus('error');
+        } finally {
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
+      };
+      reader.onerror = () => {
+        toast.error('Failed to process image');
+        setEncodingStatus('error');
+      };
+      reader.readAsDataURL(carrierBlob);
+    } catch (error) {
+      logger.error('Steganography Encoding Failed:', error);
+      setEncodingStatus('error');
+      setEncodingError((error as Error).message);
+      toast.error(t('steganography.encode_error', 'Failed to encode image'));
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDownloadCarrier = () => {
+    const url = viewMode === 'encode' ? encodedCarrierUrl : decodedImageUrl;
+
+    if (url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nahan_${viewMode === 'encode' ? 'stego' : 'decoded'}_${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      if (viewMode === 'encode') {
+        toast.success(t('steganography.download_success', 'Image saved. Send it as a FILE!'));
+        setPreviewOpen(false);
+      } else {
+        toast.success(t('common.download_success', 'Saved to gallery'));
+      }
+    }
+  };
 
   /**
    * Handle single click: Auto-stealth mode (unified for both regular and broadcast)
@@ -369,6 +534,31 @@ export function ChatInput() {
   return (
     <div className="p-3 bg-industrial-950 border-t border-industrial-800 backdrop-blur-md bg-opacity-90 sticky bottom-0 z-20 pb-safe">
       <div className="flex items-end gap-2 max-w-4xl mx-auto">
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={handleImageSelect}
+        />
+        <input
+          type="file"
+          accept="image/*"
+          ref={imageInputRef}
+          className="hidden"
+          onChange={handleImageSendSelect}
+        />
+        <Tooltip content={t('steganography.clip_tooltip', 'Hide data in image')}>
+          <Button
+            isIconOnly
+            variant="light"
+            className="rounded-full w-8 h-8 min-w-8 mb-1 text-industrial-400"
+            onPress={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="w-5 h-5" />
+          </Button>
+        </Tooltip>
+
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
@@ -429,6 +619,14 @@ export function ChatInput() {
         isOpen={isManualPasteOpen}
         onClose={() => setIsManualPasteOpen(false)}
         onSubmit={processPasteContent}
+      />
+
+      <SteganographyPreviewSheet
+        isOpen={isPreviewOpen}
+        onClose={() => setPreviewOpen(false)}
+        imageUrl={encodedCarrierUrl}
+        onDownload={handleDownloadCarrier}
+        // onSend removed as it is now auto-sent
       />
     </div>
   );

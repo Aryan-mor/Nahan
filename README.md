@@ -158,6 +158,9 @@ src/
 
 See [SECURITY.md](./SECURITY.md) for detailed security documentation.
 
+For details on how Nahan handles Image Steganography and Encryption, see [Image Upload Process](./docs/IMAGE_UPLOAD_PROCESS.md).
+
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](LICENSE) file for details.

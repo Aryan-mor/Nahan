@@ -14,13 +14,23 @@ import {
   useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { ClipboardPaste, MessageSquare, Plus, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  ClipboardPaste,
+  ImageDown,
+  Image as ImageIcon,
+  MessageSquare,
+  Plus,
+  Search,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { DetectionResult } from '../hooks/useClipboardDetection';
+import { ImageSteganographyService } from '../services/steganography';
+import { Contact, StorageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
+import { useSteganographyStore } from '../stores/steganographyStore';
 import * as logger from '../utils/logger';
 
 import { ManualPasteModal } from './ManualPasteModal';
@@ -43,8 +53,21 @@ export function ChatList({
     lastStorageUpdate,
     chatSummaries,
     refreshChatSummaries,
+    identity,
+    sessionPassphrase,
   } = useAppStore();
+  const {
+    decodingStatus,
+    setDecodingStatus,
+    setDecodedImageUrl,
+    setDecodingError,
+    resetDecoding,
+    decodedImageUrl,
+  } = useSteganographyStore();
+  const stegoService = ImageSteganographyService.getInstance();
+  const storageService = StorageService.getInstance();
   const [searchQuery, setSearchQuery] = useState('');
+  const [decodedContact, setDecodedContact] = useState<Contact | null>(null);
 
   // New Chat Modal
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -52,6 +75,7 @@ export function ChatList({
   const [modalSearch, setModalSearch] = useState('');
   const [isProcessingPaste, setIsProcessingPaste] = useState(false);
   const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Sender Selection Modal
   const [isSenderSelectOpen, setIsSenderSelectOpen] = useState(false);
@@ -322,6 +346,86 @@ export function ChatList({
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-industrial-100">{t('chat.list.title')}</h1>
           <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileRef}
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (!identity || !sessionPassphrase) {
+                  toast.error(t('chat.input.error.missing_context'));
+                  return;
+                }
+                resetDecoding();
+                setDecodingStatus('processing');
+                setDecodedContact(null);
+                try {
+                  const { url, senderPublicKey } = await stegoService.decode(
+                    file,
+                    identity.privateKey,
+                    sessionPassphrase,
+                    contacts.map((c) => c.publicKey),
+                  );
+                  setDecodedImageUrl(url);
+
+                  // Store message logic
+                  if (senderPublicKey) {
+                    const contact = contacts.find((c) => c.publicKey === senderPublicKey);
+                    if (contact) {
+                      setDecodedContact(contact);
+
+                      // Convert file to base64 for storage
+                      const reader = new FileReader();
+                      reader.onload = async () => {
+                        const base64Image = reader.result as string;
+                        // Store as 'image_stego' so it renders as mesh gradient but contains the carrier
+                        // The Chat View will auto-decode it using the logic we just added
+                        await storageService.storeMessage(
+                          {
+                            senderFingerprint: contact.fingerprint,
+                            recipientFingerprint: identity.fingerprint,
+                            type: 'image_stego',
+                            content: {
+                              plain: '',
+                              encrypted: '', // Payload is in the pixels
+                              image: base64Image,
+                            },
+                            isOutgoing: false,
+                            read: false,
+                            status: 'sent',
+                          },
+                          sessionPassphrase,
+                        );
+
+                        // Refresh summaries to show new message
+                        refreshChatSummaries();
+                        toast.success(t('steganography.message_saved', 'Message saved to chat'));
+                      };
+                      reader.readAsDataURL(file);
+                    } else {
+                      // Unknown sender - maybe just show the decoded image?
+                      // Or should we prompt to add contact?
+                      // For now, standard behavior is just show success
+                      toast.warning(
+                        t('steganography.unknown_sender', 'Decoded from unknown sender'),
+                      );
+                    }
+                  }
+
+                  setDecodingStatus('success');
+                } catch (error) {
+                  setDecodingStatus('error');
+                  setDecodingError((error as Error).message);
+                  toast.error(t('steganography.decode_error', 'Failed to decode image'));
+                } finally {
+                  if (fileRef.current) {
+                    fileRef.current.value = '';
+                  }
+                }
+              }}
+            />
             <Button
               isIconOnly
               variant="flat"
@@ -331,6 +435,15 @@ export function ChatList({
               title={t('chat.list.paste_encrypted')}
             >
               <ClipboardPaste className="w-5 h-5" />
+            </Button>
+            <Button
+              isIconOnly
+              variant="flat"
+              className="rounded-full bg-industrial-800 text-industrial-300"
+              onPress={() => fileRef.current?.click()}
+              title={t('steganography.decode_image', 'Decode Stego Image')}
+            >
+              <ImageDown className="w-5 h-5" />
             </Button>
             <Button
               isIconOnly
@@ -356,6 +469,46 @@ export function ChatList({
 
       {/* List */}
       <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-2 scrollbar-hide">
+        {decodingStatus !== 'idle' && (
+          <Card
+            className={`w-full ${
+              decodingStatus === 'success'
+                ? 'bg-success-900/30 border-success-700'
+                : decodingStatus === 'error'
+                ? 'bg-danger-900/30 border-danger-700'
+                : 'bg-industrial-800 border-industrial-700'
+            }`}
+          >
+            <CardBody className="flex items-center justify-between p-3">
+              <div className="text-sm">
+                {decodingStatus === 'processing' &&
+                  t('steganography.decoding', 'Decoding image...')}
+                {decodingStatus === 'success' &&
+                  t('steganography.decode_success', 'Decoded successfully')}
+                {decodingStatus === 'error' && t('steganography.decode_error', 'Failed to decode')}
+              </div>
+              {decodingStatus === 'success' && decodedImageUrl && (
+                <Button
+                  size="sm"
+                  color="primary"
+                  variant="flat"
+                  onPress={() => {
+                    if (decodedContact) {
+                      setActiveChat(decodedContact);
+                      resetDecoding(); // Close the card
+                    } else {
+                      window.open(decodedImageUrl, '_blank');
+                    }
+                  }}
+                >
+                  {decodedContact
+                    ? t('steganography.view_in_chat', 'View in Chat')
+                    : t('steganography.view_image', 'View Image')}
+                </Button>
+              )}
+            </CardBody>
+          </Card>
+        )}
         {filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-industrial-500 opacity-50">
             <MessageSquare className="w-12 h-12 mb-2" />
@@ -406,9 +559,20 @@ export function ChatList({
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-industrial-400 truncate pr-4">
                           {lastMsg ? (
-                            lastMsg.content.plain
+                            lastMsg.type === 'image' ||
+                            lastMsg.type === 'image_stego' ||
+                            lastMsg.content.image ? (
+                              <span className="flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3" />
+                                {t('chat.list.image', 'Image')}
+                              </span>
+                            ) : (
+                              lastMsg.content.plain
+                            )
                           ) : (
-                            <span className="italic text-industrial-600">{t('chat.list.no_messages')}</span>
+                            <span className="italic text-industrial-600">
+                              {t('chat.list.no_messages')}
+                            </span>
                           )}
                         </p>
                       </div>
@@ -421,7 +585,9 @@ export function ChatList({
                   <div className="mt-3 mb-2 px-2">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-px bg-industrial-800"></div>
-                      <span className="text-xs text-industrial-500 px-2">{t('chat.list.recent_conversations')}</span>
+                      <span className="text-xs text-industrial-500 px-2">
+                        {t('chat.list.recent_conversations')}
+                      </span>
                       <div className="flex-1 h-px bg-industrial-800"></div>
                     </div>
                   </div>
@@ -449,7 +615,9 @@ export function ChatList({
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">{t('chat.list.new_chat.title')}</ModalHeader>
+              <ModalHeader className="flex flex-col gap-1">
+                {t('chat.list.new_chat.title')}
+              </ModalHeader>
               <ModalBody>
                 <Input
                   placeholder={t('chat.list.search_contacts_placeholder')}
