@@ -25,6 +25,8 @@ export function LockScreen() {
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const isVerifyingRef = useRef(false);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -39,12 +41,16 @@ export function LockScreen() {
   }, [identity]);
 
   const handleUnlock = async (pin: string) => {
+    if (isVerifyingRef.current) return;
+
     if (!identity) {
       toast.error(t('lock.error.select'));
       return;
     }
 
     // No loading state to keep UI responsive
+    isVerifyingRef.current = true;
+    setIsVerifying(true);
     setError('');
 
     try {
@@ -64,24 +70,30 @@ export function LockScreen() {
           }
         }
       } else {
-        incrementFailedAttempts();
-        const currentFailed = failedAttempts + 1;
+        if (isMounted.current) {
+          isVerifyingRef.current = false;
+          setIsVerifying(false);
+          incrementFailedAttempts();
+          const currentFailed = failedAttempts + 1;
 
-        if (currentFailed >= 5) {
-          toast.error(t('lock.error.max_attempts'));
-          await wipeData();
-          return;
+          if (currentFailed >= 5) {
+            toast.error(t('lock.error.max_attempts'));
+            await wipeData();
+            return;
+          }
+
+          const remaining = 5 - currentFailed;
+          const msg = t('lock.error.incorrect_pin', { count: remaining });
+          setError(msg);
+          setPassphrase('');
+          toast.warning(msg);
         }
-
-        const remaining = 5 - currentFailed;
-        const msg = t('lock.error.incorrect_pin', { count: remaining });
-        setError(msg);
-        setPassphrase('');
-        toast.warning(msg);
       }
     } catch (error) {
       logger.error('Unlock failed:', error);
       if (isMounted.current) {
+        isVerifyingRef.current = false;
+        setIsVerifying(false);
         setError(t('lock.error.verify'));
         toast.error(t('lock.error.verify_toast'));
         setPassphrase('');
@@ -105,6 +117,7 @@ export function LockScreen() {
           label={t('lock.enter_pin')}
           subLabel={t('lock.sublabel')}
           error={error}
+          isLoading={isVerifying}
         />
       </motion.div>
     </div>
