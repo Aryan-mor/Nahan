@@ -21,24 +21,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # اول باید pnpm نصب شود تا سیستم آن را بشناسد
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      # حالا که pnpm نصب است، می‌توانیم نود را با کش pnpm بالا بیاوریم
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build
-        run: pnpm build
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
