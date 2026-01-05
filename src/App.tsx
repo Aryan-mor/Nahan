@@ -1,6 +1,7 @@
 import { Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
+  Download,
   FileUser,
   Lock,
   MessageSquare,
@@ -23,6 +24,7 @@ import { NewMessageModal } from './components/NewMessageModal';
 import { Onboarding } from './components/Onboarding';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import { Settings } from './components/Settings';
 import { StealthModal } from './components/StealthModal';
 import {
@@ -57,8 +59,23 @@ export default function App() {
     setActiveChat,
   } = useAppStore();
 
-  const { language, isLocked, setLocked, activeTab, setActiveTab, camouflageLanguage } = useUIStore();
+  const {
+    language,
+    isLocked,
+    setLocked,
+    activeTab,
+    setActiveTab,
+    camouflageLanguage,
+    isStandalone,
+    deferredPrompt,
+    setInstallPromptVisible,
+  } = useUIStore();
   const { t, i18n } = useTranslation();
+
+  // Welcome Screen State
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => localStorage.getItem('welcome-screen-dismissed') === 'true',
+  );
 
   // Back Button Control
   const isPopState = useRef(false);
@@ -395,6 +412,19 @@ export default function App() {
       return <LanguageSelector />;
     }
 
+    // Show Welcome Screen if not dismissed and user hasn't created an identity yet
+    // This comes AFTER language selection but BEFORE Onboarding (PIN creation)
+    if (!identity && !welcomeDismissed && !isStandalone) {
+      return (
+        <WelcomeScreen
+          onDismiss={() => {
+            localStorage.setItem('welcome-screen-dismissed', 'true');
+            setWelcomeDismissed(true);
+          }}
+        />
+      );
+    }
+
     // Show Onboarding if no identity exists
     if (!identity) {
       return <Onboarding />;
@@ -490,6 +520,19 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-4">
+              {!isStandalone && deferredPrompt && (
+                <Button
+                  isIconOnly
+                  variant="flat"
+                  size="sm"
+                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 animate-pulse"
+                  onPress={() => setInstallPromptVisible(true)}
+                  title="Install App"
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
+              )}
+
               {identity && (
                 <div className="flex items-center gap-2">
                   <Button

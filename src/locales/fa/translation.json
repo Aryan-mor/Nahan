@@ -140,6 +140,9 @@
         "add": "گزینه 'Install App' یا 'Add to Home Screen' را انتخاب کنید"
       },
       "install_button": "نصب اکنون",
+      "add_to_home": "افزودن به صفحه اصلی",
+      "instant_install": "نصب در لحظه بدون نیاز به استور",
+      "continue_browser": "ادامه در مرورگر",
       "dismiss": "شاید بعداً"
     },
     "update": {

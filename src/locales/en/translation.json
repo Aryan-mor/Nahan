@@ -140,6 +140,9 @@
         "add": "Select 'Install App' or 'Add to Home Screen'"
       },
       "install_button": "Install Now",
+      "add_to_home": "Add to Home Screen",
+      "instant_install": "Installs instantly without App Store",
+      "continue_browser": "Continue in browser",
       "dismiss": "Maybe later"
     },
     "update": {
