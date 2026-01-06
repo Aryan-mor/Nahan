@@ -28,7 +28,7 @@ import { Onboarding } from './components/Onboarding';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 import { Settings } from './components/Settings';
-import { StealthModal } from './components/StealthModal';
+import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
   DetectionResult,
@@ -56,8 +56,6 @@ export default function App() {
     activeChat,
     showStealthModal,
     setShowStealthModal,
-    pendingStealthBinary,
-    confirmStealthSend,
     sessionPassphrase,
     processIncomingMessage,
     setActiveChat,
@@ -89,12 +87,19 @@ export default function App() {
 
   // Back Button Control
   const isPopState = useRef(false);
+  const isProgrammaticBack = useRef(false);
   const prevActiveChat = useRef(activeChat);
   const prevShowStealthModal = useRef(showStealthModal);
 
   // Handle popstate (Browser Back Button)
   useEffect(() => {
     const handlePopState = () => {
+      // Ignore if we triggered the back action programmatically
+      if (isProgrammaticBack.current) {
+        isProgrammaticBack.current = false;
+        return;
+      }
+
       // Priority: Stealth Modal > Active Chat
       if (showStealthModal) {
         isPopState.current = true;
@@ -126,6 +131,7 @@ export default function App() {
     if ((isChatClosing || isModalClosing) && !isPopState.current) {
       // If closed manually (UI button), sync history
       if (window.history.state?.modalOpen) {
+        isProgrammaticBack.current = true;
         window.history.back();
       }
     }
@@ -457,15 +463,8 @@ export default function App() {
         <PWAInstallPrompt />
         <PWAUpdateNotification />
 
-        {/* Global Stealth Modal */}
-        {showStealthModal && (
-          <StealthModal
-            isOpen={showStealthModal}
-            onOpenChange={() => setShowStealthModal(!showStealthModal)}
-            pendingBinary={pendingStealthBinary}
-            onConfirm={confirmStealthSend}
-          />
-        )}
+        {/* Global Stealth Drawer */}
+        <UnifiedStealthDrawer />
 
         {/* Clipboard Permission Prompt */}
         <ClipboardPermissionPrompt

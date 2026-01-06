@@ -80,12 +80,16 @@ export const createStealthSlice: StateCreator<AppState, [], [], StealthSlice> = 
   isStealthMode: false,
   showStealthModal: false,
   pendingStealthBinary: null,
+  pendingStealthImage: null,
   pendingPlaintext: null,
+  stealthDrawerMode: 'dual',
 
   setStealthMode: (enabled) => set({ isStealthMode: enabled }),
   setShowStealthModal: (show) => set({ showStealthModal: show }),
   setPendingStealthBinary: (binary) => set({ pendingStealthBinary: binary }),
+  setPendingStealthImage: (image) => set({ pendingStealthImage: image }),
   setPendingPlaintext: (text) => set({ pendingPlaintext: text }),
+  setStealthDrawerMode: (mode) => set({ stealthDrawerMode: mode }),
 
   confirmStealthSend: async (finalOutput) => {
     const { activeChat, identity, pendingPlaintext } = get();

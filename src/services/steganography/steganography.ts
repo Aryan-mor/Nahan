@@ -1,18 +1,28 @@
+/* eslint-disable max-lines-per-function */
 import i18next from 'i18next';
+import * as logger from '../../utils/logger';
+
+const HEADER = [0x53, 0x54]; // 'ST' (Stealth)
 
 const serializePayload = (payload: string): Uint8Array => {
   const payloadLength = payload.length;
-  const allBytes = new Uint8Array(4 + payloadLength);
-  
+  const headerLength = HEADER.length;
+  const lengthBytes = 4;
+  const allBytes = new Uint8Array(headerLength + lengthBytes + payloadLength);
+
+  // Write Header
+  allBytes[0] = HEADER[0];
+  allBytes[1] = HEADER[1];
+
   // Write length
-  allBytes[0] = (payloadLength >>> 24) & 0xff;
-  allBytes[1] = (payloadLength >>> 16) & 0xff;
-  allBytes[2] = (payloadLength >>> 8) & 0xff;
-  allBytes[3] = payloadLength & 0xff;
+  allBytes[2] = (payloadLength >>> 24) & 0xff;
+  allBytes[3] = (payloadLength >>> 16) & 0xff;
+  allBytes[4] = (payloadLength >>> 8) & 0xff;
+  allBytes[5] = payloadLength & 0xff;
 
   // Write payload
   for (let i = 0; i < payloadLength; i++) {
-    allBytes[4 + i] = payload.charCodeAt(i);
+    allBytes[headerLength + lengthBytes + i] = payload.charCodeAt(i);
   }
   return allBytes;
 };
@@ -20,14 +30,18 @@ const serializePayload = (payload: string): Uint8Array => {
 const checkCapacity = (width: number, height: number, payloadLength: number) => {
   const totalPixels = width * height;
   const totalBitsAvailable = totalPixels * 6;
-  const totalBitsNeeded = (4 + payloadLength) * 8;
+  const totalBitsNeeded = (HEADER.length + 4 + payloadLength) * 8;
 
   if (totalBitsNeeded > totalBitsAvailable) {
     throw new Error(
-      i18next.t('errors.capacityExceeded', 'Image capacity exceeded. Needed: {{needed}}, Available: {{available}}', {
-        needed: totalBitsNeeded,
-        available: totalBitsAvailable,
-      })
+      i18next.t(
+        'errors.capacityExceeded',
+        'Image capacity exceeded. Needed: {{needed}}, Available: {{available}}',
+        {
+          needed: totalBitsNeeded,
+          available: totalBitsAvailable,
+        },
+      ),
     );
   }
 };
@@ -39,6 +53,7 @@ const checkCapacity = (width: number, height: number, payloadLength: number) => 
  * @returns A Promise resolving to the resulting image Blob (PNG).
  */
 export const embedPayload = async (carrier: HTMLCanvasElement, payload: string): Promise<Blob> => {
+  logger.debug(`[Stego] Embedding payload: ${payload.length} chars`);
   const ctx = carrier.getContext('2d');
   if (!ctx) throw new Error(i18next.t('errors.canvasInitFailed', 'Failed to initialize canvas'));
 
@@ -65,14 +80,20 @@ export const embedPayload = async (carrier: HTMLCanvasElement, payload: string):
         byteIndex++;
       }
     }
+    // Force alpha to 255 to prevent browser optimization/premultiplication of transparent pixels
+    // which would destroy the embedded data in RGB channels.
+    data[i + 3] = 255;
   }
 
   ctx.putImageData(imageData, 0, 0);
 
   return new Promise((resolve, reject) => {
     carrier.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error(i18next.t('errors.blobCreationFailed', 'Failed to create image blob')));
+      if (blob) {
+        logger.debug(`[Stego] Embed success. Blob size: ${blob.size}`);
+        resolve(blob);
+      } else
+        reject(new Error(i18next.t('errors.blobCreationFailed', 'Failed to create image blob')));
     }, 'image/png'); // Must use PNG to be lossless
   });
 };
@@ -100,6 +121,7 @@ const getCanvasData = (carrier: HTMLCanvasElement) => {
  * @returns The extracted string payload.
  */
 export const extractPayload = (carrier: HTMLCanvasElement): string => {
+  logger.debug(`[Stego] Extracting payload from ${carrier.width}x${carrier.height} image`);
   const { data, width, height } = getCanvasData(carrier);
 
   let length = 0;
@@ -109,30 +131,51 @@ export const extractPayload = (carrier: HTMLCanvasElement): string => {
   let payloadBytes: Uint8Array | null = null;
 
   for (let i = 0; i < data.length; i += 4) {
-    if (payloadBytes && bytesRead >= length + 4) break;
+    if (payloadBytes && bytesRead >= length + 6) break;
 
     for (let c = 0; c < 3; c++) {
-      if (payloadBytes && bytesRead >= length + 4) break;
+      if (payloadBytes && bytesRead >= length + 6) break;
       const bits = data[i + c] & 0x03;
-      
+
       currentByte = (currentByte << 2) | bits;
       bitIndex += 2;
 
       if (bitIndex >= 8) {
-        if (bytesRead < 4) {
+        if (bytesRead < 2) {
+          if (currentByte !== HEADER[bytesRead]) {
+            logger.error(
+              `[Stego] Invalid Header Byte ${bytesRead}: Expected ${HEADER[bytesRead]}, Got ${currentByte}`,
+            );
+            throw new Error(
+              i18next.t(
+                'stealth.error.invalid_header',
+                'No hidden message found. The image might be compressed or not contain stealth data.',
+              ),
+            );
+          }
+        } else if (bytesRead < 6) {
           length = (length << 8) | currentByte;
         } else if (payloadBytes) {
-          payloadBytes[bytesRead - 4] = currentByte;
+          payloadBytes[bytesRead - 6] = currentByte;
         }
-        
+
         bytesRead++;
         currentByte = 0;
         bitIndex = 0;
 
-        if (bytesRead === 4) {
-          const maxCapacity = (width * height * 6) / 8 - 4;
+        if (bytesRead === 6) {
+          const maxCapacity = (width * height * 6) / 8 - 6;
+          logger.debug(
+            `[Stego] Header valid. Payload Length: ${length}, Max Capacity: ${maxCapacity}`,
+          );
           if (length < 0 || length > maxCapacity) {
-             throw new Error(i18next.t('errors.invalidPayloadLength', 'Invalid payload length detected'));
+            logger.error(`[Stego] Invalid payload length: ${length}`);
+            throw new Error(
+              i18next.t(
+                'stealth.error.invalid_payload',
+                'Invalid payload length detected. The image might be corrupted.',
+              ),
+            );
           }
           payloadBytes = new Uint8Array(length);
         }
@@ -140,9 +183,12 @@ export const extractPayload = (carrier: HTMLCanvasElement): string => {
     }
   }
 
-  if (!payloadBytes || bytesRead < length + 4) {
-     throw new Error(i18next.t('errors.incompletePayload', 'Failed to extract complete payload'));
+  if (!payloadBytes || bytesRead < length + 6) {
+    logger.error(`[Stego] Incomplete payload. Read: ${bytesRead}, Expected: ${length + 6}`);
+    throw new Error(i18next.t('errors.incompletePayload', 'Failed to extract complete payload'));
   }
 
-  return reconstructString(payloadBytes);
+  const result = reconstructString(payloadBytes);
+  logger.debug(`[Stego] Extraction success. Result length: ${result.length}`);
+  return result;
 };

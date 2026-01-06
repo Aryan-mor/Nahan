@@ -9,7 +9,7 @@ import {
   Spinner,
 } from '@heroui/react';
 import { AlertTriangle, Copy, Download, Send } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -49,6 +49,14 @@ export function SteganographyPreviewSheet({
     setDecodingError,
   } = useSteganographyStore();
 
+  const [decodedText, setDecodedText] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (decodingStatus === 'processing') {
+      setDecodedText(null);
+    }
+  }, [decodingStatus]);
+
   useEffect(() => {
     if (isOpen && viewMode === 'decode' && decodingStatus === 'processing' && decodingCarrierUrl) {
       const decode = async () => {
@@ -63,14 +71,15 @@ export function SteganographyPreviewSheet({
           const blob = await response.blob();
           const file = new File([blob], 'carrier.png', { type: 'image/png' });
 
-          const { url: resultUrl } = await steganographyService.decode(
+          const { url: resultUrl, text: resultText } = await steganographyService.decode(
             file,
             identity.privateKey,
             sessionPassphrase,
             senderPublicKey ? [senderPublicKey] : [],
           );
 
-          setDecodedImageUrl(resultUrl);
+          setDecodedImageUrl(resultUrl || null);
+          setDecodedText(resultText || null);
           setDecodingStatus('success');
         } catch (error) {
           logger.error('Decoding failed', error);
@@ -195,6 +204,17 @@ export function SteganographyPreviewSheet({
               )
             )}
           </div>
+
+          {viewMode === 'decode' && decodingStatus === 'success' && decodedText && (
+            <div className="p-3 bg-black/20 rounded-lg border border-industrial-700/50">
+              <div className="text-xs text-primary-400 mb-1 font-medium">
+                {t('steganography.hidden_message', 'Hidden Message')}
+              </div>
+              <p className="text-sm text-industrial-100 whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">
+                {decodedText}
+              </p>
+            </div>
+          )}
 
           {viewMode === 'encode' && (
             <div className="bg-warning-900/20 border border-warning-900/50 rounded-lg p-3 flex gap-3 items-start">

@@ -339,9 +339,10 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
       let finalType: 'text' | 'image' = 'text';
 
       try {
-        if (finalPlain.startsWith('{') && finalPlain.includes('"nahan_type":"image"')) {
-          const parsed = JSON.parse(finalPlain);
-          if (parsed.nahan_type === 'image') {
+        const trimmedPlain = finalPlain.trim();
+        if (trimmedPlain.startsWith('{') && (trimmedPlain.includes('"nahan_type":"image"') || trimmedPlain.includes('"nahan_type":"image_stego"'))) {
+          const parsed = JSON.parse(trimmedPlain);
+          if (parsed.nahan_type === 'image' || parsed.nahan_type === 'image_stego') {
             finalType = 'image';
             finalPlain = parsed.text || '';
             finalImage = parsed.image;

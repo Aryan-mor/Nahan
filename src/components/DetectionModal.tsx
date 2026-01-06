@@ -34,12 +34,7 @@ export function DetectionModal({
   contactPublicKey,
   contactFingerprint,
 }: DetectionModalProps) {
-  const {
-    addContact,
-    setActiveChat,
-    contacts,
-    sessionPassphrase,
-  } = useAppStore();
+  const { addContact, setActiveChat, contacts, sessionPassphrase } = useAppStore();
 
   const { setActiveTab } = useUIStore();
   const { t } = useTranslation();
@@ -52,7 +47,7 @@ export function DetectionModal({
       const fingerprint = await cryptoService.getFingerprint(contactPublicKey);
 
       // Check if contact already exists
-      const existingContact = contacts.find(c => c.fingerprint === fingerprint);
+      const existingContact = contacts.find((c) => c.fingerprint === fingerprint);
       if (existingContact) {
         // Contact already exists - just navigate to chat
         setActiveChat(existingContact);
@@ -90,7 +85,7 @@ export function DetectionModal({
   const handleGoToChat = async () => {
     if (!contactFingerprint) return;
 
-    const contact = contacts.find(c => c.fingerprint === contactFingerprint);
+    const contact = contacts.find((c) => c.fingerprint === contactFingerprint);
     if (contact) {
       setActiveChat(contact);
       setActiveTab('chats');
@@ -136,7 +131,7 @@ export function DetectionModal({
                       <Trans
                         i18nKey="detection.contact_found"
                         values={{ name: contactName }}
-                        components={{ strong_text: <strong className="text-industrial-100" /> }}
+                        components={{ b: <strong className="text-industrial-100" /> }}
                       />
                     </p>
                     <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
@@ -151,13 +146,11 @@ export function DetectionModal({
                       <Trans
                         i18nKey="detection.message_found"
                         values={{ name: contactName }}
-                        components={{ strong_text: <strong className="text-industrial-100" /> }}
+                        components={{ b: <strong className="text-industrial-100" /> }}
                       />
                     </p>
                     <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
-                      <p className="text-xs text-industrial-400">
-                        {t('detection.message_info')}
-                      </p>
+                      <p className="text-xs text-industrial-400">{t('detection.message_info')}</p>
                     </div>
                   </>
                 )}

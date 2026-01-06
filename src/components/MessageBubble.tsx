@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { ImageSteganographyService } from '../services/steganography';
+import * as logger from '../utils/logger';
 import { SecureMessage } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useSteganographyStore } from '../stores/steganographyStore';
@@ -32,6 +33,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isOutgoing = message.isOutgoing;
 
   const [decodedSrc, setDecodedSrc] = useState<string | null>(null);
+  const [decodedText, setDecodedText] = useState<string | null>(null);
+  const [decodeFailed, setDecodeFailed] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -45,7 +48,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   // Auto-decode steganography images for chat view
   useEffect(() => {
     let isMounted = true;
-    if (message.type === 'image_stego' && imageUrl && !decodedSrc && identity && sessionPassphrase) {
+    if (message.type === 'image_stego' && imageUrl && !decodedSrc && !decodedText && !decodeFailed && identity && sessionPassphrase) {
       const decode = async () => {
         try {
           const senderKey = isOutgoing ? identity.publicKey : activeChat?.publicKey;
@@ -58,7 +61,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           const blob = await response.blob();
           const file = new File([blob], "carrier.png", { type: "image/png" });
           
-          const { url: resultUrl } = await steganographyService.decode(
+          const { url: resultUrl, text: resultText } = await steganographyService.decode(
             file,
             identity.privateKey,
             sessionPassphrase,
@@ -66,19 +69,31 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             decryptionPeerKey
           );
           
+          if (resultText) {
+             logger.info('MessageBubble: Hidden text found', { textLength: resultText.length });
+          }
+          
           if (isMounted) {
-            setDecodedSrc(resultUrl);
+            if (resultUrl) setDecodedSrc(resultUrl);
+            if (resultText) setDecodedText(resultText);
           }
         } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error('Auto-decode failed:', error);
-          // Fallback to carrier image is automatic (decodedSrc remains null)
+          // Only log as warning for expected steganography failures (e.g. compression or no data)
+          const errorMessage = (error as Error).message;
+          if (errorMessage?.includes('No hidden message found')) {
+            logger.warn('Auto-decode skipped (no steganography data found):', message.id);
+          } else {
+            logger.error('Auto-decode failed:', error);
+          }
+          if (isMounted) {
+            setDecodeFailed(true);
+          }
         }
       };
       decode();
     }
     return () => { isMounted = false; };
-  }, [message.type, imageUrl, decodedSrc, identity, sessionPassphrase, isOutgoing, activeChat]);
+  }, [message.type, imageUrl, decodedSrc, decodedText, decodeFailed, identity, sessionPassphrase, isOutgoing, activeChat, message.id]);
 
   const handleDownloadImage = () => {
     if (imageUrl) {
@@ -108,6 +123,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   };
 
   const smartCopy = () => {
+    // For Steganography messages, open the carrier view (which allows downloading/copying the image)
+    // instead of copying the text payload.
+    if (message.type === 'image_stego' && imageUrl) {
+      handleSteganographyClick({ stopPropagation: () => {} } as React.MouseEvent);
+      toast.success(t('steganography.encrypted_image_ready', 'Encrypted Image Ready'));
+      setMenuPosition(null);
+      return;
+    }
+
     const textToCopy = isOutgoing ? message.content.encrypted : message.content.plain;
     const label = isOutgoing ? t('chat.message.encrypted_block') : t('chat.message.text');
 
@@ -119,6 +143,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   };
 
   const copyEncrypted = () => {
+    // Same logic for explicit "Copy Encrypted" action
+    if (message.type === 'image_stego' && imageUrl) {
+        handleSteganographyClick({ stopPropagation: () => {} } as React.MouseEvent);
+        toast.success(t('steganography.encrypted_image_ready', 'Encrypted Image Ready'));
+        setMenuPosition(null);
+        return;
+    }
+
     navigator.clipboard.writeText(message.content.encrypted);
     toast.success(t('chat.message.encrypted_copied'));
     setMenuPosition(null);
@@ -212,7 +244,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             onContextMenu={(e) => e.preventDefault()}
           >
             {/* Image Content */}
-            {hasImage && imageUrl && (
+            {hasImage && imageUrl && (decodedSrc || (!decodedText && !message.content.plain)) && (
               <div className="mb-2 relative group/image">
                 <Image
                   src={decodedSrc || imageUrl}
@@ -251,9 +283,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               </div>
             )}
 
-            {/* Message Content */}
-            {message.content.plain && (
-              <div className="whitespace-pre-wrap">{message.content.plain}</div>
+            {/* Message Content (or Decoded Text if Plain is Missing) */}
+            {(message.content.plain || (decodedText && !decodedSrc)) && (
+              <div className="whitespace-pre-wrap">{message.content.plain || decodedText}</div>
+            )}
+
+            {/* Decoded Steganography Text (Only if DIFFERENT from main content and NOT already shown as main content) */}
+            {decodedText && 
+             decodedText.trim() !== (message.content.plain || '').trim() && 
+             decodedSrc && // If decodedSrc exists, decodedText is secondary (like metadata), so show it in box. 
+                           // If decodedSrc doesn't exist, decodedText is MAIN content (handled above), so hide box.
+                           // Actually, if decodedSrc doesn't exist, we showed it above. So we shouldn't show it here.
+             (
+              <div className="whitespace-pre-wrap mt-2 p-2 bg-black/20 rounded-lg border border-industrial-700/50 text-industrial-100">
+                <span className="text-xs text-primary-400 block mb-1 font-medium flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  {t('steganography.hidden_message', 'Hidden Message')}
+                </span>
+                {decodedText}
+              </div>
             )}
 
             {/* Context Menu (Desktop Hover - Visible on Hover) */}

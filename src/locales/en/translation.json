@@ -176,9 +176,9 @@
   "detection": {
     "new_contact": "New Contact Detected",
     "new_message": "New Message Detected",
-    "contact_found": "A new contact <strong_text>{{name}}</strong_text> was detected in your clipboard. Would you like to add them and start a chat?",
+    "contact_found": "A new contact <b>{{name}}</b> was detected in your clipboard. Would you like to add them and start a chat?",
     "steganography_info": "The contact information was hidden using steganography. No plaintext public keys were exposed.",
-    "message_found": "New message from <strong_text>{{name}}</strong_text> received. History updated.",
+    "message_found": "New message from <b>{{name}}</b> received. History updated.",
     "message_info": "The message was detected from your clipboard and imported successfully.",
     "dismiss": "Dismiss",
     "add_chat": "Add & Start Chat",
@@ -293,7 +293,37 @@
     "share_title": "NAHAN Identity - {{name}}",
     "share_text": "Scan to add {{name}} on NAHAN"
   },
-  "stealth_modal": {
+  "stealth": {
+    "decode_success": "Image decoded successfully",
+    "decode_error": "Failed to decode image",
+    "image_mode_title": "Stealth Image",
+    "tab": {
+      "text": "Hide in Text",
+      "image": "Hide in Image"
+    },
+    "default_message": "Sent a stealth image",
+    "send_success": "Stealth image sent successfully",
+    "send_error": "Failed to send stealth image",
+    "send_now": "Send Now",
+    "cover_text": "Cover Text",
+    "enter_cover_text": "Enter text to hide your message...",
+    "security_score": "Security Score",
+    "image_placeholder": "Generate a unique gradient mask to hide your data.",
+    "generate_mask": "Generate Mask",
+    "upload_carrier": "Upload Custom",
+    "send": "Send Stealth Message",
+    "warning": {
+      "file_transfer": "Important: Always send this image as a File/Document in messaging apps. Standard photo sharing will destroy the hidden data.",
+      "public_image": "Caution: Public images may reveal the existence of hidden data.",
+      "learn_more_content": "Using public images found online may allow observers to detect changes through bit-comparison. However, even if detected, your content remains cryptographically secure and unreadable without your private key."
+    },
+    "error": {
+      "generate_failed": "Failed to generate image",
+      "process_failed": "Failed to process image. It might be too small for the data.",
+      "no_data": "No data to hide",
+      "invalid_header": "No hidden message found. The image might be compressed or not contain stealth data.",
+      "invalid_payload": "Invalid data detected. The image might be corrupted."
+    },
     "title": "Stealth Mode",
     "subtitle": "Hide your encrypted message inside a cover text using invisible characters.",
     "safety": "Stealth Safety",
@@ -302,7 +332,6 @@
       "moderate": "Orange Zone (Moderate)",
       "risky": "Red Zone (Risky)"
     },
-    "cover_text": "Cover Text",
     "reset": "Reset",
     "reset_suggestion": "Reset Suggestion",
     "mode": {
@@ -583,6 +612,14 @@
     "send": "Send Now",
     "close": "Close",
     "download_image": "Download Image",
-    "image_preview": "Image Preview"
+    "image_preview": "Image Preview",
+    "download": "Download",
+    "copy": "Copy",
+    "regenerate": "Regenerate / Choose Different Image",
+    "cancel": "Cancel",
+    "learn_more": "Learn More",
+    "download_success": "Saved to gallery",
+    "copy_success": "Copied to clipboard",
+    "copy_failed": "Failed to copy"
   }
 }

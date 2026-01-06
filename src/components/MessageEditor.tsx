@@ -41,20 +41,22 @@ import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import * as logger from '../utils/logger';
 
-import { StealthModal } from './StealthModal';
-
 interface MessageEditorProps {
   mode: 'encrypt' | 'decrypt';
 }
 
 export function MessageEditor({ mode }: MessageEditorProps) {
-  const { identity, contacts, sessionPassphrase } = useAppStore();
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const {
-    isOpen: isStealthOpen,
-    onOpen: onStealthOpen,
-    onOpenChange: onStealthOpenChange,
-  } = useDisclosure();
+    identity,
+    contacts,
+    sessionPassphrase,
+    setPendingStealthBinary,
+    setPendingPlaintext,
+    setShowStealthModal,
+    setStealthDrawerMode,
+    setActiveChat,
+  } = useAppStore();
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const { t } = useTranslation();
 
   const [message, setMessage] = useState('');
@@ -67,7 +69,6 @@ export function MessageEditor({ mode }: MessageEditorProps) {
   const [signatureVerified, setSignatureVerified] = useState<boolean | null>(null);
   const [senderInfo, setSenderInfo] = useState<{ name: string; fingerprint: string } | null>(null);
   const [clipboardTimer, setClipboardTimer] = useState<NodeJS.Timeout | null>(null);
-  const [pendingBinary, setPendingBinary] = useState<Uint8Array | null>(null);
 
   const isEncryptMode = mode === 'encrypt';
   const title = isEncryptMode ? t('message_editor.encrypt_title') : t('message_editor.decrypt_title');
@@ -132,52 +133,6 @@ export function MessageEditor({ mode }: MessageEditorProps) {
     }
   };
 
-  const handleStealthConfirm = async (finalText: string) => {
-    try {
-      const recipient = contacts.find((c) => c.id === selectedContact);
-      if (!recipient || !identity) return;
-
-      setEncryptedMessage(finalText);
-      setDecryptedMessage('');
-      setSignatureVerified(null);
-      setSenderInfo(null);
-
-      // Store the message
-      if (!sessionPassphrase) {
-        throw new Error('SecureStorage: Missing key');
-      }
-
-      await storageService.storeMessage({
-        senderFingerprint: identity.fingerprint,
-        recipientFingerprint: recipient.fingerprint,
-        content: {
-          plain: message,
-          encrypted: finalText,
-        },
-        isOutgoing: true,
-        read: true,
-        status: 'sent',
-      }, sessionPassphrase);
-
-      toast.success(t('message_editor.success.hidden'));
-
-      // Clear clipboard after 60 seconds for security
-      if (clipboardTimer) {
-        clearTimeout(clipboardTimer);
-      }
-      const timer = setTimeout(() => {
-        if (isEncryptMode && finalText) {
-          navigator.clipboard.writeText('');
-          toast.info(t('message_editor.info.clipboard_cleared'));
-        }
-      }, 60000);
-      setClipboardTimer(timer);
-    } catch (error) {
-      logger.error('Failed to finalize encryption:', error);
-      toast.error(t('message_editor.error.save'));
-    }
-  };
-
   const processWithPassphrase = async () => {
     if (!passphrase) {
       toast.error(t('message_editor.error.passphrase'));
@@ -207,13 +162,19 @@ export function MessageEditor({ mode }: MessageEditorProps) {
         // Store binary for stealth modal
         if (encrypted instanceof Uint8Array) {
           setPendingBinary(encrypted);
+          setPendingStealthBinary(encrypted);
+          setPendingPlaintext(message);
         } else {
           throw new Error('Expected Uint8Array in binary mode');
         }
 
         // Suggest Stealth Mode immediately
         logger.debug("LOG 6: MessageEditor - Opening Stealth Modal. EXECUTING RETURN NOW.");
-        onStealthOpen();
+        
+        // Prepare global stealth drawer
+        await setActiveChat(recipient);
+        setStealthDrawerMode('dual');
+        setShowStealthModal(true);
         return;
       } else {
         const result = await cryptoService.decryptMessage(
@@ -649,13 +610,7 @@ export function MessageEditor({ mode }: MessageEditorProps) {
         </ModalContent>
       </Modal>
 
-      {/* Stealth Modal */}
-      <StealthModal
-        isOpen={isStealthOpen}
-        onOpenChange={onStealthOpenChange}
-        pendingBinary={pendingBinary}
-        onConfirm={handleStealthConfirm}
-      />
+
     </motion.div>
   );
 }

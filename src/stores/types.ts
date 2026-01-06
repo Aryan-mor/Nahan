@@ -47,11 +47,15 @@ export interface StealthSlice {
   isStealthMode: boolean;
   showStealthModal: boolean;
   pendingStealthBinary: Uint8Array | null;
+  pendingStealthImage: string | null;
   pendingPlaintext: string | null;
+  stealthDrawerMode: 'image' | 'dual';
   setStealthMode: (enabled: boolean) => void;
   setShowStealthModal: (show: boolean) => void;
   setPendingStealthBinary: (binary: Uint8Array | null) => void;
+  setPendingStealthImage: (image: string | null) => void;
   setPendingPlaintext: (text: string | null) => void;
+  setStealthDrawerMode: (mode: 'image' | 'dual') => void;
   confirmStealthSend: (finalOutput: string) => Promise<void>;
   sendAutoStealthMessage: (text: string) => Promise<string>;
 }

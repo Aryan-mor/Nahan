@@ -25,6 +25,8 @@ export function ChatInput() {
     sendAutoStealthMessage,
     setShowStealthModal,
     setPendingStealthBinary,
+    setPendingStealthImage,
+    setStealthDrawerMode,
     setPendingPlaintext,
     processIncomingMessage,
     sendMessage,
@@ -135,24 +137,38 @@ export function ChatInput() {
         activeChat.fingerprint === 'BROADCAST' ? undefined : activeChat.publicKey;
 
       // Encode
-      const carrierBlob = await steganographyService.encode(
+      logger.info('ChatInput: Starting encoding', { hasText: !!messageInput });
+      const { carrier, payload } = await steganographyService.encode(
         file,
         identity.privateKey,
         sessionPassphrase,
         recipientPublicKey,
+        messageInput // Pass the text from the input
       );
+
+      logger.info('ChatInput: Encoding successful', { 
+        carrierSize: carrier.size, 
+        payloadSize: payload.length 
+      });
 
       // Auto-send the carrier
       const reader = new FileReader();
       reader.onload = async () => {
         try {
           const base64Image = reader.result as string;
-          await sendMessage('', base64Image, 'image_stego');
-          toast.success(t('chat.input.send_success', 'Sent successfully'));
+          // Open UnifiedStealthDrawer in Image Mode
+          setPendingStealthImage(base64Image);
+          setStealthDrawerMode('image');
+          setShowStealthModal(true);
           resetEncoding();
+          
+          // Clear the text input since it's now embedded in the image
+          if (messageInput) {
+             setMessageInput('');
+          }
         } catch (error) {
-          logger.error('Failed to send steganography image:', error);
-          toast.error('Failed to send image');
+          logger.error('Failed to open stealth drawer:', error);
+          toast.error('Failed to process image');
           setEncodingStatus('error');
         } finally {
           // Reset file input
@@ -165,7 +181,7 @@ export function ChatInput() {
         toast.error('Failed to process image');
         setEncodingStatus('error');
       };
-      reader.readAsDataURL(carrierBlob);
+      reader.readAsDataURL(carrier);
     } catch (error) {
       logger.error('Steganography Encoding Failed:', error);
       setEncodingStatus('error');
@@ -262,6 +278,7 @@ export function ChatInput() {
         // Open stealth modal with signed broadcast payload
         setPendingStealthBinary(signedBinary);
         setPendingPlaintext(messageInput);
+        setStealthDrawerMode('dual');
         setShowStealthModal(true);
       } else {
         // Standard mode: encrypt message to binary for stealth modal
@@ -281,6 +298,7 @@ export function ChatInput() {
         // Open stealth modal with pending binary
         setPendingStealthBinary(encryptedBinary);
         setPendingPlaintext(messageInput);
+        setStealthDrawerMode('dual');
         setShowStealthModal(true);
       }
     } catch (error) {

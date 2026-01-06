@@ -92,9 +92,9 @@
   "detection": {
     "new_contact": "مخاطب جدید شناسایی شد",
     "new_message": "پیام جدید شناسایی شد",
-    "contact_found": "مخاطب جدید <strong_text>{{name}}</strong_text> در کلیپ‌بورد شما شناسایی شد. آیا می‌خواهید او را اضافه کرده و گفتگو را شروع کنید؟",
+    "contact_found": "مخاطب جدید <b>{{name}}</b> در کلیپ‌بورد شما شناسایی شد. آیا می‌خواهید او را اضافه کرده و گفتگو را شروع کنید؟",
     "steganography_info": "اطلاعات مخاطب با استفاده از پنهان‌نگاری مخفی شده بود. هیچ کلید عمومی متن ساده‌ای فاش نشد.",
-    "message_found": "پیام جدیدی از <strong_text>{{name}}</strong_text> دریافت شد. تاریخچه به‌روز شد.",
+    "message_found": "پیام جدیدی از <b>{{name}}</b> دریافت شد. تاریخچه به‌روز شد.",
     "message_info": "پیام از کلیپ‌بورد شما شناسایی و با موفقیت وارد شد.",
     "dismiss": "رد کردن",
     "add_chat": "افزودن و شروع گفتگو",
@@ -426,20 +426,74 @@
       "error": "خطا در پاک کردن داده‌ها"
     }
   },
-  "steganography": {
-    "preview_title": "تصویر رمزگذاری شده آماده است",
-    "decode_title": "پیام مخفی",
-    "preview_subtitle": "پیام شما در این تصویر پنهان شده است",
-    "decode_subtitle": "محتوا از تصویر استخراج شد",
-    "decoding": "در حال استخراج پیام مخفی...",
-    "warning_file_transfer": "شما باید این تصویر را به عنوان فایل (FILE) ارسال کنید. ارسال آن به عنوان عکس معمولی داده‌های مخفی را خراب می‌کند.",
-    "download_image": "دانلود به عنوان فایل",
-    "copy_image": "کپی تصویر",
-    "image_copied": "تصویر در کلیپ‌بورد کپی شد",
-    "copy_failed": "کپی تصویر ناموفق بود",
+  "stealth": {
+    "decode_success": "تصویر با موفقیت رمزگشایی شد",
     "decode_error": "خطا در رمزگشایی تصویر",
-    "unknown_sender": "رمزگشایی شده از فرستنده ناشناس",
-    "message_saved": "پیام در گفتگو ذخیره شد"
+    "image_mode_title": "تصویر مخفی",
+    "tab": {
+      "text": "مخفی در متن",
+      "image": "مخفی در تصویر"
+    },
+    "default_message": "یک تصویر مخفی ارسال شد",
+    "send_success": "تصویر مخفی با موفقیت ارسال شد",
+    "send_error": "خطا در ارسال تصویر مخفی",
+    "send_now": "ارسال اکنون",
+    "cover_text": "متن پوششی",
+    "enter_cover_text": "متنی وارد کنید تا پیام خود را در آن مخفی کنید...",
+    "security_score": "امتیاز امنیت",
+    "image_placeholder": "یک ماسک گرادیان منحصر به فرد برای مخفی کردن داده‌های خود ایجاد کنید.",
+    "generate_mask": "ایجاد ماسک",
+    "upload_carrier": "آپلود تصویر سفارشی",
+    "send": "ارسال پیام مخفی",
+    "warning": {
+      "file_transfer": "مهم: همیشه این تصویر را به صورت فایل/سند ارسال کنید. ارسال به صورت عکس معمولی داده‌های مخفی را از بین می‌برد.",
+      "public_image": "هشدار: تصاویر عمومی ممکن است وجود داده‌های مخفی را فاش کنند.",
+      "learn_more_content": "استفاده از تصاویر عمومی آنلاین ممکن است به ناظران اجازه دهد تا تغییرات را از طریق مقایسه بیت‌ها تشخیص دهند. با این حال، حتی در صورت تشخیص، محتوای شما به صورت رمزنگاری شده امن باقی می‌ماند و بدون کلید خصوصی شما قابل خواندن نیست."
+    },
+    "error": {
+      "generate_failed": "خطا در ایجاد تصویر",
+      "process_failed": "خطا در پردازش تصویر. ممکن است تصویر برای داده‌ها خیلی کوچک باشد.",
+      "no_data": "داده‌ای برای مخفی کردن وجود ندارد",
+      "invalid_header": "پیام مخفی یافت نشد. ممکن است تصویر فشرده شده باشد یا حاوی داده مخفی نباشد.",
+      "invalid_payload": "داده نامعتبر تشخیص داده شد. ممکن است تصویر خراب شده باشد."
+    },
+    "title": "Stealth Mode",
+    "subtitle": "Hide your encrypted message inside a cover text using invisible characters.",
+    "safety": "Stealth Safety",
+    "safety_levels": {
+      "safe": "Green Zone (Safe)",
+      "moderate": "Orange Zone (Moderate)",
+      "risky": "Red Zone (Risky)"
+    },
+    "reset": "Reset",
+    "reset_suggestion": "Reset Suggestion",
+    "mode": {
+      "auto": "Auto",
+      "custom": "Custom"
+    },
+    "placeholder": "Type or paste a cover text...",
+    "how_it_works": {
+      "title": "How it works",
+      "desc": "The encrypted data is encoded into Zero-Width Characters and embedded into the cover text. The output looks exactly like the cover text but contains the hidden message.",
+      "payload_size": "Payload Size: {{size}} bytes"
+    },
+    "status": {
+      "telegram_risk": "⚠️ Telegram Splitting Risk: {{length}} chars (limit: 4096). Message may be split.",
+      "too_short": "Text is too short for the payload size ({{size}} bytes). Minimum safety: {{threshold}}%. Please use longer cover text.",
+      "excellent": "Excellent! The message is well hidden with a safe ratio.",
+      "good": "Good length ratio. The message is reasonably hidden."
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "confirm_copy": "Confirm & Copy",
+      "confirm_low_safety": "Confirm (Low Safety)",
+      "too_large": "Too Large for Telegram"
+    },
+    "toast": {
+      "low_ratio": "Stealth ratio is low ({{score}}%). Recommendation: {{threshold}}%",
+      "telegram_risk": "Telegram Splitting Risk: Message is {{length}} chars (limit: 4096). Message may be split into multiple parts.",
+      "success": "Stealth message copied to clipboard!"
+    }
   },
   "common": {
     "send": "ارسال کن",

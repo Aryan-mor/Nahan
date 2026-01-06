@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { DetectionResult } from '../hooks/useClipboardDetection';
+import { analyzeClipboard } from '../services/clipboardAnalysis';
 import { ImageSteganographyService } from '../services/steganography';
 import { Contact, StorageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
@@ -91,29 +92,89 @@ export function ChatList({
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
 
   const handlePaste = async () => {
-    let clipboardText = '';
-    try {
-      clipboardText = await navigator.clipboard.readText();
-      if (!clipboardText) {
-        throw new Error('Clipboard empty');
-      }
-      const result = await handleUniversalInput(clipboardText, undefined, true);
+    setIsProcessingPaste(true);
+    setDecodingStatus('processing');
+    let decodingOutcome: 'success' | 'error' | null = null;
 
-      // If a message was detected, show the new message modal
-      if (result && result.type === 'message') {
-        setNewMessageResult(result);
-        setShowNewMessageModal(true);
+    try {
+      if (!identity || !sessionPassphrase) {
+        toast.error(t('auth.required'));
+        return;
+      }
+
+      const { processed } = await analyzeClipboard({
+        identity,
+        sessionPassphrase,
+        contacts,
+        handleUniversalInput,
+      });
+
+      if (processed) {
+        if (processed.type === 'message') {
+          // Message already stored by analyzeClipboard (if image) or handleUniversalInput (if text)
+          // We just need to update UI
+
+          if (processed.source === 'image') {
+            setDecodingStatus('success');
+            decodingOutcome = 'success';
+            toast.success(t('stealth.decode_success', 'Image decoded successfully'));
+          }
+
+          setNewMessageResult({
+            type: 'message',
+            fingerprint: processed.fingerprint!,
+            isBroadcast: processed.isBroadcast || false,
+            senderName: processed.senderName || 'Unknown',
+          });
+          setShowNewMessageModal(true);
+        } else if (processed.type === 'contact') {
+          // Handle contact detection
+          // analyzeClipboard might return contact type from handleUniversalInput
+          if (processed.data) {
+            const contactData = processed.data;
+            // Use existing logic for contact intro
+            if (onDetection) {
+              onDetection({
+                type: 'id',
+                contactName: contactData.name || 'Unknown',
+                contactPublicKey: contactData.publicKey || contactData.key,
+              });
+            } else {
+              toast.info(t('chat.list.contact_key_detected'));
+              onNewChat();
+            }
+          }
+        }
+      } else {
+        // Nothing found
+        toast.info(t('chat.list.clipboard_empty', 'Clipboard empty or format not supported'));
       }
     } catch (error: unknown) {
+      setDecodingStatus('error');
+      decodingOutcome = 'error';
       const err = error as {
         message?: string;
         keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
       };
+
       if (err.message === 'SENDER_UNKNOWN') {
-        setPendingMessage(clipboardText);
-        setIsSenderSelectOpen(true);
+        // How to handle sender unknown for analyzeClipboard?
+        // If it was text, we have the text?
+        // analyzeClipboard doesn't return the text on error.
+        // We might need to manually read text here if we want to support "Select Sender" flow?
+        // The previous code read text and setPendingMessage(clipboardText).
+
+        // For now, let's just log and show error, or try to recover text?
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) {
+            setPendingMessage(text);
+            setIsSenderSelectOpen(true);
+          }
+        } catch {
+          toast.error(t('chat.list.process_error'));
+        }
       } else if (err.message === 'CONTACT_INTRO_DETECTED') {
-        // UNIFICATION: Handle contact ID detection the same way as auto-detector
         if (onDetection && err.keyData) {
           const contactName = err.keyData.name || err.keyData.username || 'Unknown';
           const contactPublicKey = err.keyData.publicKey || err.keyData.key;
@@ -125,19 +186,26 @@ export function ChatList({
             });
           } else {
             toast.info(t('chat.list.contact_key_detected'));
-            onNewChat(); // Fallback: Navigate to keys tab if handler not available
+            onNewChat();
           }
         } else {
           toast.info(t('chat.list.contact_key_detected'));
-          onNewChat(); // Fallback: Navigate to keys tab if handler not available
+          onNewChat();
         }
       } else {
         toast.error(t('chat.list.process_error'));
         logger.error('[UniversalInput] Error:', error);
-        // If clipboard access failed, open manual input
-        if (err.message?.includes('Clipboard')) {
+
+        // Check if manual paste needed
+        if (err.message?.includes('Clipboard') || err.message?.includes('read')) {
           setIsManualPasteOpen(true);
         }
+      }
+    } finally {
+      setIsProcessingPaste(false);
+      // Reset status if we didn't finish with success/error (e.g. text message or empty)
+      if (!decodingOutcome) {
+        setDecodingStatus('idle');
       }
     }
   };
@@ -368,7 +436,7 @@ export function ChatList({
                     sessionPassphrase,
                     contacts.map((c) => c.publicKey),
                   );
-                  setDecodedImageUrl(url);
+                  setDecodedImageUrl(url || null);
 
                   // Store message logic
                   if (senderPublicKey) {
@@ -487,7 +555,7 @@ export function ChatList({
                   t('steganography.decode_success', 'Decoded successfully')}
                 {decodingStatus === 'error' && t('steganography.decode_error', 'Failed to decode')}
               </div>
-              {decodingStatus === 'success' && decodedImageUrl && (
+              {decodingStatus === 'success' && (decodedImageUrl || decodedContact) && (
                 <Button
                   size="sm"
                   color="primary"
@@ -496,7 +564,7 @@ export function ChatList({
                     if (decodedContact) {
                       setActiveChat(decodedContact);
                       resetDecoding(); // Close the card
-                    } else {
+                    } else if (decodedImageUrl) {
                       window.open(decodedImageUrl, '_blank');
                     }
                   }}
@@ -557,7 +625,7 @@ export function ChatList({
                         )}
                       </div>
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-industrial-400 truncate pr-4">
+                        <p className="text-sm text-industrial-400 truncate pr-4 max-w-36">
                           {lastMsg ? (
                             lastMsg.type === 'image' ||
                             lastMsg.type === 'image_stego' ||

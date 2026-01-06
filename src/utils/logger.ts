@@ -1,71 +1,21 @@
 /* eslint-disable no-console */
+
 /**
- * Production-Safe Logger Utility
- * Only logs in development mode (import.meta.env.DEV)
- * Prevents debug information from leaking into production builds
+ * Modern Production-Safe Logger Utility
+ * Built to be highly tree-shakable and performance-optimized.
  */
 
 const isDev = import.meta.env.DEV;
 
-/**
- * Log a message (only in development)
- */
-export function log(...args: unknown[]): void {
-  if (isDev) {
-    console.log(...args);
-  }
-}
+// Use an arrow function assigned to a constant for better minifier optimization
+export const log = isDev ? (...args: unknown[]) => console.log(...args) : () => {}; // In production, this becomes an empty function that can be stripped
+
+export const warn = isDev ? (...args: unknown[]) => console.warn(...args) : () => {};
 
 /**
- * Alias for log (for compatibility)
+ * Errors should always be logged for production diagnostics
  */
-export const info = log;
+export const error = (...args: unknown[]) => console.error(...args);
 
-/**
- * Alias for log (for compatibility)
- */
 export const debug = log;
-
-/**
- * Log a warning (only in development)
- */
-export function warn(...args: unknown[]): void {
-  if (isDev) {
-    console.warn(...args);
-  }
-}
-
-/**
- * Log an error (always logs, even in production)
- * Errors are critical and should be visible in production
- */
-export function error(...args: unknown[]): void {
-  console.error(...args);
-}
-
-/**
- * Create a grouped log (only in development)
- */
-export function group(label: string): void {
-  if (isDev) {
-    console.group(label);
-  }
-}
-
-/**
- * End a grouped log (only in development)
- */
-export function groupEnd(): void {
-  if (isDev) {
-    console.groupEnd();
-  }
-}
-
-/**
- * Log a trace with a label (only in development)
- */
-export function trace(label: string, ...args: unknown[]): void {
-  if (isDev) {
-    console.log(`[TRACE: ${label}]`, ...args);
-  }
-}
+export const info = log;
