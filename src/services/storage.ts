@@ -166,11 +166,16 @@ export class StorageService {
     }
 
     // Decrypt and parse
-    const decryptedJson = await decryptData(entry.payload, passphrase);
-    const parsed = JSON.parse(decryptedJson) as T;
+    try {
+      const decryptedJson = await decryptData(entry.payload, passphrase);
+      const parsed = JSON.parse(decryptedJson) as T;
 
-    // Convert date strings back to Date objects (JSON.parse converts Date to string)
-    return this.convertDates(parsed);
+      // Convert date strings back to Date objects (JSON.parse converts Date to string)
+      return this.convertDates(parsed);
+    } catch (error) {
+      logger.warn(`[Storage] Failed to decrypt ${id}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -185,11 +190,15 @@ export class StorageService {
 
     for (const entry of allEntries) {
       if (entry.id.startsWith(prefix)) {
-        const decryptedJson = await decryptData(entry.payload, passphrase);
-        const parsed = JSON.parse(decryptedJson) as T;
+        try {
+          const decryptedJson = await decryptData(entry.payload, passphrase);
+          const parsed = JSON.parse(decryptedJson) as T;
 
-        // Convert date strings back to Date objects (JSON.parse converts Date to string)
-        results.push(this.convertDates(parsed));
+          // Convert date strings back to Date objects (JSON.parse converts Date to string)
+          results.push(this.convertDates(parsed));
+        } catch (error) {
+          logger.warn(`[Storage] Failed to decrypt entry ${entry.id} (skipping):`, error);
+        }
       }
     }
 

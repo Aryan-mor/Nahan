@@ -1,5 +1,15 @@
 /* eslint-disable max-lines-per-function, max-lines */
-import { Button, Image, Tab, Tabs } from '@heroui/react';
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Tab,
+  Tabs,
+  Textarea,
+} from '@heroui/react';
 import {
   AlertTriangle,
   Copy,
@@ -33,7 +43,6 @@ export function UnifiedStealthDrawer() {
     pendingStealthImage,
     confirmStealthSend,
     stealthDrawerMode,
-    pendingPlaintext, // Use pendingPlaintext for "Hide in Text" logic if needed
     sendMessage,
   } = useAppStore();
 
@@ -141,7 +150,7 @@ export function UnifiedStealthDrawer() {
     setIsGenerating(true);
     const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image();
+      const img = document.createElement('img');
       img.onload = async () => {
         try {
           const canvas = document.createElement('canvas');
@@ -222,7 +231,9 @@ export function UnifiedStealthDrawer() {
         });
       }
 
-      await sendMessage(pendingPlaintext || '', imageToSend, 'image_stego');
+      // Send empty string as text content so the secret is NOT visible in the chat bubble
+      // The secret is hidden inside the image_stego payload
+      await sendMessage('', imageToSend, 'image_stego');
       toast.success(t('stealth.send_success', 'Stealth image sent successfully'));
       setGeneratedImage(null);
       setShowStealthModal(false);

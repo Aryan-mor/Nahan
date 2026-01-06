@@ -161,7 +161,6 @@ export function MessageEditor({ mode }: MessageEditorProps) {
 
         // Store binary for stealth modal
         if (encrypted instanceof Uint8Array) {
-          setPendingBinary(encrypted);
           setPendingStealthBinary(encrypted);
           setPendingPlaintext(message);
         } else {

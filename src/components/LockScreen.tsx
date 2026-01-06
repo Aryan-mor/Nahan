@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { } from '@heroui/react';
+import {} from '@heroui/react';
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,25 +12,21 @@ import * as logger from '../utils/logger';
 import { PinPad } from './PinPad';
 
 export function LockScreen() {
-  const {
-    identity,
-    wipeData,
-  } = useAppStore();
+  const { identity, wipeData } = useAppStore();
 
-  const {
-    failedAttempts,
-    incrementFailedAttempts,
-    resetFailedAttempts,
-  } = useUIStore();
+  const { failedAttempts, incrementFailedAttempts, resetFailedAttempts } = useUIStore();
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const isVerifyingRef = useRef(false);
   const isMounted = useRef(true);
+  const instanceId = useRef(Math.random().toString(36).substring(7));
 
   useEffect(() => {
+    logger.debug(`[LockScreen:${instanceId.current}] Mounted`);
     return () => {
+      logger.debug(`[LockScreen:${instanceId.current}] Unmounting`);
       isMounted.current = false;
     };
   }, []);
@@ -52,10 +48,21 @@ export function LockScreen() {
     isVerifyingRef.current = true;
     setIsVerifying(true);
     setError('');
+    logger.debug(`[LockScreen:${instanceId.current}] Starting unlock attempt`);
 
     try {
       // Use unlockApp action to verify and set session state
-      const isValid = await useAppStore.getState().unlockApp(pin);
+      // Add timeout to prevent infinite loading state
+      const unlockPromise = useAppStore.getState().unlockApp(pin);
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          logger.warn(`[LockScreen:${instanceId.current}] Unlock timed out`);
+          resolve(false);
+        }, 15000); // 15 seconds timeout (PBKDF2 can be slow on mobile)
+      });
+
+      const isValid = await Promise.race([unlockPromise, timeoutPromise]);
+      logger.debug(`[LockScreen:${instanceId.current}] Unlock result: ${isValid}`);
 
       if (isValid) {
         toast.success(t('lock.welcome'));
@@ -70,12 +77,17 @@ export function LockScreen() {
           }
         }
       } else {
-        if (isMounted.current) {
-          isVerifyingRef.current = false;
-          setIsVerifying(false);
-          incrementFailedAttempts();
-          const currentFailed = failedAttempts + 1;
+        // ALWAYS update store regardless of mount status to ensure sync
+        incrementFailedAttempts();
 
+        logger.debug(`[LockScreen:${instanceId.current}] Unlock failed - resetting state`);
+
+        // Attempt to update local state even if unmounted (catch errors)
+        // This fixes "zombie" component issues where isMounted might be false but UI is visible
+        try {
+          setPassphrase('');
+
+          const currentFailed = failedAttempts + 1;
           if (currentFailed >= 5) {
             toast.error(t('lock.error.max_attempts'));
             await wipeData();
@@ -85,19 +97,46 @@ export function LockScreen() {
           const remaining = 5 - currentFailed;
           const msg = t('lock.error.incorrect_pin', { count: remaining });
           setError(msg);
-          setPassphrase('');
           toast.warning(msg);
+        } catch (e) {
+          logger.warn(
+            `[LockScreen:${instanceId.current}] Failed to update local state (likely unmounted):`,
+            e,
+          );
         }
       }
     } catch (error) {
       logger.error('Unlock failed:', error);
-      if (isMounted.current) {
-        isVerifyingRef.current = false;
-        setIsVerifying(false);
+      logger.debug(`[LockScreen:${instanceId.current}] Unlock exception, resetting state`);
+
+      try {
+        setPassphrase('');
         setError(t('lock.error.verify'));
         toast.error(t('lock.error.verify_toast'));
-        setPassphrase('');
+      } catch (_) {
+        // ignore state update error
       }
+    } finally {
+      // ALWAYS reset verifying state
+      logger.debug(`[LockScreen:${instanceId.current}] Finally block - resetting state`);
+
+      isVerifyingRef.current = false;
+      try {
+        setIsVerifying(false);
+      } catch (_) {
+        // ignore
+      }
+
+      // Safety net: Force reset in next tick to ensure UI updates
+      setTimeout(() => {
+        logger.debug(`[LockScreen:${instanceId.current}] Safety reset executed`);
+        try {
+          setIsVerifying(false);
+          isVerifyingRef.current = false;
+        } catch (_) {
+          // ignore
+        }
+      }, 50);
     }
   };
 
@@ -109,8 +148,8 @@ export function LockScreen() {
         transition={{ duration: 0.3 }}
         className="w-full max-w-md"
       >
-
         <PinPad
+          key={failedAttempts} // Force remount on failure to clear any stuck state
           value={passphrase}
           onChange={setPassphrase}
           onComplete={handleUnlock}

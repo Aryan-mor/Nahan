@@ -26,6 +26,16 @@ export const PinPad: React.FC<PinPadProps> = ({
 }) => {
   const { t } = useTranslation();
   const displayLabel = label || t('pinpad.enter_pin');
+  
+  // Track last submitted value to prevent loops/duplicate submissions
+  const lastSubmittedRef = React.useRef<string>('');
+  
+  // Reset last submitted if value is cleared (e.g. error retry)
+  useEffect(() => {
+    if (value === '') {
+      lastSubmittedRef.current = '';
+    }
+  }, [value]);
 
   const handleNumberClick = (num: number) => {
     if (value.length < maxLength && !isLoading) {
@@ -42,14 +52,21 @@ export const PinPad: React.FC<PinPadProps> = ({
 
   const handleEnter = () => {
     if (value.length > 0 && !isLoading && onComplete) {
-      onComplete(value);
+      if (value !== lastSubmittedRef.current) {
+        lastSubmittedRef.current = value;
+        onComplete(value);
+      }
     }
   };
 
   // Auto-submit when maxLength is reached
   useEffect(() => {
     if (value.length === maxLength && onComplete && !isLoading) {
-      onComplete(value);
+      // Prevent duplicate submission of the same PIN
+      if (value !== lastSubmittedRef.current) {
+        lastSubmittedRef.current = value;
+        onComplete(value);
+      }
     }
   }, [value, maxLength, onComplete, isLoading]);
 
@@ -68,7 +85,10 @@ export const PinPad: React.FC<PinPadProps> = ({
         }
       } else if (e.key === 'Enter') {
         if (value.length > 0 && onComplete) {
-          onComplete(value);
+          if (value !== lastSubmittedRef.current) {
+             lastSubmittedRef.current = value;
+             onComplete(value);
+          }
         }
       }
     };

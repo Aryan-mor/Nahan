@@ -138,12 +138,22 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       // This decrypts the vault entry and returns the identity object
       // The identity.privateKey is already encrypted with the user's PIN
       // Use fresh PIN (no cached keys) for decryption
-      const identityWithEncryptedPrivateKey = await storageService.getIdentity(pin);
+      logger.debug('[unlockApp] Attempting to decrypt identity from vault');
+      let identityWithEncryptedPrivateKey = null;
+      try {
+        identityWithEncryptedPrivateKey = await storageService.getIdentity(pin);
+      } catch (error) {
+        logger.warn('[unlockApp] getIdentity failed (likely wrong PIN):', error);
+        return false;
+      }
+      
       if (!identityWithEncryptedPrivateKey) {
         // Decryption failed - likely wrong PIN
         logger.warn('[unlockApp] Failed to decrypt identity - wrong PIN or corrupted data');
         return false;
       }
+
+      logger.debug('[unlockApp] Identity decrypted, verifying private key');
 
       // Step 2: Verify PIN via cryptoService using the encrypted privateKey from identity
       // The privateKey in the identity is already encrypted with the user's PIN
