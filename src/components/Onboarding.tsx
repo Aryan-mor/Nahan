@@ -6,10 +6,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
-import { cryptoService } from '../services/crypto';
-import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
-import { useUIStore } from '../stores/uiStore';
 import * as logger from '../utils/logger';
 
 import { PinPad } from './PinPad';
@@ -17,8 +14,6 @@ import { PinPad } from './PinPad';
 type Step = 'create-pin' | 'confirm-pin' | 'warning' | 'identity';
 
 export function Onboarding() {
-  const { addIdentity, setSessionPassphrase } = useAppStore();
-  const { setLocked } = useUIStore();
   const { t } = useTranslation();
 
   const [step, setStep] = useState<Step>('create-pin');
@@ -78,23 +73,8 @@ export function Onboarding() {
       const sanitizedName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
       const email = `${sanitizedName || 'user'}@nahan.local`;
 
-      const keyPair = await cryptoService.generateKeyPair(
-        name,
-        email,
-        pin, // Use PIN as passphrase
-      );
-
-      const identity = await storageService.storeIdentity({
-        name: name,
-        email: email,
-        publicKey: keyPair.publicKey,
-        privateKey: keyPair.privateKey,
-        fingerprint: keyPair.fingerprint,
-      }, pin);
-
-      addIdentity(identity);
-      setSessionPassphrase(pin); // Set session passphrase for immediate use
-      setLocked(false); // Unlock immediately after creation
+      // V2: Use centralized registration
+      await useAppStore.getState().registerAccount(name, email, pin);
 
       toast.success(t('auth.welcome'));
     } catch (error) {

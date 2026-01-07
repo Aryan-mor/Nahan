@@ -1,364 +1,322 @@
 import * as logger from '../utils/logger';
 
-/* eslint-disable max-lines-per-function */
+
 /**
- * SecureStorage - Encrypted localStorage wrapper for Zustand persist middleware
- * Uses AES-GCM encryption with key derived from user PIN (sessionPassphrase)
+ * SecureStorage - Encrypted localStorage wrapper
+ * V2 Architecture: Master Key (MK) Encryption
+ * - Data is encrypted with a random Master Key (MK).
+ * - MK is encrypted (wrapped) with a KDF derived from PIN + WebAuthn Secret.
+ * - This file manages the active MK and encryption ops.
  */
 
-let _encryptionLock = false;
-let _isEncrypting = false;
+let _activeMasterKey: CryptoKey | null = null;
+// let _encryptionLock = false; // Unused
+
+// We still need to track if we have a key loaded
+let _isKeyLoaded = false;
 
 /**
- * Encrypted storage format:
+ * Storage Format V2:
  * {
- *   version: number,        // Storage version (for migration)
- *   encrypted: string,      // Base64-encoded encrypted JSON
- *   salt: string,           // Base64-encoded salt for key derivation
- *   iv: string,             // Base64-encoded initialization vector
- *   tag: string             // Base64-encoded authentication tag
+ *   version: 2,
+ *   encrypted: string (base64 ciphertext),
+ *   iv: string (base64 iv),
+ *   tag: string (base64 tag),
+ *   salt: string (base64 salt - used for diversification if needed, or strictly random)
  * }
  */
 
 /**
- * Key cache: Maps (passphrase, salt) -> CryptoKey
- * Salt is converted to base64 string for use as map key
+ * Set the Master Key for the current session.
+ * Called after unwrapping the key during login/unlock.
  */
-const keyCache = new Map<string, CryptoKey>();
+export function setMasterKey(key: CryptoKey | null) {
+  _activeMasterKey = key;
+  _isKeyLoaded = !!key;
+  if (!key) {
+    logger.debug('[SecureStorage] Master Key cleared');
+  } else {
+    logger.debug('[SecureStorage] Master Key set');
+  }
+}
 
-/**
- * Generate cache key from passphrase and salt
- */
-function getCacheKey(passphrase: string, salt: Uint8Array): string {
-  const saltBase64 = btoa(String.fromCharCode(...salt));
-  return `${passphrase}:${saltBase64}`;
+export function getMasterKey(): CryptoKey | null {
+  return _activeMasterKey;
 }
 
 /**
- * Derive encryption key from passphrase using PBKDF2
- * Uses cached key if available to avoid expensive PBKDF2 re-computation
- * @param passphrase User PIN/passphrase
- * @param salt Salt for key derivation
- * @returns Encryption key (32 bytes for AES-256)
+ * Generate a new random Master Key (AES-GCM 256)
  */
-async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
-  const cacheKey = getCacheKey(passphrase, salt);
+export async function generateMasterKey(): Promise<CryptoKey> {
+  return await crypto.subtle.generateKey(
+    {
+      name: 'AES-GCM',
+      length: 256,
+    },
+    true, // Extractable (must be able to wrap it)
+    ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey']
+  );
+}
 
-  // Check cache first
-  const cached = keyCache.get(cacheKey);
-  if (cached) {
-    return cached;
+/**
+ * Encrypt data using the currently loaded Master Key (Version 2)
+ */
+export async function encryptData(data: string, _legacyPassphraseIgnored?: string): Promise<string> {
+  if (!_activeMasterKey) {
+    throw new Error('Master Key not loaded - cannot encrypt');
   }
 
-  // Derive new key
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(passphrase),
-    'PBKDF2',
-    false,
-    ['deriveBits', 'deriveKey'],
-  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
 
-  const key = await crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 600000, // High iteration count to prevent fast offline brute-force attacks on 6-digit PINs.
-      // At 600k iterations, each PIN guess takes ~500ms-1s on average hardware,
-      // making a full search of 1,000,000 possible combinations take several days of constant CPU work.
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  );
-
-  // Cache the key for future use
-  keyCache.set(cacheKey, key);
-  return key;
-}
-
-/**
- * Encrypt data using AES-GCM
- * @param data Plaintext data to encrypt
- * @param passphrase User PIN/passphrase
- * @returns Encrypted storage object
- */
-export async function encryptData(data: string, passphrase: string): Promise<string> {
-  // Generate random salt and IV
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv = crypto.getRandomValues(new Uint8Array(12)); // 12 bytes for GCM
-
-  // Derive encryption key
-  const key = await deriveKey(passphrase, salt);
-
-  // Encrypt data
   const encoder = new TextEncoder();
   const encrypted = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
       iv: iv,
     },
-    key,
-    encoder.encode(data),
+    _activeMasterKey,
+    encoder.encode(data)
   );
 
-  // Convert to Uint8Array
-  // Note: crypto.subtle.encrypt with AES-GCM returns ciphertext + 16-byte tag (already combined)
   const encryptedArray = new Uint8Array(encrypted);
+  // Separate tag (last 16 bytes)
+  const ciphertext = encryptedArray.slice(0, -16);
+  const tag = encryptedArray.slice(-16);
 
-  // Separate ciphertext from authentication tag
-  // The last 16 bytes are the GCM authentication tag
-  const ciphertext = encryptedArray.slice(0, -16); // All bytes except last 16
-  const tag = encryptedArray.slice(-16); // Last 16 bytes (authentication tag)
-
-  // Convert to base64 for storage
-  // Use chunked conversion to avoid stack overflow with large arrays
   const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
-    let binary = '';
-    const len = bytes.byteLength;
-    const CHUNK_SIZE = 0x8000; // 32KB chunks
-    for (let i = 0; i < len; i += CHUNK_SIZE) {
-      const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, len));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    return btoa(binary);
+      let binary = '';
+      const len = bytes.byteLength;
+      const CHUNK_SIZE = 0x8000;
+      for (let i = 0; i < len; i += CHUNK_SIZE) {
+        const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, len));
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      return btoa(binary);
+    };
+
+  const obj = {
+    version: 2,
+    encrypted: uint8ArrayToBase64(ciphertext),
+    iv: btoa(String.fromCharCode(...iv)),
+    tag: btoa(String.fromCharCode(...tag)),
+    salt: '', // Not used for key derivation in V2 (Key is constant)
   };
 
-  const ciphertextBase64 = uint8ArrayToBase64(ciphertext);
-  const saltBase64 = btoa(String.fromCharCode(...salt));
-  const ivBase64 = btoa(String.fromCharCode(...iv));
-  const tagBase64 = btoa(String.fromCharCode(...tag));
-
-  // Create storage object
-  // encrypted field contains ONLY the ciphertext (without tag)
-  // tag field contains the 16-byte authentication tag
-  const storageObj = {
-    version: 1,
-    encrypted: ciphertextBase64, // Ciphertext only (tag stored separately)
-    salt: saltBase64,
-    iv: ivBase64,
-    tag: tagBase64, // Authentication tag (16 bytes)
-  };
-
-  return JSON.stringify(storageObj);
+  return JSON.stringify(obj);
 }
 
 /**
- * Decrypt data using AES-GCM
- * @param encryptedData Encrypted storage object (JSON string)
- * @param passphrase User PIN/passphrase
- * @returns Decrypted plaintext data
- * @throws Error if decryption fails (wrong passphrase or corrupted data)
+ * Decrypt data using the Master Key (Strict V2)
  */
-export async function decryptData(encryptedData: string, passphrase: string): Promise<string> {
+export async function decryptData(encryptedData: string, _legacyPassphraseIgnored?: string): Promise<string> {
+  if (!_activeMasterKey) {
+    throw new Error('Master Key not loaded - cannot decrypt');
+  }
+
+  const obj = JSON.parse(encryptedData);
+
+  // STRICT CHECK: Only support Version 2 (Master Key)
+  if (obj.version !== 2) {
+    // We allow a specific error to be caught by the migration logic
+    throw new Error(`Unsupported encryption version: ${obj.version}. Migration required.`);
+  }
+
+  const iv = Uint8Array.from(atob(obj.iv), c => c.charCodeAt(0));
+  const ciphertext = Uint8Array.from(atob(obj.encrypted), c => c.charCodeAt(0));
+  const tag = Uint8Array.from(atob(obj.tag), c => c.charCodeAt(0));
+
+  const encryptedWithTag = new Uint8Array(ciphertext.length + tag.length);
+  encryptedWithTag.set(ciphertext, 0);
+  encryptedWithTag.set(tag, ciphertext.length);
+
   try {
-    const storageObj = JSON.parse(encryptedData);
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+      },
+      _activeMasterKey,
+      encryptedWithTag
+    );
 
-    // Check if it's the encrypted format
-    if (storageObj.version && storageObj.version >= 1) {
-      // New encrypted format
-      const salt = Uint8Array.from(atob(storageObj.salt), (c) => c.charCodeAt(0));
-      const iv = Uint8Array.from(atob(storageObj.iv), (c) => c.charCodeAt(0));
-      // encrypted field contains ONLY the ciphertext (tag is stored separately)
-      const ciphertext = Uint8Array.from(atob(storageObj.encrypted), (c) => c.charCodeAt(0));
-      const tag = Uint8Array.from(atob(storageObj.tag), (c) => c.charCodeAt(0));
-
-      // Derive encryption key
-      const key = await deriveKey(passphrase, salt);
-
-      // Reconstruct the buffer: ciphertext + tag (GCM requires tag to be appended)
-      // The encrypted field contains ciphertext only, tag is stored separately
-      const encryptedWithTag = new Uint8Array(ciphertext.length + tag.length);
-      encryptedWithTag.set(ciphertext, 0); // Set ciphertext at the beginning
-      encryptedWithTag.set(tag, ciphertext.length); // Append tag at the end
-
-      // Decrypt data
-      const decrypted = await crypto.subtle.decrypt(
-        {
-          name: 'AES-GCM',
-          iv: iv,
-        },
-        key,
-        encryptedWithTag,
-      );
-
-      const decoder = new TextDecoder();
-      return decoder.decode(decrypted);
-    } else {
-      // Old unencrypted format (should not happen after migration, but handle gracefully)
-      throw new Error('Old unencrypted format detected - migration required');
-    }
+    return new TextDecoder().decode(decrypted);
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Old unencrypted format')) {
-      throw error;
-    }
-
-    // Log the original error for debugging
-    logger.error('[secureStorage] Decryption error:', error);
-
-    // Clear key cache on decryption failure to prevent stale keys
-    // This ensures fresh keys are derived on retry
-    keyCache.clear();
-
-    // Check if it's a specific crypto error
-    if (error instanceof Error) {
-      // DOMException with specific error names
-      if (error.name === 'OperationError' || error.name === 'InvalidAccessError') {
-        // This usually means wrong passphrase (key derivation succeeds but decryption fails)
-        // or corrupted authentication tag
-        throw new Error('Decryption failed - invalid passphrase or corrupted data');
-      }
-
-      // Check for specific error messages
-      if (error.message.includes('bad decrypt') ||
-          error.message.includes('decryption failed') ||
-          error.message.includes('Unsupported state or unable to authenticate data')) {
-        throw new Error('Decryption failed - invalid passphrase or corrupted data');
-      }
-    }
-
-    // Generic fallback
-    throw new Error('Decryption failed - invalid passphrase or corrupted data');
+    logger.error('Decryption failed', error);
+    throw new Error('Decryption failed - possibly wrong key or corrupted data');
   }
 }
 
+/**
+ * KEY WRAPPING UTILITIES (For System Settings)
+ */
 
 /**
- * SecureStorage - Encrypted localStorage wrapper for Zustand persist
- * Implements StateStorage interface from zustand/middleware
- * Note: Encryption/decryption is async, but Zustand persist expects sync storage
- * So we store encrypted data as-is and handle decryption in migrate function
+ * Derive a Key-Wrapping Key (KWK) from PIN + Hardware Secret
+ * using PBKDF2
  */
-let currentPassphrase: string | null = null;
+async function deriveWrapperKey(pin: string, hardwareSecret: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const pinBuffer = encoder.encode(pin);
 
-/**
- * Set the current passphrase for encryption
- * Must be called before any setItem operations
- * Clears key cache when passphrase changes to ensure security
- */
-export function setPassphrase(passphrase: string | null): void {
-  // Clear cache when passphrase changes to prevent key reuse across sessions
-  if (currentPassphrase !== passphrase) {
-    keyCache.clear();
-  }
-  currentPassphrase = passphrase;
+  // Combine PIN and Hardware Secret
+  const combinedMaterial = new Uint8Array(pinBuffer.length + hardwareSecret.length);
+  combinedMaterial.set(pinBuffer, 0);
+  combinedMaterial.set(hardwareSecret, pinBuffer.length);
+
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    combinedMaterial,
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  // Use a fixed salt for the wrapper key (we rely on the hardware secret for entropy)
+  // Or we could store a salt too. Let's use a static salt for simplicity + hardware strength.
+  const salt = encoder.encode('nahan-wrapper-salt-v1');
+
+  return await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    baseKey,
+    { name: 'AES-KW', length: 256 }, // AES-KW for wrapping
+    false,
+    ['wrapKey', 'unwrapKey']
+  );
 }
 
 /**
- * Clear the key cache
- * Useful when decryption fails to ensure fresh keys are derived on retry
+ * Wrap the Master Key for storage
  */
-export function clearKeyCache(): void {
-  keyCache.clear();
+export async function wrapMasterKey(
+  masterKey: CryptoKey,
+  pin: string,
+  hardwareSecret: Uint8Array
+): Promise<string> {
+  const wrapperKey = await deriveWrapperKey(pin, hardwareSecret);
+
+  const wrappedIndex = await crypto.subtle.wrapKey(
+    'raw',
+    masterKey,
+    wrapperKey,
+    'AES-KW'
+  );
+
+  return btoa(String.fromCharCode(...new Uint8Array(wrappedIndex)));
 }
 
 /**
- * Get the current passphrase
+ * Unwrap the Master Key from storage
  */
-export function getPassphrase(): string | null {
-  return currentPassphrase;
+export async function unwrapMasterKey(
+  wrappedKeyBase64: string,
+  pin: string,
+  hardwareSecret: Uint8Array
+): Promise<CryptoKey> {
+  const wrapperKey = await deriveWrapperKey(pin, hardwareSecret);
+  const wrappedKey = Uint8Array.from(atob(wrappedKeyBase64), c => c.charCodeAt(0));
+
+  return await crypto.subtle.unwrapKey(
+    'raw',
+    wrappedKey,
+    wrapperKey,
+    'AES-KW',
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey']
+  );
 }
 
-/**
- * Synchronous storage wrapper for Zustand persist
- * CRITICAL: Never stores plaintext - zero-fallback policy
- * Strategy:
- * - getItem: Returns encrypted string as-is (decryption happens in migrate)
- * - setItem: Returns early if no passphrase (NEVER stores plaintext)
- * - Uses synchronous lock to prevent race conditions during unlock-then-save flow
- */
+// --------------------------------------------------------------------------
+// LEGACY HELPERS (TEMPORARY FOR MIGRATION)
+// --------------------------------------------------------------------------
 
+/**
+ * Legacy V1 Decryption (PIN only)
+ * Kept strictly for the one-time migration process.
+ */
+export async function decryptLegacyData(encryptedData: string, passphrase: string): Promise<string> {
+   // Copy of the old derived key logic
+   const deriveLegacyKey = async (passphrase: string, salt: Uint8Array) => {
+      const encoder = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(passphrase),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      );
+      return await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+   };
+
+   try {
+     const obj = JSON.parse(encryptedData);
+     // If it's already V2, this function fails (intended)
+     if (obj.version && obj.version !== 1) throw new Error('Not V1 data');
+
+     const salt = Uint8Array.from(atob(obj.salt), c => c.charCodeAt(0));
+     const iv = Uint8Array.from(atob(obj.iv), c => c.charCodeAt(0));
+     const ciphertext = Uint8Array.from(atob(obj.encrypted), c => c.charCodeAt(0));
+     const tag = Uint8Array.from(atob(obj.tag), c => c.charCodeAt(0));
+
+     const key = await deriveLegacyKey(passphrase, salt);
+
+     const combined = new Uint8Array(ciphertext.length + tag.length);
+     combined.set(ciphertext, 0);
+     combined.set(tag, ciphertext.length);
+
+     const decrypted = await crypto.subtle.decrypt(
+       { name: 'AES-GCM', iv },
+       key,
+       combined
+     );
+
+     return new TextDecoder().decode(decrypted);
+   } catch (_e) {
+     throw new Error('Legacy decryption failed');
+   }
+}
+
+// --------------------------------------------------------------------------
+// ZUSTAND WRAPPER
+// --------------------------------------------------------------------------
 
 export const secureStorage = {
   getItem: (name: string): string | null => {
-    try {
-      const raw = localStorage.getItem(name);
-      if (!raw) return null;
-
-      // Check if this is an encryption marker (temporary placeholder during async encryption)
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed._nahan_encrypting === true) {
-          const markerAge = Date.now() - (parsed._timestamp || 0);
-          // If marker is recent (< 100ms), encryption is likely in progress - return null to prevent reading incomplete data
-          // If marker is old (> 1000ms), encryption likely failed - return null to prevent reading stale marker
-          if (markerAge < 100 || markerAge > 1000) {
-            logger.warn('SecureStorage: Detected encryption marker - encryption may be in progress or failed');
-            return null;
-          }
-          // Marker is between 100ms and 1000ms old - encryption should have completed, but return null to be safe
-          return null;
-        }
-      } catch {
-        // Not a marker - proceed with normal handling
-      }
-
-      // Return raw data (encrypted or unencrypted) - decryption happens in migrate
-      return raw;
-    } catch (error) {
-      logger.error('SecureStorage getItem failed:', error);
-      return null;
-    }
+    return localStorage.getItem(name);
   },
 
   setItem: (name: string, value: string): void => {
-    // CRITICAL SECURITY: Zero-plaintext policy
-    // NEVER store sensitive data without encryption
-    const passphrase = getPassphrase();
-
-    // Strict No-Fallback: If no passphrase, return immediately
-    // NEVER write plaintext to localStorage
-    if (!passphrase) {
-      // Debug log only - this is expected during normal boot-up when app is locked
-      logger.debug('SecureStorage: Save aborted - no passphrase available');
+    if (!_activeMasterKey) {
+      logger.debug('SecureStorage: Save aborted - Master Key not loaded');
       return;
     }
 
-    // Check if value is already encrypted (safety check)
     try {
       const parsed = JSON.parse(value);
-      if (parsed.version && parsed.version >= 1 && parsed.encrypted && parsed.salt && parsed.iv && parsed.tag) {
-        // Already encrypted - store directly
+      if (parsed.version === 2) {
         localStorage.setItem(name, value);
         return;
       }
     } catch {
-      // Not encrypted format - must encrypt before storing
+      // Not encrypted
     }
 
-    // Set lock to prevent concurrent writes
-    _encryptionLock = true;
-    _isEncrypting = true;
-
-    // Store a temporary marker BEFORE encryption starts
-    // This marker will be replaced by encrypted data once encryption completes
-    // Note: There's a race condition if page refreshes before encryption completes
-    // We handle this in getItem by detecting stale markers
-    const markerTimestamp = Date.now();
-    const encryptionMarker = JSON.stringify({
-      _nahan_encrypting: true,
-      _timestamp: markerTimestamp,
-      _hash: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+    // Encrypt async but storage system expects sync - similar issues as before
+    // But since we are V2 strict, we can assume the UI blocks until keys are ready
+    encryptData(value).then(encrypted => {
+       localStorage.setItem(name, encrypted);
     });
-    localStorage.setItem(name, encryptionMarker);
-
-    // Encrypt the data asynchronously
-    // IMPORTANT: This is async, but Zustand persist expects sync storage
-    // The marker above prevents reading incomplete data, but there's still a race condition
-    // if the page refreshes before encryption completes (marker will be lost)
-    encryptData(value, passphrase)
-      .then((encrypted) => {
-        // Store ONLY encrypted data (replaces the marker)
-        localStorage.setItem(name, encrypted);
-      })
-      .catch((err) => {
-        logger.error('Failed to encrypt storage:', err);
-        // Remove the marker if encryption fails (prevent reading stale marker)
-        localStorage.removeItem(name);
-      });
   },
 
   removeItem: (name: string): void => {
@@ -366,4 +324,12 @@ export const secureStorage = {
   },
 };
 
+// Re-export specific functions for direct usage
+export function setPassphrase(_p: string | null) {
+  // Legacy compatibility: Does nothing in V2 mode as we use setMasterKey
+  // But we might want to warn if used
+}
 
+export function clearKeyCache() {
+  setMasterKey(null);
+}

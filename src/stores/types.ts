@@ -6,7 +6,8 @@ export interface AuthSlice {
   isLoading: boolean;
   sessionPassphrase: string | null; // In-memory only
   initializeApp: () => Promise<void>;
-  addIdentity: (identity: Identity) => Promise<void>;
+  addIdentity: (identity: Identity) => Promise<void>; // @deprecated Use registerAccount
+  registerAccount: (name: string, email: string, pin: string) => Promise<void>;
   wipeData: () => Promise<void>;
   unlockApp: (pin: string) => Promise<boolean>;
   lockApp: () => void;

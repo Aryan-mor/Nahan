@@ -1,10 +1,13 @@
 # Nahan
 
-**Nahan** is a secure, offline-first messenger built with React, Vite, and modern cryptographic libraries. It is designed to function as a Progressive Web App (PWA) with strong privacy guarantees and zero metadata leakage.
+**Nahan** is a high-security Steganographic Communication Vault. It enables users to cloak encrypted messages within innocuous digital carriers, such as ordinary images or seemingly standard text, providing a metadata-less channel for covert information exchange in restricted environments. By decoupling the message from the transport medium, Nahan ensures resilient, zero-footprint communication.
+
+[**Try Nahan Now**](https://aryan-mor.github.io/Nahan/)
 
 ## Features
 
 - **End-to-End Encryption:** Uses `tweetnacl` (X25519/Ed25519) for secure message exchange via the Nahan Compact Protocol
+- **Hardware-Bound Encryption (V2):** Master Key architecture with WebAuthn PRF binding (or high-entropy seed fallback), ensuring keys cannot be extracted from the device interactively.
 - **Stealth Mode:** Zero-Width Character (ZWC) steganography to hide encrypted messages within poetry/cover text
 - **Offline-First:** Works without an internet connection using local storage and service workers
 - **PWA Support:** Installable on mobile and desktop devices

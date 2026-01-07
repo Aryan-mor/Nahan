@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import {} from '@heroui/react';
+import { } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,9 +24,10 @@ export function LockScreen() {
   const instanceId = useRef(Math.random().toString(36).substring(7));
 
   useEffect(() => {
-    logger.debug(`[LockScreen:${instanceId.current}] Mounted`);
+    const id = instanceId.current;
+    logger.debug(`[LockScreen:${id}] Mounted`);
     return () => {
-      logger.debug(`[LockScreen:${instanceId.current}] Unmounting`);
+      logger.debug(`[LockScreen:${id}] Unmounting`);
       isMounted.current = false;
     };
   }, []);

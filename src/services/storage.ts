@@ -14,6 +14,7 @@ export interface Identity {
   fingerprint: string;
   createdAt: Date;
   lastUsed: Date;
+  security_version?: number; // 1 = PIN only, 2 = MasterKey + HW Binding
 }
 
 export interface Contact {
@@ -54,6 +55,7 @@ interface VaultEntry {
 
 interface NahanDB {
   secure_vault: VaultEntry;
+  system_settings: unknown; // Flexible store for settings
 }
 
 /**
@@ -69,7 +71,7 @@ export class StorageService {
   private static instance: StorageService;
   private db: IDBPDatabase<NahanDB> | null = null;
   private readonly DB_NAME = 'nahan_secure_v1';
-  private readonly DB_VERSION = 2; // Increment to trigger migration
+  private readonly DB_VERSION = 3; // Increment to trigger migration for system_settings
 
   private constructor() {}
 
@@ -86,7 +88,7 @@ export class StorageService {
   async initialize(): Promise<void> {
     try {
       this.db = (await openDB<NahanDB>(this.DB_NAME, this.DB_VERSION, {
-        async upgrade(db, oldVersion) {
+        upgrade(db, oldVersion) {
           // Delete all old tables (migration to vault)
           if (oldVersion < 2) {
             // Delete old tables if they exist
@@ -105,12 +107,35 @@ export class StorageService {
           if (!db.objectStoreNames.contains('secure_vault')) {
             db.createObjectStore('secure_vault', { keyPath: 'id' });
           }
+
+          // Version 3: System Settings (Unencrypted/Less sensitive metadata for Bootstrapping)
+          if (oldVersion < 3) {
+            if (!db.objectStoreNames.contains('system_settings')) {
+              db.createObjectStore('system_settings');
+            }
+          }
         },
       })) as IDBPDatabase<NahanDB>;
     } catch (error) {
       logger.error('Failed to initialize database:', error);
       throw new Error('Failed to initialize storage');
     }
+  }
+
+  /**
+   * Get a system setting (unencrypted)
+   */
+  async getSystemSetting<T>(key: string): Promise<T | undefined> {
+    if (!this.db) await this.initialize();
+    return this.db?.get('system_settings', key);
+  }
+
+  /**
+   * Set a system setting (unencrypted)
+   */
+  async setSystemSetting(key: string, value: unknown): Promise<void> {
+    if (!this.db) await this.initialize();
+    await this.db?.put('system_settings', value, key);
   }
 
   /**
@@ -671,6 +696,78 @@ export class StorageService {
       throw new Error('Failed to clear messages');
     }
   }
+
+  /**
+   * MIGRATION V1 -> V2
+   * Decrypts V1 Identity/Contacts using PIN (Legacy)
+   * Clears (Purges) all Messages
+   * Re-encrypts Identity/Contacts using currently loaded Master Key (V2)
+   */
+  async migrateV1ToV2(pin: string): Promise<boolean> {
+    if (!this.db) await this.initialize();
+    if (!this.db) return false;
+
+    // Importing legacy helper dynamically to avoid circular dependencies if possible,
+    // or we assume it's available via import.
+    // We already imported decryptData, let's assume we can import decryptLegacyData too.
+    const { decryptLegacyData } = await import('./secureStorage');
+
+    try {
+       // 1. Fetch Raw Identity & Contacts
+       // We can't use getIdentity() because it uses decryptData (V2 strict).
+       // We must fetch the Valid Entry directly.
+       const identityEntry = await this.db.get('secure_vault', ID_PREFIX.IDENTITY);
+       const contactEntries = await this.getAllRawWithPrefix(ID_PREFIX.CONTACT);
+
+       if (!identityEntry) return false;
+
+       // 2. Decrypt Legacy Data
+       const identityJson = await decryptLegacyData(identityEntry.payload, pin);
+       const identity = JSON.parse(identityJson) as Identity;
+
+       const contacts: Contact[] = [];
+       for (const entry of contactEntries) {
+         try {
+           const contactJson = await decryptLegacyData(entry.payload, pin);
+           contacts.push(JSON.parse(contactJson));
+         } catch (_e) {
+           // Skip bad contact
+         }
+       }
+
+       // 3. Purge Messages
+       await this.clearAllMessages();
+
+       // 4. Update Data Version
+       identity.security_version = 2;
+
+       // 5. Re-Store (This will use the currently set Master Key in secureStorage)
+       // ID_PREFIX.IDENTITY
+       await this.storeInVault(ID_PREFIX.IDENTITY, identity, 'IGNORED_PIN');
+
+       for (const contact of contacts) {
+         await this.storeInVault(contact.id, contact, 'IGNORED_PIN');
+       }
+
+       logger.log('[Storage] Migration V1->V2 Complete. Messages purged. Identity re-encrypted.');
+       return true;
+
+    } catch (error) {
+      logger.error('Migration failed', error);
+      return false;
+    }
+  }
+
+  // Helper to get raw entries without decryption
+  private async getAllRawWithPrefix(prefix: string): Promise<VaultEntry[]> {
+    if (!this.db) return [];
+
+    // We can use a range or filter.
+    const all = await this.db.getAll('secure_vault');
+    return all.filter(e => e.id.startsWith(prefix));
+  }
+
+
 
   /**
    * Close the database connection

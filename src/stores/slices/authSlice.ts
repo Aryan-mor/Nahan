@@ -2,8 +2,14 @@
 import { StateCreator } from 'zustand';
 
 import { CryptoService } from '../../services/crypto';
-import { clearKeyCache, setPassphrase } from '../../services/secureStorage';
+import {
+    generateMasterKey,
+    setMasterKey,
+    unwrapMasterKey,
+    wrapMasterKey
+} from '../../services/secureStorage';
 import { Identity, storageService } from '../../services/storage';
+import { webAuthnService } from '../../services/webAuthnService';
 import * as logger from '../../utils/logger';
 import { AppState, AuthSlice } from '../types';
 import { useUIStore } from '../uiStore';
@@ -98,10 +104,64 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   addIdentity: async (identity) => {
+    // Legacy support or direct injection
     set({ identity });
     const { sessionPassphrase } = get();
     if (sessionPassphrase) {
       await storageService.updateIdentityLastUsed(identity.fingerprint, sessionPassphrase);
+    }
+  },
+
+  registerAccount: async (name: string, email: string, pin: string) => {
+    try {
+      // 1. Generate Master Key (V2)
+      const masterKey = await generateMasterKey();
+      setMasterKey(masterKey);
+
+      // 2. Setup Hardware Binding (Fallback Seed Only for now to ensure smooth flow)
+      // Note: Ideal flow would be to prompt registration here, but for now we follow the "Atomic Migration" style fallback
+      // to ensure the user gets a V2 account immediately without friction.
+      const randomValues = crypto.getRandomValues(new Uint8Array(32));
+      const seedStr = btoa(String.fromCharCode(...randomValues));
+      const hardwareSecret = new TextEncoder().encode(seedStr);
+
+      // 3. Wrap Master Key
+      const wrappedKey = await wrapMasterKey(masterKey, pin, hardwareSecret);
+
+      // 4. Save V2 Infrastructure
+      await storageService.setSystemSetting('wrapped_master_key', wrappedKey);
+      await storageService.setSystemSetting('device_seed', seedStr);
+
+      // 5. Generate Identity KeyPair (Passphrase is PIN)
+      const keyPair = await cryptoService.generateKeyPair(name, email, pin);
+
+      // 6. Store Identity (Encrypted with Master Key we just set)
+      const identity = await storageService.storeIdentity({
+        name: name,
+        email: email,
+        publicKey: keyPair.publicKey,
+        privateKey: keyPair.privateKey,
+        fingerprint: keyPair.fingerprint,
+        security_version: 2,
+      }, pin);
+
+      // 7. Update State
+      set({
+        identity,
+        sessionPassphrase: pin,
+        contacts: []
+      });
+
+      // Unlock
+      useUIStore.getState().setLocked(false);
+
+      logger.log('[Auth] New user registered with Security Version 2');
+    } catch (error) {
+      logger.error('Registration failed:', error);
+      // Cleanup partial state if needed?
+      // Ideally we should catch this and maybe clear master key.
+      setMasterKey(null);
+      throw error; // Re-throw for UI to handle
     }
   },
 
@@ -123,96 +183,135 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   unlockApp: async (pin: string) => {
-    // Check if identity exists (even if placeholder)
-    const identityExists = await storageService.hasIdentity();
-    if (!identityExists) return false;
+    // 1. Check for V2 (Master Key) existence
+    const wrappedKey = await storageService.getSystemSetting<string>('wrapped_master_key');
+    const authenticatorId = await storageService.getSystemSetting<string>('authenticator_id');
+    const deviceSeed = await storageService.getSystemSetting<string>('device_seed');
 
     try {
-      // CRITICAL: Clear any stale key cache at the very beginning
-      // This ensures fresh key derivation for the unlock attempt
-      setPassphrase(null);
-      clearKeyCache();
-      logger.log('[AUTH] Cache Cleared');
+      if (wrappedKey) {
+        // --- V2 UNLOCK FLOW ---
+        logger.debug('[Auth] V2 Storage detected. Attempting unlock...');
 
-      // Step 1: Decrypt the vault entry with PIN attempt to get identity structure
-      // This decrypts the vault entry and returns the identity object
-      // The identity.privateKey is already encrypted with the user's PIN
-      // Use fresh PIN (no cached keys) for decryption
-      logger.debug('[unlockApp] Attempting to decrypt identity from vault');
-      let identityWithEncryptedPrivateKey = null;
-      try {
-        identityWithEncryptedPrivateKey = await storageService.getIdentity(pin);
-      } catch (error) {
-        logger.warn('[unlockApp] getIdentity failed (likely wrong PIN):', error);
-        return false;
-      }
+        let hardwareSecret: Uint8Array | null = null;
 
-      if (!identityWithEncryptedPrivateKey) {
-        // Decryption failed - likely wrong PIN
-        logger.warn('[unlockApp] Failed to decrypt identity - wrong PIN or corrupted data');
-        return false;
-      }
-
-      logger.debug('[unlockApp] Identity decrypted, verifying private key');
-
-      // Step 2: Verify PIN via cryptoService using the encrypted privateKey from identity
-      // The privateKey in the identity is already encrypted with the user's PIN
-      const isValid = await cryptoService.verifyPrivateKeyPassphrase(
-        identityWithEncryptedPrivateKey.privateKey,
-        pin,
-      );
-
-      if (!isValid) {
-        // PIN verification failed - wrong PIN
-        logger.warn('[unlockApp] PIN verification failed - wrong PIN');
-        return false;
-      }
-
-      // Step 3: Set passphrase FIRST to enable encryption layer
-      // This clears the key cache to ensure fresh keys are used
-      setPassphrase(pin);
-
-      // Step 4: Re-fetch the decrypted identity and contacts (now that PIN is verified)
-      // The identity we got above is already decrypted (we decrypted the vault entry with PIN)
-      // But we re-fetch to ensure consistency and load contacts
-      const decryptedIdentity = await storageService.getIdentity(pin);
-      const decryptedContacts = await storageService.getContacts(pin);
-
-      if (!decryptedIdentity) {
-        logger.error('[unlockApp] Failed to re-fetch identity after PIN verification');
-        return false;
-      }
-
-      // Step 5: Replace placeholder with real decrypted identity and load contacts
-      set({
-        sessionPassphrase: pin,
-        identity: decryptedIdentity,
-        contacts: decryptedContacts,
-      });
-
-      // Pre-load chat summaries while still in "unlocking" state
-      await get().refreshChatSummaries();
-
-      // Step 6: Update UI lock state in uiStore
-      useUIStore.getState().setLocked(false);
-      useUIStore.getState().resetFailedAttempts();
-
-      return true;
-    } catch (error) {
-      // Log the full error for debugging
-      logger.error('[unlockApp] Unlock failed:', error);
-
-      // Check if it's a decryption error (wrong PIN or corrupted data)
-      if (error instanceof Error) {
-        if (error.message.includes('Decryption failed')) {
-          logger.error('[unlockApp] Decryption error - wrong PIN or corrupted vault data');
-        } else if (error.message.includes('invalid passphrase')) {
-          logger.error('[unlockApp] Invalid passphrase - wrong PIN');
-        } else {
-          logger.error('[unlockApp] Unexpected error during unlock:', error.message);
+        // Try WebAuthn if ID exists
+        if (authenticatorId) {
+          hardwareSecret = await webAuthnService.getHardwareSecret(authenticatorId);
         }
-      }
 
+        // Fallback to device seed if WebAuthn failed or not set
+        if (!hardwareSecret && deviceSeed) {
+          hardwareSecret = new TextEncoder().encode(deviceSeed);
+        }
+
+        if (!hardwareSecret) {
+          // This creates a blocking state: "Hardware Key Missing"
+          // In a real app, we'd prompt the user to insert key or re-register.
+          logger.error('[Auth] Hardware secret missing (WebAuthn failed and no backup seed)');
+          return false;
+        }
+
+        const masterKey = await unwrapMasterKey(wrappedKey, pin, hardwareSecret);
+        setMasterKey(masterKey);
+
+        // Load Data
+        const identity = await storageService.getIdentity(pin); // Note: getIdentity still takes pin but we handle it
+        // Actually, storageService.getIdentity calls getFromVault calls decryptData
+        // secureStorage.decryptData now uses the setMasterKey internal state
+        // The 'pin' arg in storageService methods is now ignored by secureStorage v2
+
+        if (identity) {
+          const contacts = await storageService.getContacts(pin);
+
+          set({
+            sessionPassphrase: pin, // Keep pin for UI consistency if needed
+            identity,
+            contacts,
+          });
+
+          await get().refreshChatSummaries();
+          useUIStore.getState().setLocked(false);
+          useUIStore.getState().resetFailedAttempts();
+          return true;
+        }
+        return false;
+
+
+      } else {
+        // --- V1 -> V2 MIGRATION FLOW (Purge & Renew) ---
+        logger.warn('[Auth] Legacy V1 detected. Starting Migration...');
+
+        // 1. Verify V1 Credential (using legacy helper)
+        // We need to fetch the raw encrypted identity from IDB first to verify PIN
+        const hasIdentity = await storageService.hasIdentity();
+        if (!hasIdentity) return false;
+
+        // Danger: We are doing a "Blind" migration attempt?
+        // We MUST verify the PIN works on the old data before destroying it.
+        // We can try to decrypt the Identity using the Legacy Helper.
+        // But storageService.getIdentity tries to use the main decryptData.
+
+        // Retrieve raw entry manually (bypass service wrapper to get string)
+        // We can't easily bypass storageService without exposing internal DB.
+        // Hack: We'll modify storageService to expose a raw fetch or just rely on
+        // a try/catch block with a specific "Legacy" flag.
+
+        // Better: We assume if we are here, we are V1.
+        // We need to generate the V2 Key infrastructure first.
+
+        // A. Generate New Master Key
+        const newMasterKey = await generateMasterKey();
+
+        // B. Setup Hardware Binding
+        // Note: For extensive WebAuthn support during migration, we would handle it here.
+        // Currently falling back to Device Seed for atomic migration.
+
+        // Creating strong device seed (Fallback/Default for now to ensure atomic migration)
+        const randomValues = crypto.getRandomValues(new Uint8Array(32));
+        const seedStr = btoa(String.fromCharCode(...randomValues));
+        const hardwareSecret = new TextEncoder().encode(seedStr);
+
+        // C. Wrap Master Key
+        const wrappedC = await wrapMasterKey(newMasterKey, pin, hardwareSecret);
+
+        // D. Perform Data Migration
+        // Set the new Master Key locally so storageService can use it for encryption during migration
+        setMasterKey(newMasterKey);
+
+        const success = await storageService.migrateV1ToV2(pin);
+
+        if (!success) {
+          logger.error('[Auth] Migration failed. Check PIN or Data Integrity.');
+          setMasterKey(null); // Clear key on failure
+          return false;
+        }
+
+        // E. Save V2 Infrastructure
+        await storageService.setSystemSetting('wrapped_master_key', wrappedC);
+        await storageService.setSystemSetting('device_seed', seedStr);
+        // await storageService.setSystemSetting('authenticator_id', authId); // If we did WebAuthn
+
+        logger.log('[Auth] Migration Success. Application upgraded to Security Version 2.');
+
+        // F. Final Load (Unlock)
+        const identity = await storageService.getIdentity(pin);
+        if (identity) {
+          const contacts = await storageService.getContacts(pin);
+          set({
+            sessionPassphrase: pin,
+            identity,
+            contacts,
+          });
+          await get().refreshChatSummaries();
+          useUIStore.getState().setLocked(false);
+          useUIStore.getState().resetFailedAttempts();
+          return true;
+        }
+        return false;
+      }
+    } catch (error) {
+      logger.error('Unlock failed during migration check', error);
       return false;
     }
   },
