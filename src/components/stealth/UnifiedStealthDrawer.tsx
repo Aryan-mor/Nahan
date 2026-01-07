@@ -1,24 +1,24 @@
 /* eslint-disable max-lines-per-function, max-lines */
 import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Tab,
-  Tabs,
-  Textarea,
+    Button,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Tab,
+    Tabs,
+    Textarea,
 } from '@heroui/react';
 import {
-  AlertTriangle,
-  Copy,
-  Download,
-  Image as ImageIcon,
-  RefreshCw,
-  Shield,
-  Type,
-  Upload,
+    AlertTriangle,
+    Copy,
+    Download,
+    Image as ImageIcon,
+    RefreshCw,
+    Shield,
+    Type,
+    Upload,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -216,6 +216,19 @@ export function UnifiedStealthDrawer() {
     if (!generatedImage) return;
 
     try {
+      // Auto-copy to clipboard first
+      try {
+        const blob = await (await fetch(generatedImage)).blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            [blob.type]: blob,
+          }),
+        ]);
+      } catch (copyError) {
+        logger.error('Failed to auto-copy stealth image:', copyError);
+        // Continue with sending even if copy fails
+      }
+
       // Convert Blob URL to Base64 for persistence and cross-device compatibility
       // This ensures the image data is embedded directly in the message payload
       // and survives page reloads or device transfers.
@@ -234,7 +247,9 @@ export function UnifiedStealthDrawer() {
       // Send empty string as text content so the secret is NOT visible in the chat bubble
       // The secret is hidden inside the image_stego payload
       await sendMessage('', imageToSend, 'image_stego');
-      toast.success(t('stealth.send_success', 'Stealth image sent successfully'));
+
+      // Update toast to reflect both actions
+      toast.success(t('stealth.send_success_copy', 'Sent & Copied to clipboard'));
       setGeneratedImage(null);
       setShowStealthModal(false);
     } catch (error) {

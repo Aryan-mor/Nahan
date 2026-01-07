@@ -18,10 +18,10 @@ const cryptoService = CryptoService.getInstance();
 interface DetectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  type: 'message' | 'id';
+  type: 'message' | 'id' | 'duplicate_message';
   contactName: string;
   contactPublicKey?: string; // For ID type
-  contactFingerprint?: string; // For message type
+  contactFingerprint?: string; // For message types
   encryptedData?: string; // Base64-encoded encrypted message (for message type)
 }
 
@@ -93,6 +93,17 @@ export function DetectionModal({
     }
   };
 
+  const getTitle = () => {
+    switch (type) {
+      case 'id':
+        return t('detection.new_contact');
+      case 'duplicate_message':
+        return t('detection.duplicate_message');
+      default:
+        return t('detection.new_message');
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -118,9 +129,7 @@ export function DetectionModal({
                 ) : (
                   <MessageSquare className="w-5 h-5 text-primary" />
                 )}
-                <span>
-                  {type === 'id' ? t('detection.new_contact') : t('detection.new_message')}
-                </span>
+                <span>{getTitle()}</span>
               </div>
             </ModalHeader>
             <ModalBody>
@@ -144,13 +153,15 @@ export function DetectionModal({
                   <>
                     <p className="text-sm text-industrial-300">
                       <Trans
-                        i18nKey="detection.message_found"
+                        i18nKey={type === 'duplicate_message' ? 'detection.duplicate_found' : 'detection.message_found'}
                         values={{ name: contactName }}
                         components={{ b: <strong className="text-industrial-100" /> }}
                       />
                     </p>
                     <div className="bg-industrial-900 rounded-lg p-3 border border-industrial-800">
-                      <p className="text-xs text-industrial-400">{t('detection.message_info')}</p>
+                      <p className="text-xs text-industrial-400">
+                        {type === 'duplicate_message' ? t('detection.duplicate_info') : t('detection.message_info')}
+                      </p>
                     </div>
                   </>
                 )}

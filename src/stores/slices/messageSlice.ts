@@ -2,15 +2,20 @@
 import { StateCreator } from 'zustand';
 
 import { CryptoService } from '../../services/crypto';
-import { storageService, SecureMessage } from '../../services/storage';
+import { SecureMessage, storageService } from '../../services/storage';
 import * as logger from '../../utils/logger';
 import { AppState, MessageSlice } from '../types';
 
 const cryptoService = CryptoService.getInstance();
+const MAX_MESSAGES_IN_MEMORY = 50;
 
 export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = (set, get) => ({
   activeChat: null,
-  messages: [],
+  // Normalized state structure
+  messages: {
+    ids: [],
+    entities: {}
+  },
   chatSummaries: {},
   messageInput: '',
   lastStorageUpdate: Date.now(),
@@ -23,19 +28,36 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         throw new Error('SecureStorage: Missing key');
       }
 
-      // Handle broadcast contact
-      if (contact.id === 'system_broadcast') {
-        // Fetch messages using fixed fingerprint 'BROADCAST'
-        const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
-        set({ messages });
-      } else {
-        // Load messages for regular contact
-        const messages = await storageService.getMessagesByFingerprint(contact.fingerprint, sessionPassphrase);
-        set({ messages });
+      const fingerprint = contact.id === 'system_broadcast' ? 'BROADCAST' : contact.fingerprint;
+
+      // Use new paginated fetch with limit
+      // We pass limit + 1 just to know if there are more, but for now let's stick to strict 50
+      const messages = await storageService.getMessagesPaginated(
+        fingerprint,
+        sessionPassphrase,
+        MAX_MESSAGES_IN_MEMORY
+      );
+
+      // Normalize
+      const ids: string[] = [];
+      const entities: Record<string, SecureMessage> = {};
+
+      messages.forEach(msg => {
+        ids.push(msg.id);
+        entities[msg.id] = msg;
+      });
+
+      set({
+        messages: { ids, entities }
+      });
+
+      if (contact.id !== 'system_broadcast') {
         await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
       }
     } else {
-      set({ messages: [] });
+      set({
+        messages: { ids: [], entities: {} }
+      });
     }
   },
 
@@ -53,7 +75,6 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         if (image) {
           throw new Error('Images cannot be sent in stealth mode yet');
         }
-        // Stealth mode: Encrypt to binary and open modal for user customization
         const encryptedBinary = await cryptoService.encryptMessage(
           text,
           activeChat.publicKey,
@@ -62,7 +83,6 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
           { binary: true }
         ) as Uint8Array;
 
-        // Store pending state and trigger modal
         set({
           pendingStealthBinary: encryptedBinary,
           pendingPlaintext: text,
@@ -72,16 +92,12 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         return '';
       }
 
-      // Standard mode: Encrypt/Sign message
-      // If image is present, create a composite payload
       let payloadToEncrypt = text;
-      
-      // Determine actual message type
       const messageType = type === 'image_stego' ? 'image_stego' : (image ? 'image' : 'text');
-      
+
       if (image) {
         payloadToEncrypt = JSON.stringify({
-          nahan_type: messageType, // Use specific type (image or image_stego)
+          nahan_type: messageType,
           text: text,
           image: image
         });
@@ -91,14 +107,12 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
       const isBroadcast = activeChat.id === 'system_broadcast';
 
       if (isBroadcast) {
-        // Broadcast: Sign only (no encryption for specific recipient)
         encryptedContent = await cryptoService.signMessage(
           payloadToEncrypt,
           identity.privateKey,
           sessionPassphrase
         ) as string;
       } else {
-        // Private Chat: Encrypt for recipient
         if (!activeChat.publicKey) {
           throw new Error('Missing recipient public key');
         }
@@ -112,8 +126,6 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
       const isOffline = !navigator.onLine;
 
-      // Store message
-      // For Broadcast, recipient is 'BROADCAST'
       const newMessage = await storageService.storeMessage({
         senderFingerprint: identity.fingerprint,
         recipientFingerprint: isBroadcast ? 'BROADCAST' : activeChat.fingerprint,
@@ -128,13 +140,31 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         status: isOffline ? 'pending' : 'sent',
       }, sessionPassphrase);
 
-      // Update lastStorageUpdate to trigger UI reactivity
       const now = Date.now();
-      set((state) => ({
-        messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
-        messageInput: '', // Clear input after successful standard send
-        lastStorageUpdate: now,
-      }));
+
+      set((state) => {
+        const currentIds = state.messages.ids;
+        const currentEntities = state.messages.entities;
+
+        // Prepend new ID
+        const newIds = [newMessage.id, ...currentIds];
+        const newEntities = { ...currentEntities, [newMessage.id]: newMessage };
+
+        // Prune if > 50
+        if (newIds.length > MAX_MESSAGES_IN_MEMORY) {
+          const removedId = newIds.pop(); // Remove oldest (last in array)
+          if (removedId) {
+            delete newEntities[removedId];
+            // Here we would also trigger URL.revokeObjectURL if we had reference counting
+          }
+        }
+
+        return {
+          messages: { ids: newIds, entities: newEntities },
+          messageInput: '',
+          lastStorageUpdate: now,
+        };
+      });
 
       return encryptedContent;
     } catch (error) {
@@ -146,9 +176,15 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
   deleteMessage: async (id) => {
     try {
       await storageService.deleteMessage(id);
-      set((state) => ({
-        messages: state.messages.filter((m) => m.id !== id),
-      }));
+      set((state) => {
+        const newIds = state.messages.ids.filter((msgId) => msgId !== id);
+        const newEntities = { ...state.messages.entities };
+        delete newEntities[id];
+
+        return {
+          messages: { ids: newIds, entities: newEntities }
+        };
+      });
     } catch (error) {
       logger.error('Failed to delete message:', error);
       throw error;
@@ -162,13 +198,13 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
     }
 
     try {
-      // Delete all messages for this contact from storage
       await storageService.deleteMessagesByFingerprint(fingerprint, sessionPassphrase);
 
-      // Clear messages from state if this is the active chat
       const { activeChat } = get();
       if (activeChat && activeChat.fingerprint === fingerprint) {
-        set({ messages: [] });
+        set({
+          messages: { ids: [], entities: {} }
+        });
       }
     } catch (error) {
       logger.error('Failed to clear chat history:', error);
@@ -179,8 +215,23 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
   refreshMessages: async () => {
     const { activeChat, sessionPassphrase } = get();
     if (activeChat && sessionPassphrase) {
-      const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint, sessionPassphrase);
-      set({ messages });
+      const fingerprint = activeChat.id === 'system_broadcast' ? 'BROADCAST' : activeChat.fingerprint;
+      const messages = await storageService.getMessagesPaginated(
+        fingerprint,
+        sessionPassphrase,
+        MAX_MESSAGES_IN_MEMORY
+      );
+
+      const ids: string[] = [];
+      const entities: Record<string, SecureMessage> = {};
+      messages.forEach(msg => {
+        ids.push(msg.id);
+        entities[msg.id] = msg;
+      });
+
+      set({
+        messages: { ids, entities }
+      });
     }
   },
 
@@ -198,10 +249,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
     const broadcastContact = allContacts.find((c) => c.fingerprint === 'BROADCAST');
     if (broadcastContact) {
-      const broadcastMessages = await storageService.getMessagesByFingerprint(
-        'BROADCAST',
-        sessionPassphrase,
-      );
+      const broadcastMessages = await storageService.getMessagesPaginated('BROADCAST', sessionPassphrase, 1);
       const latestBroadcast = broadcastMessages.length > 0 ? broadcastMessages[0] : undefined;
       map['BROADCAST'] = latestBroadcast;
     }
@@ -210,7 +258,6 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
   },
 
   processPendingMessages: async () => {
-    // Ensure database is initialized before accessing it
     try {
       await storageService.initialize();
     } catch (error) {
@@ -230,16 +277,20 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
       await storageService.updateMessageStatus(msg.id, 'sent', sessionPassphrase);
     }
 
+    // Refresh current view if active
     const { activeChat } = get();
     if (activeChat) {
-         const messages = await storageService.getMessagesByFingerprint(activeChat.fingerprint, sessionPassphrase);
-         set({ messages });
+         // Re-fetch using refreshMessages to maintain consistency
+         const { refreshMessages } = get();
+         await refreshMessages();
     }
     return pending.length;
   },
 
   clearAllMessages: async () => {
     await storageService.clearAllMessages();
-    set({ messages: [] });
+    set({
+      messages: { ids: [], entities: {} }
+    });
   },
 });

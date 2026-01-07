@@ -1,9 +1,7 @@
 /* eslint-disable max-lines-per-function, no-useless-catch, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
-import { ImageSteganographyService } from './steganography';
-import { storageService } from './storage';
-import { Contact } from './storage';
-import { Identity } from './storage';
 import * as logger from '../utils/logger';
+import { ImageSteganographyService } from './steganography';
+import { Contact, Identity, storageService } from './storage';
 
 export interface ProcessingContext {
   identity: Identity | null;
@@ -123,7 +121,7 @@ export async function processStegoImage(
     // But for "not a stego image", we usually just return null or let caller handle
     // However, if it IS a stego image but decode failed (wrong key?), that's different.
     // stegoService.decode throws if it can't find a sender or decode fails.
-    
+
     // We'll let the caller decide what to do with errors, but for "unified" analysis,
     // we often treat "decode failed" as "not a message" and move on.
     throw error;
@@ -172,15 +170,15 @@ export async function analyzeClipboard(
             // unless we want to propagate error?
             // For unified detector, we usually ignore non-stego images.
           }
-          
+
           // If we are here, image was found but not processed as message.
           // We return the hash so we don't re-check this image.
-          // But we continue to check text? 
-          // Usually if there is an image, we don't check text? 
+          // But we continue to check text?
+          // Usually if there is an image, we don't check text?
           // Browser clipboard usually has one or the other as "primary".
           // If we have an image, we probably stop.
           // return { processed: null, contentHash: hash };
-          
+
           // Actually, let's fall through to text if image yielded nothing.
           // But we must return the hash so we know we checked this image.
         }
@@ -198,9 +196,30 @@ export async function analyzeClipboard(
           return { processed: null, textContent: text };
       }
 
-      // Propagate logic errors from handleUniversalInput
-      const result = await handleUniversalInput(text, undefined, true);
-      
+      let result;
+      try {
+        result = await handleUniversalInput(text, undefined, true);
+      } catch (error: any) {
+        if (error.message === 'CONTACT_INTRO_DETECTED') {
+          return {
+            processed: {
+              type: 'contact',
+              data: error.keyData,
+              source: 'text',
+            },
+            textContent: text,
+          };
+        }
+
+        // Ensure we stop the loop for these known "soft" errors
+        if (error.message === 'SENDER_UNKNOWN' || error.message === 'DUPLICATE_MESSAGE') {
+           logger.debug(`[ClipboardAnalysis] ${error.message} - suppressing loop`);
+           return { processed: null, textContent: text };
+        }
+
+        throw error;
+      }
+
       let processed: ProcessedResult | null = null;
       if (result && result.type === 'message') {
         processed = {
@@ -224,12 +243,11 @@ export async function analyzeClipboard(
             source: 'text',
           };
       }
-      
+
       return { processed, textContent: text };
     }
   } catch (err) {
     // If it's a permission error, ignore.
-    // If it's a logic error from handleUniversalInput, we want to re-throw it so caller can handle specific cases
     if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
         // ignore
     } else {

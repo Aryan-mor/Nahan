@@ -22,7 +22,10 @@ export interface ContactSlice {
 
 export interface MessageSlice {
   activeChat: Contact | null;
-  messages: SecureMessage[];
+  messages: {
+    ids: string[];
+    entities: Record<string, SecureMessage>;
+  };
   chatSummaries: Record<string, SecureMessage | undefined>;
   messageInput: string;
   lastStorageUpdate: number;

@@ -116,7 +116,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       contacts: [],
       sessionPassphrase: null,
       activeChat: null,
-      messages: [],
+      messages: { ids: [], entities: {} },
     });
     // Reload to ensure clean slate
     window.location.reload();
@@ -146,7 +146,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         logger.warn('[unlockApp] getIdentity failed (likely wrong PIN):', error);
         return false;
       }
-      
+
       if (!identityWithEncryptedPrivateKey) {
         // Decryption failed - likely wrong PIN
         logger.warn('[unlockApp] Failed to decrypt identity - wrong PIN or corrupted data');
@@ -221,7 +221,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     // Update UI state (non-sensitive)
     useUIStore.getState().setLocked(true);
     // Clear sensitive in-memory state
-    set({ sessionPassphrase: null, activeChat: null, messages: [] });
+    set({ sessionPassphrase: null, activeChat: null, messages: { ids: [], entities: {} } });
   },
 
   setSessionPassphrase: (passphrase) => set({ sessionPassphrase: passphrase }),

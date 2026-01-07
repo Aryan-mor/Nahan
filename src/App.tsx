@@ -3,13 +3,13 @@
 import { Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-  Download,
-  FileUser,
-  Lock,
-  MessageSquare,
-  QrCode,
-  Settings as SettingsIcon,
-  Users,
+    Download,
+    FileUser,
+    Lock,
+    MessageSquare,
+    QrCode,
+    Settings as SettingsIcon,
+    Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,9 +31,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-  DetectionResult,
-  useClipboardDetection,
-  useClipboardPermission,
+    DetectionResult,
+    useClipboardDetection,
+    useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -57,7 +57,6 @@ export default function App() {
     showStealthModal,
     setShowStealthModal,
     sessionPassphrase,
-    processIncomingMessage,
     setActiveChat,
   } = useAppStore();
 
@@ -237,19 +236,25 @@ export default function App() {
         const { sessionPassphrase } = useAppStore.getState();
 
         if (sessionPassphrase) {
-          const isDuplicate = await storageService.messageExists(
+          const duplicate = await storageService.findDuplicateMessage(
             result.encryptedData,
             sessionPassphrase,
           );
-          if (isDuplicate) {
-            // Message is a duplicate - silently ignore (no modal, no toast)
-            logger.debug('App: Ignoring duplicate message detection');
+          if (duplicate) {
+            logger.debug('App: Duplicate message found, showing navigation modal');
+            setDetectionResult({
+               ...result,
+               type: 'duplicate_message',
+               // Use stored contact fingerprint if available to ensure correct navigation
+               contactFingerprint: result.contactFingerprint
+            });
+            setShowDetectionModal(true);
             return;
           }
         }
 
-        // Auto-import the message silently (skipNavigation = true)
-        await processIncomingMessage(result.encryptedData, result.contactFingerprint, true);
+        // Message is already imported by the detection service (via handleUniversalInput)
+        // We just need to show the modal
 
         // Show modal for user to decide when to navigate
         setDetectionResult(result);

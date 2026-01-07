@@ -171,24 +171,30 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
         const { activeChat } = get();
         if (skipNavigation && activeChat && activeChat.id === 'system_broadcast') {
-          set((state) => ({
-            messages: [newMessage, ...state.messages],
-          }));
+          set((state) => {
+            const { ids, entities } = state.messages;
+            // Prevent duplicates
+            if (ids.includes(newMessage.id)) return {};
+
+            const newIds = [newMessage.id, ...ids];
+            const newEntities = { ...entities, [newMessage.id]: newMessage };
+            return {
+              messages: { ids: newIds, entities: newEntities }
+            };
+          });
         }
 
         if (!skipNavigation) {
-          set({ activeChat: sender });
-          const messages = await storageService.getMessagesByFingerprint(
-            sender.fingerprint,
-            sessionPassphrase,
-          );
-          set({ messages });
+          await get().setActiveChat(sender);
         } else {
           const { activeChat } = get();
           if (activeChat && activeChat.fingerprint === sender.fingerprint) {
-            set((state) => ({
-              messages: [newMessage, ...state.messages],
-            }));
+            set((state) => {
+               const { ids, entities } = state.messages;
+               const newIds = [newMessage.id, ...ids];
+               const newEntities = { ...entities, [newMessage.id]: newMessage };
+               return { messages: { ids: newIds, entities: newEntities } };
+            });
           }
         }
 
@@ -332,7 +338,7 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
       const recipientFingerprint = identity.fingerprint;
       const storedEncrypted = isZWC ? encryptedText : processedText;
-      
+
       // Parse payload to check for image content
       let finalPlain = typeof result.data === 'string' ? result.data : new TextDecoder().decode(result.data as Uint8Array);
       let finalImage: string | undefined = undefined;
@@ -376,19 +382,37 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
       const { activeChat } = get();
       if (skipNavigation && activeChat && activeChat.fingerprint === sender.fingerprint) {
-        set((state) => ({
-          messages: [newMessage, ...state.messages],
-        }));
+        set((state) => {
+          const { ids, entities } = state.messages;
+          if (ids.includes(newMessage.id)) return {};
+
+          const newIds = [newMessage.id, ...ids];
+          const newEntities = { ...entities, [newMessage.id]: newMessage };
+          return {
+            messages: { ids: newIds, entities: newEntities }
+          };
+        });
       }
 
-      if (!skipNavigation) {
-        set({ activeChat: sender });
-        const messages = await storageService.getMessagesByFingerprint(
-          sender.fingerprint,
-          sessionPassphrase,
-        );
-        set({ messages });
-      }
+        if (!skipNavigation) {
+          await get().setActiveChat(sender);
+        } else {
+          // If we skip navigation but the chat is active, update the view
+          const { activeChat } = get();
+          if (activeChat && activeChat.fingerprint === sender.fingerprint) {
+            set((state) => {
+               const { ids, entities } = state.messages;
+               if (ids.includes(newMessage.id)) return {};
+
+               const newIds = [newMessage.id, ...ids];
+               const newEntities = { ...entities, [newMessage.id]: newMessage };
+
+               return {
+                 messages: { ids: newIds, entities: newEntities }
+               };
+            });
+          }
+        }
 
       return {
         type: 'message' as const,

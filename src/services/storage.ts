@@ -416,7 +416,8 @@ export class StorageService {
     const conversationFingerprint = message.isOutgoing
       ? message.recipientFingerprint
       : message.senderFingerprint;
-    const messageId = `${ID_PREFIX.MESSAGE}${conversationFingerprint}_${crypto.randomUUID()}`;
+    // Use timestamp for time-based sorting (z prefix ensures it sorts AFTER old hex UUIDs)
+    const messageId = `${ID_PREFIX.MESSAGE}${conversationFingerprint}_z${Date.now()}_${crypto.randomUUID()}`;
     const completeMessage: SecureMessage = {
       ...message,
       id: messageId,
@@ -433,20 +434,29 @@ export class StorageService {
    * Used for deduplication to prevent storing the same message multiple times
    */
   async messageExists(encryptedContent: string, passphrase: string): Promise<boolean> {
+    const duplicate = await this.findDuplicateMessage(encryptedContent, passphrase);
+    return !!duplicate;
+  }
+
+  /**
+   * Find a duplicate message by encrypted content
+   */
+  async findDuplicateMessage(encryptedContent: string, passphrase: string): Promise<SecureMessage | null> {
     if (!this.db) {
       await this.initialize();
     }
 
     try {
       // Get all messages from the vault
+      // Note: In a large app, we would want an index on content hash, but for now linear scan of this user's messages is acceptable given local storage limits.
+      // We could optimize by checking only recent messages if we assume chronological paste, but global unique check is safer.
       const allMessages = await this.getAllWithPrefix<SecureMessage>(ID_PREFIX.MESSAGE, passphrase);
 
       // Check if any message has the same encrypted content
-      return allMessages.some((msg) => msg.content.encrypted === encryptedContent);
+      return allMessages.find((msg) => msg.content.encrypted === encryptedContent) || null;
     } catch (error) {
-      logger.error('Failed to check message existence:', error);
-      // On error, return false to allow processing (fail-safe)
-      return false;
+      logger.error('Failed to find duplicate message:', error);
+      return null;
     }
   }
 
@@ -455,58 +465,88 @@ export class StorageService {
    * Uses IndexedDB key ranges for efficient querying without loading entire database
    * CRITICAL: Post-decryption check ensures strict data isolation
    */
-  async getMessagesByFingerprint(fingerprint: string, passphrase: string): Promise<SecureMessage[]> {
+  /**
+   * Get messages by fingerprint with pagination
+   * Uses IndexedDB cursors for efficient querying
+   * @param fingerprint The contact fingerprint
+   * @param limit Max messages to return (default 50)
+   * @param offset Number of messages to skip (for pagination)
+   */
+  async getMessagesPaginated(
+    fingerprint: string,
+    passphrase: string,
+    limit = 50,
+    offset = 0
+  ): Promise<SecureMessage[]> {
     if (!this.db) throw new Error('Database not initialized');
     if (!passphrase) throw new Error('SecureStorage: Missing key');
 
-    // Use key range to fetch only messages for this fingerprint
-    // Message ID format: msg_{fingerprint}_{uuid}
     const prefix = `${ID_PREFIX.MESSAGE}${fingerprint}_`;
     const range = IDBKeyRange.bound(
       prefix,
-      prefix + '\uffff', // Unicode max char to get all keys starting with prefix
-      false, // exclude lower bound
-      false  // exclude upper bound
+      prefix + '\uffff',
+      false,
+      false
     );
 
     const tx = this.db.transaction('secure_vault', 'readonly');
     const store = tx.objectStore('secure_vault');
+    const rawEntries: VaultEntry[] = [];
 
-    // Get all entries in the key range (id is the keyPath, so we can use getAll with range)
-    const entries = await store.getAll(range);
+    // Use cursor moving backwards (prev) to get newest messages first
+    let cursor = await store.openCursor(range, 'prev');
+
+    // Skip offset if needed
+    if (offset > 0 && cursor) {
+      await cursor.advance(offset);
+    }
+
+    // Phase 1: Collect raw encrypted entries (Synchronous relative to transaction)
+    // We fetch 'limit' entries. Validation happens later.
+    while (cursor && rawEntries.length < limit) {
+      if (cursor.value.id.startsWith(prefix)) {
+        rawEntries.push(cursor.value);
+      }
+      cursor = await cursor.continue();
+    }
+
+    // Transaction ends here logically as we stop using it
+
+    // Phase 2: Decrypt and Validate (Async, parallel)
     const results: SecureMessage[] = [];
 
-    for (const entry of entries) {
-      // Verify the entry ID matches our prefix (safety check)
-      if (entry.id.startsWith(prefix)) {
+    // Decrypt all in parallel for performance
+    const decryptedResults = await Promise.all(
+      rawEntries.map(async (entry) => {
         try {
           const decryptedJson = await decryptData(entry.payload, passphrase);
           const parsed = JSON.parse(decryptedJson) as SecureMessage;
-
-          // CRITICAL: Secondary safety check for strict data isolation
-          // This prevents any prefix-overlap leaks (e.g., if fingerprint appears in UUID)
-          // Even if IDB range queries overlap, this guarantees data remains isolated
-          if (parsed.recipientFingerprint !== fingerprint && parsed.senderFingerprint !== fingerprint) {
-            // Message doesn't belong to this conversation - skip it
-            logger.warn(`[SECURITY] Isolated Message for ${fingerprint} - skipping unrelated message`);
-            continue;
-          }
-
-          results.push(this.convertDates(parsed));
+          return { parsed, entryId: entry.id };
         } catch (error) {
-          logger.error('Failed to decrypt message:', entry.id, error);
-          // Skip corrupted entries
+          logger.warn(`[Storage] Failed to decrypt message ${entry.id}:`, error);
+          return null;
         }
+      })
+    );
+
+    // Phase 3: Filter and Format
+    for (const res of decryptedResults) {
+      if (!res) continue;
+
+      const { parsed } = res;
+      // Strict isolation check
+      if (parsed.recipientFingerprint === fingerprint || parsed.senderFingerprint === fingerprint) {
+        results.push(this.convertDates(parsed));
       }
     }
 
-    // Sort by creation date (descending - newest first)
-    const sorted = results.sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
 
-    logger.debug(`[Storage] Fetched ${sorted.length} messages for ${fingerprint} (strictly filtered)`);
-    return sorted;
+
+    // Explicitly sort by createdAt descending (Newest first)
+    // This fixes display order even if keys (IDs) were random or unsorted
+    results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return results;
   }
 
   /**
@@ -514,8 +554,9 @@ export class StorageService {
    * Optimized version that uses key ranges to fetch only relevant messages
    */
   async getLastMessage(fingerprint: string, passphrase: string): Promise<SecureMessage | undefined> {
-    const messages = await this.getMessagesByFingerprint(fingerprint, passphrase);
-    return messages.length > 0 ? messages[0] : undefined; // Already sorted descending, first is newest
+    // Fetch only the most recent 1 message
+    const messages = await this.getMessagesPaginated(fingerprint, passphrase, 1);
+    return messages.length > 0 ? messages[0] : undefined;
   }
 
   /**
@@ -531,58 +572,9 @@ export class StorageService {
 
     // Process each fingerprint
     for (const fingerprint of fingerprints) {
-      const prefix = `${ID_PREFIX.MESSAGE}${fingerprint}_`;
-      const range = IDBKeyRange.bound(
-        prefix,
-        prefix + '\uffff',
-        false,
-        false
-      );
-
-      const tx = this.db.transaction('secure_vault', 'readonly');
-      const store = tx.objectStore('secure_vault');
-
-      // Use cursor to iterate through messages for this fingerprint
-      // We'll decrypt and find the most recent one
-      let latestMessage: SecureMessage | undefined;
-      let latestTime = 0;
-
-      const entries = await store.getAll(range);
-
-      // Decrypt entries and find the most recent
-      // CRITICAL: Strict filtering - only process entries that match the exact prefix
-      // This ensures message isolation between different conversations
-      for (const entry of entries) {
-        // Double-check prefix match for security
-        if (!entry.id.startsWith(prefix)) {
-          continue; // Skip entries that don't match the prefix
-        }
-
-        try {
-          const decryptedJson = await decryptData(entry.payload, passphrase);
-          const parsed = JSON.parse(decryptedJson) as SecureMessage;
-
-          // CRITICAL: Verify message belongs to this conversation
-          // For private messages: sender or recipient must match fingerprint
-          // For broadcast messages: recipientFingerprint must be 'BROADCAST' and sender must match
-          const isConversationMessage =
-            parsed.senderFingerprint === fingerprint ||
-            parsed.recipientFingerprint === fingerprint;
-
-          if (isConversationMessage) {
-            const msgTime = new Date(parsed.createdAt).getTime();
-            if (msgTime > latestTime) {
-              latestTime = msgTime;
-              latestMessage = this.convertDates(parsed);
-            }
-          }
-        } catch {
-          // Skip corrupted entries
-          continue;
-        }
-      }
-
-      summaries[fingerprint] = latestMessage;
+      // Use efficient single-fetch
+      const lastMsg = await this.getLastMessage(fingerprint, passphrase);
+      summaries[fingerprint] = lastMsg;
     }
 
     return summaries;
@@ -603,8 +595,10 @@ export class StorageService {
       await this.initialize();
     }
 
-    // Get all messages for this fingerprint
-    const messages = await this.getMessagesByFingerprint(fingerprint, passphrase);
+    // Get ALL messages for this fingerprint to find their IDs
+    // We use a large limit to cover reasonable history. For strict cleanup, cursors are better but this fits the interface.
+    // 10000 is a safe upper bound for mobile/web local storage context usually.
+    const messages = await this.getMessagesPaginated(fingerprint, passphrase, 10000);
 
     // Delete each message from the vault
     for (const message of messages) {

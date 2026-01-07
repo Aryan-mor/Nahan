@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CamouflageService } from '../../services/camouflage';
 import { CryptoService } from '../../services/crypto';
-import { Identity, storageService, Contact } from '../../services/storage';
+import { Contact, Identity, storageService } from '../../services/storage';
 import { useAppStore } from '../appStore';
 
 // Mock storage service
@@ -27,7 +27,7 @@ vi.mock('../../services/storage', async () => {
         ...message,
         createdAt: new Date(),
       })),
-      getMessagesByFingerprint: vi.fn().mockResolvedValue([]),
+      getMessagesPaginated: vi.fn().mockResolvedValue([]),
       messageExists: vi.fn().mockResolvedValue(false),
       hasIdentity: vi.fn().mockResolvedValue(false),
     },
@@ -99,7 +99,7 @@ describe('P2P Message Flow (Version 0x01)', () => {
       contacts: [userBContact],
       sessionPassphrase: userAPassphrase,
       activeChat: userBContact,
-      messages: [],
+      messages: { ids: [], entities: {} },
       messageInput: '',
     });
   });
@@ -216,7 +216,7 @@ describe('P2P Message Flow (Version 0x01)', () => {
       contacts: [userAContact],
       sessionPassphrase: '123456',
       activeChat: null,
-      messages: [],
+      messages: { ids: [], entities: {} },
     });
 
     const userBStore = useAppStore.getState();
@@ -341,7 +341,7 @@ describe('Broadcast Message Flow (Version 0x02)', () => {
       contacts: [userBContact],
       sessionPassphrase: userAPassphrase,
       activeChat: broadcastContact,
-      messages: [],
+      messages: { ids: [], entities: {} },
       messageInput: '',
     });
   });
@@ -453,7 +453,7 @@ describe('Broadcast Message Flow (Version 0x02)', () => {
       contacts: [userAContact],
       sessionPassphrase: '123456',
       activeChat: null,
-      messages: [],
+      messages: { ids: [], entities: {} },
     });
 
     const userBStore = useAppStore.getState();

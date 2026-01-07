@@ -1,25 +1,31 @@
 /* eslint-disable max-lines-per-function, max-lines */
 import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Image, Modal, ModalBody, ModalContent, ModalHeader } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { Copy, Lock, MoreVertical, Trash2, Download, Maximize2, ImageDown } from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
+import { Copy, Download, ImageDown, Lock, Maximize2, MoreVertical, Trash2 } from 'lucide-react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { ImageSteganographyService } from '../services/steganography';
-import * as logger from '../utils/logger';
-import { SecureMessage } from '../services/storage';
+import { workerService } from '../services/workerService';
 import { useAppStore } from '../stores/appStore';
 import { useSteganographyStore } from '../stores/steganographyStore';
+import * as logger from '../utils/logger';
 
 const steganographyService = ImageSteganographyService.getInstance();
 
 interface MessageBubbleProps {
-  message: SecureMessage;
+  id: string;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
-  const { deleteMessage, identity, sessionPassphrase, activeChat } = useAppStore();
+const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
+  // ATOMIC SELECTION: Only selecting the specific message to prevent re-renders of list
+  const message = useAppStore(state => state.messages.entities[id]);
+  const deleteMessage = useAppStore(state => state.deleteMessage);
+  const identity = useAppStore(state => state.identity);
+  const sessionPassphrase = useAppStore(state => state.sessionPassphrase);
+  const activeChat = useAppStore(state => state.activeChat);
+
   const {
     setViewMode,
     setPreviewOpen,
@@ -30,7 +36,6 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     decodingCarrierUrl
   } = useSteganographyStore();
   const { t } = useTranslation();
-  const isOutgoing = message.isOutgoing;
 
   const [decodedSrc, setDecodedSrc] = useState<string | null>(null);
   const [decodedText, setDecodedText] = useState<string | null>(null);
@@ -41,26 +46,83 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const hasImage = message.type === 'image' || !!message.content.image;
-  const imageUrl = message.content.image;
+  // Intersection Observer Ref
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  const isOutgoing = message?.isOutgoing;
+  const hasImage = message?.type === 'image' || !!message?.content.image;
+  const imageUrl = message?.content.image;
   const isDecoding = decodingStatus === 'processing' && decodingCarrierUrl === imageUrl;
 
-  // Auto-decode steganography images for chat view
+  // Intersection Observer for Predictive Loading
+  useEffect(() => {
+    if (!message) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+        if (!entry.isIntersecting) {
+            // OPTIONAL: Cancel ongoing decoding task if user scrolls away fast
+            // But we'll leave it simple for now, relying on worker queue management
+        }
+      },
+      { rootMargin: '150px' } // Pre-load 150px before entering viewport
+    );
+
+    if (bubbleRef.current) {
+      observer.observe(bubbleRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+      // CLEANUP: Revoke object URLs when component unmounts
+      if (decodedSrc) {
+        URL.revokeObjectURL(decodedSrc);
+      }
+    };
+  }, [decodedSrc, message]); // Dependency on decodedSrc to ensure we revoke the *current* on unmount
+
+  // Auto-decode steganography images for chat view ONLY IF VISIBLE
   useEffect(() => {
     let isMounted = true;
-    if (message.type === 'image_stego' && imageUrl && !decodedSrc && !decodedText && !decodeFailed && identity && sessionPassphrase) {
+    const abortController = new AbortController();
+
+    if (message?.type === 'image_stego' && imageUrl && !decodedSrc && !decodedText && !decodeFailed && identity && sessionPassphrase && isVisible) {
       const decode = async () => {
         try {
           const senderKey = isOutgoing ? identity.publicKey : activeChat?.publicKey;
-          // If WE sent the message, we encrypted it for the recipient (activeChat.publicKey).
-          // To decrypt it using OUR private key, we must treat the Recipient's Public Key as the "Peer Key"
-          // because nacl.box uses SharedKey = MyPriv * RecipientPub.
           const decryptionPeerKey = isOutgoing ? activeChat?.publicKey : undefined;
 
-          const response = await fetch(imageUrl);
-          const blob = await response.blob();
-          const file = new File([blob], "carrier.png", { type: "image/png" });
-          
+          // FETCHING: fetch blob from URL (or base64)
+          // Since imageUrl is likely base64 from IDB, we can use it directly?
+          // Actually, imageUrl in store is base64 string.
+          // We need to convert base64 -> Uint8Array via WORKER
+
+          // Convert Base64 to Binary via Worker (Zero-Copy flow)
+          // We use fetch just to turn dataURL into blob? No, we have base64 string.
+          // Let's use our workerService 'base64ToBinary'
+
+          let file: File;
+
+          // Optimization: If URL is data URL, use worker. Otherwise fetch.
+          if (imageUrl.startsWith('data:')) {
+             const binaryData = await workerService.execute<Uint8Array>(
+                 'base64ToBinary',
+                 { base64: imageUrl },
+                 { priority: 'HIGH', signal: abortController.signal }
+             );
+             file = new File([binaryData], "carrier.png", { type: "image/png" });
+          } else {
+             // Fallback for object URLs (rare for persistence)
+             const response = await fetch(imageUrl);
+             const blob = await response.blob();
+             file = new File([blob], "carrier.png", { type: "image/png" });
+          }
+
+          // Steganography decode still on main thread (service) for now?
+          // Plan said: "Steganography decoding/encoding (future step)".
+          // So we use existing stegoService but passed a File created from worker-processed binary.
+
           const { url: resultUrl, text: resultText } = await steganographyService.decode(
             file,
             identity.privateKey,
@@ -68,20 +130,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             senderKey ? [senderKey] : [],
             decryptionPeerKey
           );
-          
-          if (resultText) {
-             logger.info('MessageBubble: Hidden text found', { textLength: resultText.length });
-          }
-          
+
           if (isMounted) {
             if (resultUrl) setDecodedSrc(resultUrl);
             if (resultText) setDecodedText(resultText);
           }
         } catch (error) {
-          // Only log as warning for expected steganography failures (e.g. compression or no data)
           const errorMessage = (error as Error).message;
+          if (errorMessage?.includes('Aborted')) return;
+
           if (errorMessage?.includes('No hidden message found')) {
-            logger.warn('Auto-decode skipped (no steganography data found):', message.id);
+            logger.warn('Auto-decode skipped (no steganography data found):', message?.id);
           } else {
             logger.error('Auto-decode failed:', error);
           }
@@ -92,8 +151,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       };
       decode();
     }
-    return () => { isMounted = false; };
-  }, [message.type, imageUrl, decodedSrc, decodedText, decodeFailed, identity, sessionPassphrase, isOutgoing, activeChat, message.id]);
+    return () => {
+        isMounted = false;
+        abortController.abort();
+    };
+  }, [message?.type, imageUrl, decodedSrc, decodedText, decodeFailed, identity, sessionPassphrase, isOutgoing, activeChat, message?.id, isVisible]);
 
   const handleDownloadImage = () => {
     if (imageUrl) {
@@ -116,7 +178,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     setViewMode('encode');
     setEncodedCarrierUrl(imageUrl);
     setPreviewOpen(true);
-    
+
     // Reset decoding state
     setDecodingStatus('idle');
     setDecodedImageUrl(null);
@@ -219,6 +281,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <>
       <motion.div
+        ref={bubbleRef}
         initial={{ opacity: 0, y: 10, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         className={`flex w-full ${isOutgoing ? 'justify-end' : 'justify-start'}`}
@@ -262,7 +325,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   }}
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors flex items-center justify-center gap-4 opacity-0 group-hover/image:opacity-100">
-                  <button 
+                  <button
                     onClick={() => setIsImageModalOpen(true)}
                     className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
                     title={t('common.view', 'View')}
@@ -270,7 +333,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     <Maximize2 className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   {message.type === 'image_stego' && (
-                    <button 
+                    <button
                       onClick={handleSteganographyClick}
                       disabled={isDecoding}
                       className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors disabled:opacity-50"
@@ -289,11 +352,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             )}
 
             {/* Decoded Steganography Text (Only if DIFFERENT from main content and NOT already shown as main content) */}
-            {decodedText && 
-             decodedText.trim() !== (message.content.plain || '').trim() && 
-             decodedSrc && // If decodedSrc exists, decodedText is secondary (like metadata), so show it in box. 
-                           // If decodedSrc doesn't exist, decodedText is MAIN content (handled above), so hide box.
-                           // Actually, if decodedSrc doesn't exist, we showed it above. So we shouldn't show it here.
+            {decodedText &&
+             decodedText.trim() !== (message.content.plain || '').trim() &&
+             decodedSrc && // If decodedSrc exists, decodedText is secondary (like metadata), so show it in box.
              (
               <div className="whitespace-pre-wrap mt-2 p-2 bg-black/20 rounded-lg border border-industrial-700/50 text-industrial-100">
                 <span className="text-xs text-primary-400 block mb-1 font-medium flex items-center gap-1">
@@ -452,8 +513,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       )}
 
       {/* Image Preview Modal */}
-      <Modal 
-        isOpen={isImageModalOpen} 
+      <Modal
+        isOpen={isImageModalOpen}
         onOpenChange={setIsImageModalOpen}
         size="5xl"
         classNames={{
@@ -479,8 +540,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           )}
         </ModalContent>
       </Modal>
-
-      {/* SteganographyPreviewSheet removed, using global one in ChatInput via store */}
     </>
   );
-}
+};
+
+// Strict Memoization: Only re-render if ID changes or Message Status changes
+// We pull the message inside the component, but if the wrapper re-renders, check ID.
+// Actually, since we use `useAppStore` hook inside, changes to the *specific message* will trigger re-render
+// of the component due to Zustand subscription, assuming we select granularly.
+// But Zustand selectors run on every state change.
+// To avoid expensive re-renders, we use memo check here.
+export const MessageBubble = memo(MessageBubbleComponent, (prev, next) => {
+  return prev.id === next.id;
+});
+

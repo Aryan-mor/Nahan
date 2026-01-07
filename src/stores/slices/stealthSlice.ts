@@ -25,6 +25,7 @@ interface PersistParams {
  */
 const persistMessageAndState = async (
   set: (partial: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>), replace?: boolean) => void,
+  get: () => AppState,
   params: PersistParams
 ) => {
   const { activeChat, identity, text, finalOutput, sessionPassphrase, isBroadcast } = params;
@@ -49,9 +50,11 @@ const persistMessageAndState = async (
 
     // Update lastStorageUpdate to trigger UI reactivity
     const now = Date.now();
-    // Update messages for broadcast channel
-    const messages = await storageService.getMessagesByFingerprint('BROADCAST', sessionPassphrase);
-    set({ messages, lastStorageUpdate: now });
+    // Refresh if active chat is broadcast
+    if (activeChat.id === 'system_broadcast') {
+       await get().refreshMessages();
+    }
+    set({ lastStorageUpdate: now });
   } else {
     // Standard mode: store message for single recipient (NOT broadcast)
     const newMessage = await storageService.storeMessage({
@@ -69,10 +72,24 @@ const persistMessageAndState = async (
 
     // Update lastStorageUpdate to trigger UI reactivity
     const now = Date.now();
-    set((state) => ({
-      messages: [newMessage, ...state.messages], // Prepend to maintain descending order (newest first)
-      lastStorageUpdate: now,
-    }));
+
+    // Normalized Update
+    set((state) => {
+       // Check if currently active chat matches
+       if (state.activeChat?.fingerprint !== activeChat.fingerprint) return {};
+
+       const { ids, entities } = state.messages;
+       // Avoid duplication
+       if (ids.includes(newMessage.id)) return {};
+
+       const newIds = [newMessage.id, ...ids];
+       const newEntities = { ...entities, [newMessage.id]: newMessage };
+
+       return {
+         messages: { ids: newIds, entities: newEntities },
+         lastStorageUpdate: now,
+       };
+    });
   }
 };
 
@@ -110,7 +127,7 @@ export const createStealthSlice: StateCreator<AppState, [], [], StealthSlice> = 
         throw new Error('SecureStorage: Missing key');
       }
 
-      await persistMessageAndState(set, {
+      await persistMessageAndState(set, get, {
         activeChat,
         identity,
         text: pendingPlaintext,
@@ -181,9 +198,9 @@ export const createStealthSlice: StateCreator<AppState, [], [], StealthSlice> = 
 
       // Step 3: Embed binary into cover text
       const finalOutput = camouflageService.embed(binaryPayload, coverText, camouflageLanguage || 'fa');
-      
+
       // Step 4: Store message in database
-      await persistMessageAndState(set, {
+      await persistMessageAndState(set, get, {
         activeChat,
         identity,
         text,

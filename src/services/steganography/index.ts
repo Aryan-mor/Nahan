@@ -2,11 +2,11 @@
 import i18next from 'i18next';
 import * as naclUtil from 'tweetnacl-util';
 
-import { CryptoService } from '../crypto';
 import * as logger from '../../utils/logger';
+import { CryptoService } from '../crypto';
 
-import { encodeBase122, decodeBase122 } from './base122';
-import { optimizeImage, generateMeshGradient } from './imageUtils';
+import { decodeBase122, encodeBase122 } from './base122';
+import { generateMeshGradient, optimizeImage } from './imageUtils';
 import { embedPayload, extractPayload } from './steganography';
 
 const cryptoService = CryptoService.getInstance();
@@ -76,7 +76,7 @@ export class ImageSteganographyService {
   ): Promise<{ carrier: Blob; payload: Uint8Array }> {
     try {
       logger.info('Steganography Encode: Starting...', { hasText: !!text, fileSize: file.size });
-      
+
       let payloadBytes: Uint8Array;
 
       // Optimize the image first
@@ -84,7 +84,7 @@ export class ImageSteganographyService {
       logger.debug('Steganography Encode: Image optimized', { size: optimizedImageBytes.length });
 
       // If we have text or want to use the standard envelope
-      if (text || true) { 
+      if (text || true) {
         // Convert optimized bytes to Base64 to embed in JSON
         const imageBase64 = naclUtil.encodeBase64(optimizedImageBytes);
         const dataUrl = `data:image/webp;base64,${imageBase64}`;
@@ -114,7 +114,7 @@ export class ImageSteganographyService {
       const base122Payload = encodeBase122(encryptedPayload);
       const size = this.calculateCarrierSize(base122Payload.length);
       logger.debug('Steganography Encode: Carrier size calculated', { size, payloadLength: base122Payload.length });
-      
+
       const carrier = generateMeshGradient(size, size);
 
       const resultBlob = await embedPayload(carrier, base122Payload);
@@ -130,19 +130,19 @@ export class ImageSteganographyService {
   private async loadCarrierCanvas(carrierFile: File): Promise<HTMLCanvasElement> {
     const img = new Image();
     const url = URL.createObjectURL(carrierFile);
-    
+
     await new Promise((resolve, reject) => {
       img.onload = resolve;
       img.onerror = reject;
       img.src = url;
     });
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = img.width;
     canvas.height = img.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error(i18next.t('errors.canvasInitFailed', 'Failed to initialize canvas'));
-    
+
     ctx.drawImage(img, 0, 0);
     URL.revokeObjectURL(url);
     return canvas;
@@ -196,8 +196,13 @@ export class ImageSteganographyService {
     try {
       const canvas = await this.loadCarrierCanvas(carrierFile);
       const base122Payload = extractPayload(canvas);
+
+      // MEMORY OPTIMIZATION: Dispose canvas immediately
+      canvas.width = 0;
+      canvas.height = 0;
+
       const messageBytes = decodeBase122(base122Payload);
-      
+
       const { data: plaintextBytes, senderPublicKey } = await this.decryptPayload(
         messageBytes,
         recipientPrivateKey,
@@ -234,18 +239,18 @@ export class ImageSteganographyService {
       // Check for common image headers (Magic Bytes)
       const isImage = (bytes: Uint8Array): boolean => {
         if (bytes.length < 12) return false;
-        
+
         // PNG: 89 50 4E 47
         if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return true;
-        
+
         // JPEG: FF D8
         if (bytes[0] === 0xFF && bytes[1] === 0xD8) return true;
-        
+
         // WebP: RIFF .... WEBP
         // 'R' 'I' 'F' 'F' (0-3) ... 'W' 'E' 'B' 'P' (8-11)
         if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
             bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return true;
-            
+
         return false;
       };
 

@@ -100,7 +100,7 @@ export async function requestClipboardPermission(): Promise<boolean> {
  * The actual detection is now handled by handleUniversalInput
  */
 export interface DetectionResult {
-  type: 'id' | 'message';
+  type: 'id' | 'message' | 'duplicate_message';
   contactName: string;
   contactPublicKey?: string; // For ID type
   contactFingerprint?: string; // For message type
@@ -130,11 +130,15 @@ export function useClipboardDetection(
   // This prevents the "quick re-open" loop by blocking re-detection within the same event cycle
   const lastProcessedRef = useRef<string>('');
   const lastProcessedImageRef = useRef<string>('');
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) return;
 
     const checkClipboard = async () => {
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true;
+
       try {
         const { processed, contentHash, textContent } = await analyzeClipboard(
           {
@@ -186,7 +190,7 @@ export function useClipboardDetection(
               // For text, we might want to pass it?
               // The original code passed `clipboardText.trim()` for text messages.
               // `analyzeClipboard` returns `textContent` if it was text.
-              
+
               onDetection({
                 type: 'message',
                 contactName: processed.senderName || 'Unknown',
@@ -213,15 +217,15 @@ export function useClipboardDetection(
       } catch (error: unknown) {
         // Handle errors re-thrown by analyzeClipboard (from handleUniversalInput)
         const err = error as Error;
-        
+
         // If text content was read but processing failed, we should still update tracking
         // to avoid infinite error loops?
         // analyzeClipboard doesn't return textContent on error.
         // We might need to manually read text if we want to "skip" it next time?
         // But if it failed, maybe we WANT to retry next time?
         // Original code: "setLastCheckedClipboard(clipboardText)" on error.
-        
-        // Since we can't get the text from analyzeClipboard on error, we might rely on 
+
+        // Since we can't get the text from analyzeClipboard on error, we might rely on
         // the fact that "checkClipboard" runs on focus/visibility.
         // If it fails, it will try again next event.
         // If the error is persistent (e.g. invalid format), it will loop?
@@ -262,6 +266,8 @@ export function useClipboardDetection(
             err.message,
           );
         }
+      } finally {
+        isProcessingRef.current = false;
       }
     };
 

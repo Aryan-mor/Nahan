@@ -5,8 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { devtools } from 'zustand/middleware';
+import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -24,6 +23,8 @@ interface UIState {
 
   // Navigation (non-sensitive)
   activeTab: 'chats' | 'keys' | 'settings';
+  // Chat Scroll Positions
+  scrollPositions: Record<string, number>;
 
   // PWA State (non-sensitive)
   deferredPrompt: BeforeInstallPromptEvent | null;
@@ -37,6 +38,7 @@ interface UIState {
   incrementFailedAttempts: () => void;
   resetFailedAttempts: () => void;
   setActiveTab: (tab: 'chats' | 'keys' | 'settings') => void;
+  setScrollPosition: (id: string, position: number) => void;
   setDeferredPrompt: (prompt: BeforeInstallPromptEvent | null) => void;
   setStandalone: (isStandalone: boolean) => void;
   setInstallPromptVisible: (visible: boolean) => void;
@@ -53,6 +55,7 @@ export const useUIStore = create<UIState>()(
       isLocked: false,
       failedAttempts: 0,
       activeTab: 'chats',
+      scrollPositions: {},
       deferredPrompt: null,
       isStandalone: false,
       isInstallPromptVisible: false,
@@ -64,6 +67,10 @@ export const useUIStore = create<UIState>()(
       incrementFailedAttempts: () => set((state) => ({ failedAttempts: state.failedAttempts + 1 })),
       resetFailedAttempts: () => set({ failedAttempts: 0 }),
       setActiveTab: (tab) => set({ activeTab: tab }),
+      setScrollPosition: (id, position) =>
+        set((state) => ({
+          scrollPositions: { ...state.scrollPositions, [id]: position },
+        })),
 
       setDeferredPrompt: (prompt) => set({ deferredPrompt: prompt }),
       setStandalone: (isStandalone) => set({ isStandalone }),
