@@ -57,6 +57,9 @@ export const embedPayload = async (carrier: HTMLCanvasElement, payload: string):
   const ctx = carrier.getContext('2d');
   if (!ctx) throw new Error(i18next.t('errors.canvasInitFailed', 'Failed to initialize canvas'));
 
+  // CRITICAL: Disable smoothing to preserve precise pixel values for steganography
+  ctx.imageSmoothingEnabled = false;
+
   const { width, height } = carrier;
   checkCapacity(width, height, payload.length);
 

@@ -144,16 +144,55 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
           throw new Error('Sender not found in contacts');
         }
 
+        // Prevent Self-Broadcast Processing
+        if (sender.fingerprint === identity.fingerprint) {
+           logger.log('[Processing] Ignoring self-broadcast');
+           // Return a dummy result or throw to stop processing
+           // Returning a "handled" state is better to avoid error UI
+           return {
+             type: 'message' as const,
+             fingerprint: sender.fingerprint,
+             isBroadcast: true,
+             senderName: 'Me (Ignored)',
+           };
+        }
+
         const storedEncrypted = isZWC ? input : processedText || input;
+
+        // Deterministic ID Logic
+        // Deterministic ID Logic
+        const payloadString = typeof signedResult.data === 'string'
+          ? signedResult.data
+          : new TextDecoder().decode(signedResult.data as Uint8Array);
+
+        // Extract timestamp and nonce from payload if available
+        let timestamp = Date.now();
+        const finalPlain = payloadString;
+
+        try {
+           const json = JSON.parse(payloadString);
+           if (json.timestamp) {
+             timestamp = json.timestamp;
+           }
+           // Use the raw payloadString for hashing to match sender's logic exactly
+           // The payloadString MUST match what was signed, which includes nonce and timestamp
+        } catch (_e) {
+           // efficient fallback for legacy non-JSON broadcasts
+        }
+
+        const dataToHash = new TextEncoder().encode(sender.publicKey + payloadString);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', dataToHash);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const customId = `msg_BROADCAST_${hashHex}`;
+
         const newMessage = await storageService.storeMessage(
           {
+            id: customId,
             senderFingerprint: sender.fingerprint,
             recipientFingerprint: identity.fingerprint,
             content: {
-              plain:
-                typeof signedResult.data === 'string'
-                  ? signedResult.data
-                  : new TextDecoder().decode(signedResult.data as Uint8Array),
+              plain: finalPlain,
               encrypted: storedEncrypted,
             },
             isOutgoing: false,
@@ -161,6 +200,7 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
             isVerified: true,
             status: 'sent',
             isBroadcast: true,
+            createdAt: new Date(timestamp),
           },
           sessionPassphrase,
         );
@@ -173,7 +213,7 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
         if (skipNavigation && activeChat && activeChat.id === 'system_broadcast') {
           set((state) => {
             const { ids, entities } = state.messages;
-            // Prevent duplicates
+            // Prevent duplicates (Redux state level)
             if (ids.includes(newMessage.id)) return {};
 
             const newIds = [newMessage.id, ...ids];
@@ -191,6 +231,9 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
           if (activeChat && activeChat.fingerprint === sender.fingerprint) {
             set((state) => {
                const { ids, entities } = state.messages;
+               // Double check to be safe
+               if (ids.includes(newMessage.id)) return {};
+
                const newIds = [newMessage.id, ...ids];
                const newEntities = { ...entities, [newMessage.id]: newMessage };
                return { messages: { ids: newIds, entities: newEntities } };

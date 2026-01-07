@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import { StateCreator } from 'zustand';
 
@@ -94,17 +95,28 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
       let payloadToEncrypt = text;
       const messageType = type === 'image_stego' ? 'image_stego' : (image ? 'image' : 'text');
+      const timestamp = Date.now();
 
-      if (image) {
+      // Generate a nonce using crypto.getRandomValues for compatibility
+      const nonceBytes = new Uint8Array(16);
+      crypto.getRandomValues(nonceBytes);
+      const nonce = Array.from(nonceBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      const isBroadcast = activeChat.id === 'system_broadcast';
+
+      if (image || isBroadcast) {
         payloadToEncrypt = JSON.stringify({
           nahan_type: messageType,
           text: text,
-          image: image
+          image: image,
+          timestamp: timestamp,
+          nonce: nonce
         });
       }
 
       let encryptedContent: string;
-      const isBroadcast = activeChat.id === 'system_broadcast';
 
       if (isBroadcast) {
         encryptedContent = await cryptoService.signMessage(
@@ -126,7 +138,26 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
       const isOffline = !navigator.onLine;
 
+      // Generate Deterministic ID for Broadcasts
+      let customId;
+      if (isBroadcast) {
+         // ID = msg_{fingerprint}_{SHA256(senderPubKey + timestamp + nonce + content)}
+         // We use the raw payload content for the hash to be perfectly deterministic
+         // The payload already contains the nonce and timestamp
+         const dataToHash = new TextEncoder().encode(identity.publicKey + payloadToEncrypt);
+         const hashBuffer = await crypto.subtle.digest('SHA-256', dataToHash);
+         const hashArray = Array.from(new Uint8Array(hashBuffer));
+         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+         // logic in storage.ts uses recipientFingerprint which is BROADCAST for outgoing.
+
+         // NOTE: storage.ts expects `msg_{conversationFingerprint}_...`
+         // For outgoing broadcast, recipient is 'BROADCAST'.
+         customId = `msg_BROADCAST_${hashHex}`;
+      }
+
       const newMessage = await storageService.storeMessage({
+        id: customId,
         senderFingerprint: identity.fingerprint,
         recipientFingerprint: isBroadcast ? 'BROADCAST' : activeChat.fingerprint,
         type: messageType,
@@ -138,6 +169,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         isOutgoing: true,
         read: true,
         status: isOffline ? 'pending' : 'sent',
+        createdAt: new Date(timestamp), // Ensure consistent creation time
       }, sessionPassphrase);
 
       const now = Date.now();
@@ -175,6 +207,14 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
   deleteMessage: async (id) => {
     try {
+      // Memory Leak Prevention: Revoke Blob URL if exists
+      const { messages } = get();
+      const message = messages.entities[id];
+      if (message && message.content.image) {
+        logger.debug(`[MessageSlice] Revoking blob URL for message ${id}`);
+        URL.revokeObjectURL(message.content.image);
+      }
+
       await storageService.deleteMessage(id);
       set((state) => {
         const newIds = state.messages.ids.filter((msgId) => msgId !== id);

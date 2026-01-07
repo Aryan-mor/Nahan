@@ -434,19 +434,21 @@ export class StorageService {
    * Message ID format: msg_{recipientFingerprint}_{uuid}
    * This enables efficient IndexedDB key range queries for message retrieval
    */
-  async storeMessage(message: Omit<SecureMessage, 'id' | 'createdAt'>, passphrase: string): Promise<SecureMessage> {
+  async storeMessage(message: Omit<SecureMessage, 'createdAt' | 'id'> & { createdAt?: Date; id?: string }, passphrase: string): Promise<SecureMessage> {
     // Use recipient fingerprint in message ID for efficient key range queries
     // For outgoing messages, recipientFingerprint is the contact's fingerprint
     // For incoming messages, recipientFingerprint is the user's fingerprint (conversation partner)
     const conversationFingerprint = message.isOutgoing
       ? message.recipientFingerprint
       : message.senderFingerprint;
-    // Use timestamp for time-based sorting (z prefix ensures it sorts AFTER old hex UUIDs)
-    const messageId = `${ID_PREFIX.MESSAGE}${conversationFingerprint}_z${Date.now()}_${crypto.randomUUID()}`;
+
+    // Use provided ID or generate a new one (random)
+    const messageId = message.id || `${ID_PREFIX.MESSAGE}${conversationFingerprint}_z${Date.now()}_${crypto.randomUUID()}`;
+
     const completeMessage: SecureMessage = {
       ...message,
       id: messageId,
-      createdAt: new Date(),
+      createdAt: message.createdAt || new Date(),
     };
 
     await this.storeInVault(messageId, completeMessage, passphrase);

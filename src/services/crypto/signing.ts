@@ -11,7 +11,7 @@ const getCrypto = () => {
   if (typeof crypto !== 'undefined' && crypto.subtle) return crypto;
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) return window.crypto;
   if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) return globalThis.crypto;
-  
+
   logger.error('Crypto API Debug:', {
     hasCrypto: typeof crypto !== 'undefined',
     hasWindow: typeof window !== 'undefined',
@@ -20,7 +20,7 @@ const getCrypto = () => {
     hasGlobalThisCrypto: typeof globalThis !== 'undefined' && !!globalThis.crypto,
     cryptoSubtle: typeof crypto !== 'undefined' ? !!crypto.subtle : false,
   });
-  
+
   throw new Error('Crypto API not available');
 };
 
@@ -39,8 +39,8 @@ export async function signMessage(
     logger.log('[DEBUG] signMessage start');
     // Decrypt sender's private key
     const rawSenderPrivateKeyBytes = await decryptPrivateKey(senderPrivateKey, passphrase);
-    const senderPrivateKeyBytes = rawSenderPrivateKeyBytes instanceof Uint8Array 
-      ? rawSenderPrivateKeyBytes 
+    const senderPrivateKeyBytes = rawSenderPrivateKeyBytes instanceof Uint8Array
+      ? rawSenderPrivateKeyBytes
       : new Uint8Array(rawSenderPrivateKeyBytes);
 
     // Generate Ed25519 signing key pair for broadcast messages
@@ -52,12 +52,12 @@ export async function signMessage(
     // Hash the X25519 public key to create a deterministic seed for Ed25519
     // This ensures both sender and receiver can derive the same Ed25519 public key
     const cryptoApi = getCrypto();
-    
+
     const hash = await cryptoApi.subtle.digest(
       'SHA-256',
       senderX25519PublicKey, // Uint8Array is a BufferSource
     );
-    
+
     const seed = new Uint8Array(hash).slice(0, 32);
     const signingKeyPair = nacl.sign.keyPair.fromSeed(seed);
 
@@ -70,7 +70,7 @@ export async function signMessage(
     // Ensure we have valid Uint8Arrays for nacl
     const safeMessageBytes = messageBytes instanceof Uint8Array ? messageBytes : new Uint8Array(messageBytes);
     const safeSecretKey = signingKeyPair.secretKey instanceof Uint8Array ? signingKeyPair.secretKey : new Uint8Array(signingKeyPair.secretKey);
-    
+
     const signature = nacl.sign.detached(safeMessageBytes, safeSecretKey);
 
     // Get sender's public key for serialization
@@ -104,7 +104,7 @@ export async function verifySignedMessage(
   signedMessage: string | Uint8Array,
   senderPublicKeys: string[] = [],
   options?: { binary?: boolean },
-): Promise<{ data: string | Uint8Array; verified: boolean; senderFingerprint?: string; senderPublicKey?: string }> {
+): Promise<{ data: string | Uint8Array; verified: boolean; senderFingerprint?: string; senderPublicKey?: string; senderX25519PublicKey?: string }> {
   try {
     // Decode signed message
     let messageBytes: Uint8Array;
@@ -141,8 +141,8 @@ export async function verifySignedMessage(
     }
 
     // Decode message
-    const data = options?.binary 
-      ? messageBytesOnly 
+    const data = options?.binary
+      ? messageBytesOnly
       : new TextDecoder().decode(messageBytesOnly);
 
     // Try to match sender Ed25519 public key with contacts
@@ -154,6 +154,7 @@ export async function verifySignedMessage(
     // if we had it, but we don't. So we'll use a workaround: derive Ed25519 from X25519 public key hash.
     // Actually, a better approach: derive Ed25519 key pair from X25519 public key bytes as seed.
     let senderFingerprint: string | undefined;
+    let senderX25519PublicKey: string | undefined;
     let verified = false;
 
     // For each contact's X25519 public key, derive the corresponding Ed25519 public key
@@ -182,6 +183,7 @@ export async function verifySignedMessage(
           if (match) {
             verified = true;
             senderFingerprint = generateFingerprint(senderX25519Key);
+            senderX25519PublicKey = senderKeyStr;
             break;
           }
         }
@@ -195,6 +197,7 @@ export async function verifySignedMessage(
       verified,
       senderFingerprint,
       senderPublicKey: naclUtil.encodeBase64(senderPublicKeyBytes),
+      senderX25519PublicKey
     };
   } catch (error) {
     logger.error('Signature verification failed:', error);

@@ -166,7 +166,8 @@ export class ImageSteganographyService {
       const data = typeof verifyResult.data === 'string'
           ? naclUtil.decodeBase64(verifyResult.data)
           : (verifyResult.data as Uint8Array);
-      return { data, senderPublicKey: verifyResult.senderPublicKey };
+      // Use X25519 key if resolved (for contact matching), otherwise fallback to Ed25519 key
+      return { data, senderPublicKey: (verifyResult as any).senderX25519PublicKey || verifyResult.senderPublicKey };
     } else {
       const decryptResult = await cryptoService.decryptMessage(
         messageBytes,

@@ -29,9 +29,9 @@ function drawImageToCanvas(
   return canvas;
 }
 
-async function canvasToUint8Array(canvas: HTMLCanvasElement, quality = 0.5): Promise<Uint8Array> {
+async function canvasToUint8Array(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((b) => resolve(b), 'image/webp', quality)
+    canvas.toBlob((b) => resolve(b), 'image/png')
   );
   if (!blob) {
     throw new Error(i18next.t('errors.compressionFailed', 'Image compression failed'));
@@ -41,8 +41,8 @@ async function canvasToUint8Array(canvas: HTMLCanvasElement, quality = 0.5): Pro
 }
 
 /**
- * Resizes and compresses an image to WebP format.
- * Constraints: Max 800px width/height, Quality 0.5.
+ * Resizes and converts an image to PNG format.
+ * Constraints: Max 800px width/height.
  */
 export const optimizeImage = async (file: File): Promise<Uint8Array> => {
   return new Promise((resolve, reject) => {
@@ -50,13 +50,15 @@ export const optimizeImage = async (file: File): Promise<Uint8Array> => {
     const url = URL.createObjectURL(file);
 
     img.onload = () => {
-      URL.revokeObjectURL(url);
       try {
         const { width, height } = scaleDimensions(img.width, img.height, 800);
         const canvas = drawImageToCanvas(document.createElement('canvas'), img, width, height);
-        canvasToUint8Array(canvas, 0.5).then(resolve).catch(reject);
+        canvasToUint8Array(canvas).then(resolve).catch(reject);
       } catch (err) {
         reject(err as Error);
+      } finally {
+         // Only revoke after we're done drawing
+         URL.revokeObjectURL(url);
       }
     };
 
