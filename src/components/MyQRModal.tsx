@@ -145,8 +145,9 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
                   isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />
                 }
                 color={isCopied ? 'success' : 'default'}
+                data-testid="copy-identity-modal"
               >
-                {isCopied ? t('my_qr.copied') : t('my_qr.copy_string')}
+                {isCopied ? t('my_qr.copied') : t('common.copy_identity', 'Copy Identity')}
               </Button>
               <Button
                 variant="flat"

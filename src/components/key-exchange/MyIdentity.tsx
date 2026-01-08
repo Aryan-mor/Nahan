@@ -18,7 +18,7 @@ export function MyIdentity() {
   const { identity } = useAppStore();
   const { camouflageLanguage } = useUIStore();
   const { isOpen: isQROpen, onOpen: onQROpen, onOpenChange: onQROpenChange } = useDisclosure();
-  
+
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
 
   const generateQRCode = useCallback(async () => {
@@ -113,10 +113,11 @@ export function MyIdentity() {
             variant="flat"
             onPress={copyIdentityKey}
             className="bg-industrial-800 text-industrial-100 h-24 flex flex-col gap-2 p-2 min-w-0"
+            data-testid="copy-identity-keys"
           >
             <Copy className="w-6 h-6 mb-1" />
             <span className="text-xs font-medium text-center whitespace-normal leading-tight">
-              {t('my_identity.copy_id')}
+              {t('common.copy_identity', 'Copy Identity')}
             </span>
           </Button>
           <Button
@@ -135,6 +136,7 @@ export function MyIdentity() {
             variant="flat"
             onPress={onQROpen}
             className="bg-industrial-800 text-industrial-100 h-24 flex flex-col gap-2 p-2 min-w-0"
+            data-testid="view-qr-keys"
           >
             <QrCode className="w-6 h-6 mb-1" />
             <span className="text-xs font-medium text-center whitespace-normal leading-tight">

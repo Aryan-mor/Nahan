@@ -3,13 +3,13 @@
 import { Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-    Download,
-    FileUser,
-    Lock,
-    MessageSquare,
-    QrCode,
-    Settings as SettingsIcon,
-    Users,
+  Download,
+  FileUser,
+  Lock,
+  MessageSquare,
+  QrCode,
+  Settings as SettingsIcon,
+  Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,9 +31,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-    DetectionResult,
-    useClipboardDetection,
-    useClipboardPermission,
+  DetectionResult,
+  useClipboardDetection,
+  useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -557,6 +557,7 @@ export default function App() {
                     className="bg-industrial-800 text-industrial-300"
                     onPress={handleCopyIdentity}
                     title="Copy Identity"
+                    data-testid="copy-identity-home"
                   >
                     <FileUser className="w-4 h-4" />
                   </Button>
@@ -567,6 +568,7 @@ export default function App() {
                     className="bg-industrial-800 text-industrial-300"
                     onPress={qrModal.onOpen}
                     title="Show QR Code"
+                    data-testid="view-qr-header"
                   >
                     <QrCode className="w-4 h-4" />
                   </Button>
