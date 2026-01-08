@@ -95,6 +95,7 @@ export function Onboarding() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             className="w-full"
+            data-testid="onboarding-create-pin"
           >
             <PinPad
               value={pin}
@@ -114,6 +115,7 @@ export function Onboarding() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             className="w-full"
+            data-testid="onboarding-confirm-pin"
           >
             <PinPad
               value={confirmedPin}
@@ -130,6 +132,7 @@ export function Onboarding() {
                   setConfirmedPin('');
                   setStep('create-pin');
                 }}
+                data-testid="back-to-pin-button"
                 className="text-industrial-400 hover:text-industrial-200 text-sm flex items-center gap-1"
               >
                 <ArrowLeft className="w-3 h-3" /> {t('auth.back')}
@@ -145,6 +148,7 @@ export function Onboarding() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="w-full max-w-md mx-auto"
+            data-testid="onboarding-warning"
           >
             <Card className="bg-industrial-900 border-industrial-800 shadow-xl">
               <CardBody className="p-8 flex flex-col items-center text-center space-y-6">
@@ -167,6 +171,7 @@ export function Onboarding() {
                   isSelected={agreed}
                   onValueChange={setAgreed}
                   color="warning"
+                  data-testid="warning-checkbox"
                   classNames={{
                     label: 'text-industrial-300 text-sm',
                   }}
@@ -180,6 +185,7 @@ export function Onboarding() {
                   className="w-full font-semibold"
                   onPress={handleWarningAccept}
                   isDisabled={!agreed}
+                  data-testid="warning-continue-button"
                 >
                   {t('auth.warning.continue')}
                 </Button>
@@ -195,6 +201,7 @@ export function Onboarding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-md mx-auto"
+            data-testid="onboarding-identity"
           >
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-industrial-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl border border-industrial-700">
@@ -211,6 +218,7 @@ export function Onboarding() {
                   placeholder={t('auth.identity.placeholder')}
                   value={name}
                   onValueChange={setName}
+                  data-testid="display-name-input"
                   startContent={
                     <User className="w-4 h-4 text-industrial-400 pointer-events-none flex-shrink-0" />
                   }
@@ -229,6 +237,7 @@ export function Onboarding() {
                   endContent={!isGenerating && <ArrowRight className="w-5 h-5" />}
                   isLoading={isGenerating}
                   onPress={handleGenerateIdentity}
+                  data-testid="generate-identity-button"
                 >
                   {isGenerating ? t('auth.identity.generating') : t('auth.identity.submit')}
                 </Button>

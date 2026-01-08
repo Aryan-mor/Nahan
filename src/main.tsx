@@ -1,10 +1,10 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 
-import App from './App'
+import App from './App';
 import './i18n';
-import './index.css'
+import './index.css';
 import * as logger from './utils/logger';
 
 /**
@@ -58,6 +58,21 @@ const _updateSW = registerSW({
   },
   immediate: true,
 });
+
+// Expose store for E2E testing
+import { StorageService } from './services/storage';
+import { useAppStore } from './stores/appStore';
+import { useUIStore } from './stores/uiStore';
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).appStore = useAppStore;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).appStore = useAppStore;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).uiStore = useUIStore;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).storageService = StorageService.getInstance();
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

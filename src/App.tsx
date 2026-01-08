@@ -592,6 +592,7 @@ export default function App() {
                 return (
                   <button
                     key={tab.id}
+                    data-testid={`nav-${tab.id}-tab`}
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-start transition-colors ${
                       activeTab === tab.id
@@ -645,6 +646,7 @@ export default function App() {
               return (
                 <button
                   key={tab.id}
+                  data-testid={`nav-mobile-${tab.id}-tab`}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex flex-col items-center justify-center w-full h-full gap-1 ${
                     isActive

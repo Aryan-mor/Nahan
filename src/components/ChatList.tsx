@@ -1,26 +1,26 @@
 /* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import {
-  Avatar,
-  Button,
-  Card,
-  CardBody,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
+    Avatar,
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-  ClipboardPaste,
-  ImageDown,
-  Image as ImageIcon,
-  MessageSquare,
-  Plus,
-  Search,
+    ClipboardPaste,
+    ImageDown,
+    Image as ImageIcon,
+    MessageSquare,
+    Plus,
+    Search,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -519,6 +519,7 @@ export function ChatList({
               variant="flat"
               onPress={onOpen}
               className="rounded-full"
+              data-testid="add-chat-button"
             >
               <Plus className="w-5 h-5" />
             </Button>

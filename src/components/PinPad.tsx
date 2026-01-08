@@ -1,4 +1,4 @@
-import { Delete, CornerDownLeft, Loader2 } from 'lucide-react';
+import { CornerDownLeft, Delete, Loader2 } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,7 @@ interface PinPadProps {
   error?: string;
   maxLength?: number;
   isLoading?: boolean;
+  'data-testid'?: string;
 }
 
 /* eslint-disable max-lines-per-function */
@@ -23,13 +24,14 @@ export const PinPad: React.FC<PinPadProps> = ({
   error,
   maxLength = 6,
   isLoading = false,
+  'data-testid': testId,
 }) => {
   const { t } = useTranslation();
   const displayLabel = label || t('pinpad.enter_pin');
-  
+
   // Track last submitted value to prevent loops/duplicate submissions
   const lastSubmittedRef = React.useRef<string>('');
-  
+
   // Reset last submitted if value is cleared (e.g. error retry)
   useEffect(() => {
     if (value === '') {
@@ -98,7 +100,10 @@ export const PinPad: React.FC<PinPadProps> = ({
   }, [value, isLoading, maxLength, onChange, onComplete]);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto p-6">
+    <div
+      className="flex flex-col items-center justify-center w-full max-w-md mx-auto p-6"
+      data-testid={testId}
+    >
       {/* Header / Display */}
       <div className="text-center mb-8 w-full">
         <h2 className="text-2xl font-bold text-industrial-100 mb-2">{displayLabel}</h2>
@@ -137,6 +142,7 @@ export const PinPad: React.FC<PinPadProps> = ({
             key={num}
             onClick={() => handleNumberClick(num)}
             disabled={isLoading}
+            data-testid={`pin-pad-${num}`}
             className="w-16 h-16 rounded-full bg-industrial-800 hover:bg-industrial-700 active:bg-industrial-600 text-industrial-100 text-2xl font-semibold transition-all duration-150 flex items-center justify-center border border-industrial-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {num}
@@ -146,6 +152,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         <button
           onClick={handleEnter}
           disabled={isLoading || value.length === 0}
+          data-testid="pin-pad-enter"
           className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label={t('pinpad.enter')}
         >
@@ -155,6 +162,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         <button
           onClick={() => handleNumberClick(0)}
           disabled={isLoading}
+          data-testid="pin-pad-0"
           className="w-16 h-16 rounded-full bg-industrial-800 hover:bg-industrial-700 active:bg-industrial-600 text-industrial-100 text-2xl font-semibold transition-all duration-150 flex items-center justify-center border border-industrial-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           0

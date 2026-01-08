@@ -36,6 +36,7 @@ export interface SecureMessage {
     plain: string;
     encrypted: string;
     image?: string;
+    imageBlob?: Blob;
   };
   createdAt: Date;
   isOutgoing: boolean;

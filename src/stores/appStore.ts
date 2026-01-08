@@ -3,7 +3,7 @@
  * The store interface and implementation have been updated to use initializeApp.
  */
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { createJSONStorage, persist, StateStorage } from 'zustand/middleware';
 
 import { secureStorage } from '../services/secureStorage';
 
@@ -26,7 +26,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'nahan-secure-data',
       version: 1,
-      storage: createJSONStorage(() => secureStorage),
+      storage: createJSONStorage(() => secureStorage as unknown as StateStorage),
       partialize: (state) => ({
         // ONLY persist these two sensitive fields (must be encrypted)
         identity: state.identity,

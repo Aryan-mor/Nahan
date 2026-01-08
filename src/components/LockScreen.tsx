@@ -148,6 +148,7 @@ export function LockScreen() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
         className="w-full max-w-md"
+        data-testid="lock-screen-wrapper"
       >
         <PinPad
           key={failedAttempts} // Force remount on failure to clear any stuck state
@@ -158,6 +159,7 @@ export function LockScreen() {
           subLabel={t('lock.sublabel')}
           error={error}
           isLoading={isVerifying}
+          data-testid="lock-screen-pinpad"
         />
       </motion.div>
     </div>

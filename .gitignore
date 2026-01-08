@@ -45,3 +45,5 @@ android.keystore
 *.idsig
 local.properties
 build/
+test-results/
+playwright-report/

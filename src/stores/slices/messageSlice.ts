@@ -3,12 +3,18 @@
 import { StateCreator } from 'zustand';
 
 import { CryptoService } from '../../services/crypto';
+import { getMasterKey } from '../../services/secureStorage';
 import { SecureMessage, storageService } from '../../services/storage';
 import * as logger from '../../utils/logger';
 import { AppState, MessageSlice } from '../types';
 
 const cryptoService = CryptoService.getInstance();
 const MAX_MESSAGES_IN_MEMORY = 50;
+
+// Initialize Worker
+const storageWorker = new Worker(new URL('../../workers/storage.worker.ts', import.meta.url), {
+  type: 'module'
+});
 
 export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = (set, get) => ({
   activeChat: null,
@@ -29,15 +35,48 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         throw new Error('SecureStorage: Missing key');
       }
 
+      const activeMasterKey = getMasterKey();
+      if (!activeMasterKey) {
+        throw new Error('SecureStorage: Master Key not loaded');
+      }
+
       const fingerprint = contact.id === 'system_broadcast' ? 'BROADCAST' : contact.fingerprint;
 
-      // Use new paginated fetch with limit
-      // We pass limit + 1 just to know if there are more, but for now let's stick to strict 50
-      const messages = await storageService.getMessagesPaginated(
-        fingerprint,
-        sessionPassphrase,
-        MAX_MESSAGES_IN_MEMORY
-      );
+      // WORKER FETCH
+      const fetchPromise = new Promise<SecureMessage[]>((resolve, reject) => {
+        const id = crypto.randomUUID();
+
+        const handler = (event: MessageEvent) => {
+          const { id: responseId, success, data, error } = event.data;
+          if (responseId === id) {
+             storageWorker.removeEventListener('message', handler);
+             if (success) resolve(data);
+             else reject(new Error(error));
+          }
+        };
+
+        storageWorker.addEventListener('message', handler);
+        storageWorker.postMessage({
+          id,
+          type: 'getMessages',
+          payload: {
+            fingerprint,
+            limit: MAX_MESSAGES_IN_MEMORY,
+            offset: 0,
+            masterKey: activeMasterKey // Transferable CryptoKey
+          }
+        });
+      });
+
+      const messages = await fetchPromise;
+
+      // Post-Processing: Create Object URLs from Blobs (Main Thread is fast at this)
+      messages.forEach(msg => {
+        if (msg.content.imageBlob) {
+           msg.content.image = URL.createObjectURL(msg.content.imageBlob);
+           delete msg.content.imageBlob; // cleanup
+        }
+      });
 
       // Normalize
       const ids: string[] = [];

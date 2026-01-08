@@ -112,12 +112,16 @@ export async function decryptData(encryptedData: string, _legacyPassphraseIgnore
   if (!_activeMasterKey) {
     throw new Error('Master Key not loaded - cannot decrypt');
   }
+  return decryptWithKey(encryptedData, _activeMasterKey);
+}
 
+/**
+ * Pure Decryption Utility (Worker Compatible)
+ */
+export async function decryptWithKey(encryptedData: string, key: CryptoKey): Promise<string> {
   const obj = JSON.parse(encryptedData);
 
-  // STRICT CHECK: Only support Version 2 (Master Key)
   if (obj.version !== 2) {
-    // We allow a specific error to be caught by the migration logic
     throw new Error(`Unsupported encryption version: ${obj.version}. Migration required.`);
   }
 
@@ -135,14 +139,13 @@ export async function decryptData(encryptedData: string, _legacyPassphraseIgnore
         name: 'AES-GCM',
         iv: iv,
       },
-      _activeMasterKey,
+      key,
       encryptedWithTag
     );
 
     return new TextDecoder().decode(decrypted);
-  } catch (error) {
-    logger.error('Decryption failed', error);
-    throw new Error('Decryption failed - possibly wrong key or corrupted data');
+  } catch (_) {
+    throw new Error('Decryption failed');
   }
 }
 
@@ -296,25 +299,24 @@ export const secureStorage = {
     return localStorage.getItem(name);
   },
 
-  setItem: (name: string, value: string): void => {
+  setItem: (name: string, value: string): Promise<void> => {
     if (!_activeMasterKey) {
       logger.debug('SecureStorage: Save aborted - Master Key not loaded');
-      return;
+      return Promise.resolve();
     }
 
     try {
       const parsed = JSON.parse(value);
       if (parsed.version === 2) {
         localStorage.setItem(name, value);
-        return;
+        return Promise.resolve();
       }
     } catch {
       // Not encrypted
     }
 
-    // Encrypt async but storage system expects sync - similar issues as before
-    // But since we are V2 strict, we can assume the UI blocks until keys are ready
-    encryptData(value).then(encrypted => {
+    // Encrypt async and return promise so Zustand can await it
+    return encryptData(value).then(encrypted => {
        localStorage.setItem(name, encrypted);
     });
   },

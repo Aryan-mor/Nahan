@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useUIStore } from '../stores/uiStore';
 
+ 
 export function LanguageSelector() {
   const { setLanguage } = useUIStore();
   const { t } = useTranslation();
@@ -27,6 +28,7 @@ export function LanguageSelector() {
               key={lang.code}
               isPressable
               onPress={() => setLanguage(lang.code)}
+              data-testid={`lang-${lang.code}-btn`}
               className="bg-industrial-900 border-industrial-800 hover:border-industrial-600 transition-colors"
             >
               <CardBody className="p-4">
