@@ -1,12 +1,12 @@
 /* eslint-disable max-lines-per-function */
 import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Textarea,
+    Button,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Textarea,
 } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -106,7 +106,7 @@ export function ManualPasteModal({
         {() => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              {title || t('manual_paste.title_default')}
+              {title || t('manual_paste.title_import', 'Import from Text')}
               <p className="text-sm font-normal text-industrial-400">
                 {t('manual_paste.desc')}
               </p>
@@ -126,6 +126,7 @@ export function ManualPasteModal({
                     'bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:border-primary',
                 }}
                 autoFocus
+                data-testid="manual-import-textarea"
               />
 
               <div className="flex justify-between items-center mt-1">
@@ -148,20 +149,13 @@ export function ManualPasteModal({
             </ModalBody>
             <ModalFooter>
               <Button
-                variant="light"
-                onPress={handleClose}
-                isDisabled={isLoading}
-                className="text-industrial-400 hover:text-industrial-200"
-              >
-                {t('manual_paste.cancel')}
-              </Button>
-              <Button
                 color="primary"
                 onPress={handleSubmit}
                 isLoading={isLoading}
-                className="font-medium"
+                className="font-medium w-full"
+                data-testid="manual-import-decode-btn"
               >
-                {t('manual_paste.submit')}
+                {t('manual_paste.import_decode', 'Import & Decode')}
               </Button>
             </ModalFooter>
           </>

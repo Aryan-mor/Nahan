@@ -25,7 +25,7 @@ interface AddContactProps {
 export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const {
     isOpen: isScanOpen,
     onOpen: onScanOpen,
@@ -134,6 +134,7 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
           variant="flat"
           onPress={onScanOpen}
           className="h-24 flex flex-col gap-2 p-2 min-w-0"
+          data-testid="add-contact-scan-btn"
         >
           <Camera className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium text-center whitespace-normal leading-tight">
@@ -146,6 +147,7 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
           variant="flat"
           onPress={() => fileInputRef.current?.click()}
           className="h-24 flex flex-col gap-2 p-2 min-w-0"
+          data-testid="add-contact-upload-btn"
         >
           <Upload className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium text-center whitespace-normal leading-tight">
@@ -161,6 +163,7 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
             onManualOpen();
           }}
           className="h-24 flex flex-col gap-2 p-2 min-w-0"
+          data-testid="add-contact-manual-btn"
         >
           <User className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium text-center whitespace-normal leading-tight">

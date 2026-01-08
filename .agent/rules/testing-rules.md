@@ -23,3 +23,12 @@ These rules must be followed when creating or modifying E2E tests.
    - **Scenarios**: 	ests/scenarios/ (Markdown files)
    - **E2E Tests**: 	ests/e2e/ (Spec files)
    - **Page Objects**: 	ests/pages/ (POM classes)
+
+
+6. Multi-User Testing (Rule 07):
+   - Use isolated BrowserContext instances for each user.
+
+7. Autonomous Correction & Zero Masking (Rule 08):
+   - MANDATORY: Agents must fix root causes of test failures.
+   - FORBIDDEN: Using try-catch to bypass assertions.
+   - Tests must be deterministic.

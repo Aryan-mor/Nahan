@@ -1,8 +1,8 @@
 /* eslint-disable max-lines */
 import { Button, Textarea, Tooltip } from '@heroui/react';
-import { ClipboardPaste, Lock, Paperclip, Send } from 'lucide-react';
+import { Lock, Paperclip, Send } from 'lucide-react';
 /* eslint-disable max-lines-per-function */
-import React, { useRef, useState } from 'react';
+import React, { Fragment, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import * as naclUtil from 'tweetnacl-util';
@@ -52,7 +52,7 @@ export function ChatInput() {
     setPreviewOpen,
   } = useSteganographyStore();
 
-  const [isProcessing, setIsProcessing] = useState(false);
+
   const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
   const [isAutoStealthEncoding, setIsAutoStealthEncoding] = useState(false);
 
@@ -79,7 +79,7 @@ export function ChatInput() {
       return;
     }
 
-    setIsProcessing(true);
+
     try {
       const reader = new FileReader();
       reader.onload = async () => {
@@ -92,19 +92,19 @@ export function ChatInput() {
           logger.error('Failed to send image:', error);
           toast.error('Failed to send image');
         } finally {
-          setIsProcessing(false);
+
           if (imageInputRef.current) {
             imageInputRef.current.value = '';
           }
         }
       };
       reader.onerror = () => {
-        setIsProcessing(false);
+
         toast.error('Failed to read image file');
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      setIsProcessing(false);
+
       logger.error('Image processing error:', error);
     }
   };
@@ -146,9 +146,9 @@ export function ChatInput() {
         messageInput // Pass the text from the input
       );
 
-      logger.info('ChatInput: Encoding successful', { 
-        carrierSize: carrier.size, 
-        payloadSize: payload.length 
+      logger.info('ChatInput: Encoding successful', {
+        carrierSize: carrier.size,
+        payloadSize: payload.length
       });
 
       // Auto-send the carrier
@@ -161,7 +161,7 @@ export function ChatInput() {
           setStealthDrawerMode('image');
           setShowStealthModal(true);
           resetEncoding();
-          
+
           // Clear the text input since it's now embedded in the image
           if (messageInput) {
              setMessageInput('');
@@ -325,7 +325,6 @@ export function ChatInput() {
 
   const processPasteContent = async (content: string) => {
     // Never paste into input field - always try to decrypt first
-    setIsProcessing(true);
 
     try {
       let encryptedData: string | null = null;
@@ -524,21 +523,6 @@ export function ChatInput() {
         toast.error(t('chat.input.decrypt_error'));
         logger.error(error);
       }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handlePaste = async () => {
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-      if (!clipboardText) {
-        throw new Error('Clipboard empty');
-      }
-      await processPasteContent(clipboardText);
-    } catch (error) {
-      logger.warn('Clipboard access failed, opening manual input:', error);
-      setIsManualPasteOpen(true);
     }
   };
 
@@ -613,17 +597,7 @@ export function ChatInput() {
             </Button>
           </Tooltip>
         ) : (
-          <Tooltip content={t('chat.input.paste_tooltip')}>
-            <Button
-              isIconOnly
-              variant="flat"
-              className="rounded-full w-8 h-8 min-w-8 mb-1 bg-industrial-800 text-industrial-300"
-              onPress={handlePaste}
-              isLoading={isProcessing}
-            >
-              <ClipboardPaste className="w-4 h-4" />
-            </Button>
-          </Tooltip>
+          <Fragment/>
         )}
       </div>
       <div className="text-center mt-1">

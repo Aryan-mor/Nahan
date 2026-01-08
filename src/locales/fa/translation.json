@@ -235,7 +235,6 @@
       "decrypt_error": "خطا در رمزگشایی پیام",
       "paste_success": "متن جایگذاری شد",
       "clipboard_empty": "کلیپ‌بورد خالی است",
-      "paste_tooltip": "جایگذاری از کلیپ‌بورد",
       "footer": "رمزگذاری سرتاسری با PGP",
       "error": {
         "missing_context": "امکان ارسال پیام نیست: عدم وجود زمینه",

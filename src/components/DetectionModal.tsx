@@ -112,6 +112,7 @@ export function DetectionModal({
       isDismissable={false}
       isKeyboardDismissDisabled={true}
       shouldCloseOnInteractOutside={() => false}
+      data-testid="detection-modal" // E2E
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
         header: 'border-b border-industrial-800',
@@ -176,6 +177,7 @@ export function DetectionModal({
                   color="primary"
                   onPress={handleAddContact}
                   startContent={<UserPlus className="w-4 h-4" />}
+                  data-testid="detection-add-contact-btn"
                 >
                   {t('detection.add_chat')}
                 </Button>

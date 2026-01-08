@@ -392,7 +392,6 @@
       "decrypt_error": "Failed to decrypt message",
       "paste_success": "Text pasted",
       "clipboard_empty": "Clipboard empty",
-      "paste_tooltip": "Paste from Clipboard",
       "footer": "End-to-End Encrypted via PGP",
       "error": {
         "missing_context": "Cannot send message: Missing context",
