@@ -11,9 +11,11 @@ test.describe('Identity Verification & Sharing', () => {
   // Grant clipboard permissions
   test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
+  test.setTimeout(60000); // Extended timeout for full signup flow
+
   test.beforeEach(async ({ page }) => {
     authPage = new AuthPage(page);
-    await page.goto('/');
+    await authPage.goto();
 
     // Deterministic Authentication Flow
     // strict check for lock screen visibility without try-catch
