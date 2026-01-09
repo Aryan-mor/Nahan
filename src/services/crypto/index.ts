@@ -1,14 +1,14 @@
 import { decryptMessage, encryptMessage } from './encryption';
 import {
-  clearSensitiveData,
-  generateKeyPair,
-  getFingerprint,
-  getNameFromKey,
-  isValidKeyFormat,
-  parseKeyInput,
-  removeNameFromKey,
-  validatePassphrase,
-  verifyPrivateKeyPassphrase,
+    clearSensitiveData,
+    generateKeyPair,
+    getFingerprint,
+    getNameFromKey,
+    isValidKeyFormat,
+    parseKeyInput,
+    removeNameFromKey,
+    validatePassphrase,
+    verifyPrivateKeyPassphrase,
 } from './keys';
 import { signMessage, verifySignedMessage } from './signing';
 
@@ -44,3 +44,8 @@ export class CryptoService {
 }
 
 export const cryptoService = CryptoService.getInstance();
+
+if (typeof window !== 'undefined') {
+  // @ts-expect-error - testing
+  window.cryptoService = cryptoService;
+}

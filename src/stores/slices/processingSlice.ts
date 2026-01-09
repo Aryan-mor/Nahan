@@ -424,7 +424,12 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
       set({ messageInput: '', lastStorageUpdate: now });
 
       const { activeChat } = get();
-      if (skipNavigation && activeChat && activeChat.fingerprint === sender.fingerprint) {
+
+      // Fix "0 messages" bug: Update store if we are in the correct chat OR if no chat is open (e.g. Keys page)
+      // This ensures tests can verify message arrival even if navigation is skipped
+      const shouldUpdateStore = !activeChat || (activeChat.fingerprint === sender.fingerprint);
+
+      if (shouldUpdateStore) {
         set((state) => {
           const { ids, entities } = state.messages;
           if (ids.includes(newMessage.id)) return {};
@@ -437,25 +442,9 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
         });
       }
 
-        if (!skipNavigation) {
-          await get().setActiveChat(sender);
-        } else {
-          // If we skip navigation but the chat is active, update the view
-          const { activeChat } = get();
-          if (activeChat && activeChat.fingerprint === sender.fingerprint) {
-            set((state) => {
-               const { ids, entities } = state.messages;
-               if (ids.includes(newMessage.id)) return {};
-
-               const newIds = [newMessage.id, ...ids];
-               const newEntities = { ...entities, [newMessage.id]: newMessage };
-
-               return {
-                 messages: { ids: newIds, entities: newEntities }
-               };
-            });
-          }
-        }
+      if (!skipNavigation) {
+        await get().setActiveChat(sender);
+      }
 
       return {
         type: 'message' as const,

@@ -14,7 +14,6 @@
 import pako from 'pako';
 import * as naclUtil from 'tweetnacl-util';
 
-import { poetryDb } from '../constants/poetryDb';
 import * as logger from '../utils/logger';
 
 import { CamouflageService } from './camouflage';
@@ -50,8 +49,9 @@ export function generateStealthID(name: string, publicKey: string, lang: 'fa' | 
   packet[0] = PACKET_TYPE_ID;
   packet.set(compressed, 1);
 
-  // Get a short "Invite Poem" from the database
-  const invitePoem = getInvitePoem(lang);
+  // Get a recommended cover text (Poem) that fits the payload size
+  // This prevents "Cover text too short" warnings by ensuring the poem is long enough
+  const invitePoem = camouflageService.getRecommendedCover(packet.length, lang);
 
   // Embed using Nahan-Tag Protocol
   return camouflageService.embed(packet, invitePoem, lang);
@@ -132,37 +132,7 @@ export function detectPacketType(binary: Uint8Array): 'id' | 'message' | null {
   return null;
 }
 
-/**
- * Get a short "Invite Poem" for contact sharing
- * Selects a short poem from the database (preferably 2-4 lines)
- */
-function getInvitePoem(lang: 'fa' | 'en'): string {
-  // Use imported poetryDb directly (ES module import)
-  const poems = poetryDb[lang];
 
-  // Filter for short poems (2-4 lines, preferably 2)
-  const shortPoems = poems.filter(poem => {
-    const lineCount = poem.content.length;
-    return lineCount >= 2 && lineCount <= 4;
-  });
-
-  // Prefer 2-line poems
-  const twoLinePoems = shortPoems.filter(poem => poem.content.length === 2);
-
-  // Select randomly from preferred pool (2-line) or fallback to all short poems
-  const pool = twoLinePoems.length > 0 ? twoLinePoems : shortPoems;
-
-  if (pool.length === 0) {
-    // Fallback: use first poem and take first 2 lines
-    const fallbackPoem = poems[0];
-    return fallbackPoem.content.slice(0, 2).join(' ');
-  }
-
-  const randomIndex = Math.floor(Math.random() * pool.length);
-  const selectedPoem = pool[randomIndex];
-
-  return selectedPoem.content.join(' ');
-}
 
 /**
  * Format user identity into a secure stealth ID string

@@ -163,7 +163,7 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
             onManualOpen();
           }}
           className="h-24 flex flex-col gap-2 p-2 min-w-0"
-          data-testid="add-contact-manual-btn"
+          data-testid="manual-entry-button"
         >
           <User className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium text-center whitespace-normal leading-tight">

@@ -5,8 +5,7 @@ import {
     ModalBody,
     ModalContent,
     ModalFooter,
-    ModalHeader,
-    Textarea,
+    ModalHeader
 } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -28,6 +27,7 @@ export function ManualPasteModal({
   title,
 }: ManualPasteModalProps) {
   const { t } = useTranslation();
+  // HMR Trigger
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +73,6 @@ export function ManualPasteModal({
       onOpenChange={handleClose}
       isDismissable={false}
       isKeyboardDismissDisabled={true}
-      shouldCloseOnInteractOutside={() => false}
       classNames={{
         base: 'bg-industrial-900 border border-industrial-800',
         header: 'border-b border-industrial-800',
@@ -81,26 +80,6 @@ export function ManualPasteModal({
         closeButton: 'hover:bg-industrial-800 active:bg-industrial-700',
       }}
       size="2xl"
-      motionProps={{
-        variants: {
-          enter: {
-            y: 0,
-            opacity: 1,
-            transition: {
-              duration: 0.3,
-              ease: 'easeOut',
-            },
-          },
-          exit: {
-            y: -20,
-            opacity: 0,
-            transition: {
-              duration: 0.2,
-              ease: 'easeIn',
-            },
-          },
-        },
-      }}
     >
       <ModalContent>
         {() => (
@@ -125,7 +104,6 @@ export function ManualPasteModal({
                   inputWrapper:
                     'bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:border-primary',
                 }}
-                autoFocus
                 data-testid="manual-import-textarea"
               />
 

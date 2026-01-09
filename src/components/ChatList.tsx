@@ -196,8 +196,13 @@ export function ChatList({
         toast.error(t('chat.list.process_error'));
         logger.error('[UniversalInput] Error:', error);
 
-        // Check if manual paste needed
-        if (err.message?.includes('Clipboard') || err.message?.includes('read')) {
+        // Check if manual paste needed (Permission denied, Focus lost, etc.)
+        if (
+          err.message?.includes('Clipboard') ||
+          err.message?.includes('read') ||
+          err.message?.includes('focus') ||
+          err.message?.includes('permission')
+        ) {
           setIsManualPasteOpen(true);
         }
       }
@@ -501,6 +506,7 @@ export function ChatList({
               onPress={handlePaste}
               isLoading={isProcessingPaste}
               title={t('chat.list.paste_encrypted')}
+              data-testid="chat-list-manual-paste-icon"
             >
               <ClipboardPaste className="w-5 h-5" />
             </Button>
@@ -830,12 +836,14 @@ export function ChatList({
         </ModalContent>
       </Modal>
 
-      <ManualPasteModal
-        isOpen={isManualPasteOpen}
-        onClose={() => setIsManualPasteOpen(false)}
-        onSubmit={handleManualPaste}
-        title={t('chat.list.import_title')}
-      />
+      {isManualPasteOpen && (
+        <ManualPasteModal
+          isOpen={isManualPasteOpen}
+          onClose={() => setIsManualPasteOpen(false)}
+          onSubmit={handleManualPaste}
+          title={t('chat.list.import_title')}
+        />
+      )}
 
       {/* New Message Modal */}
       {newMessageResult && (

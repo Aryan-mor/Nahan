@@ -1,11 +1,11 @@
 /* eslint-disable max-lines-per-function */
 import {
-  Avatar,
-  Button,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
+    Avatar,
+    Button,
+    Dropdown,
+    DropdownItem,
+    DropdownMenu,
+    DropdownTrigger,
 } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ChevronDown, MoreVertical, Shield } from 'lucide-react';
@@ -160,6 +160,7 @@ export function ChatView() {
 
   return (
     <motion.div
+      data-testid="chat-view-container"
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
@@ -167,13 +168,17 @@ export function ChatView() {
       className="fixed inset-0 z-50 bg-industrial-950 flex flex-col h-[100dvh]"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-industrial-800 bg-industrial-900/80 backdrop-blur-md sticky top-0 z-10">
+      <div
+        data-testid="chat-view-header"
+        className="flex items-center justify-between p-3 border-b border-industrial-800 bg-industrial-900/80 backdrop-blur-md sticky top-0 z-10"
+      >
         <div className="flex items-center gap-3">
           <Button
             isIconOnly
             variant="light"
             onPress={() => setActiveChat(null)}
             className="text-industrial-300 -ms-2"
+            data-testid="back-to-list-btn"
           >
             <ArrowLeft className={`w-6 h-6 ${isRTL ? 'rotate-180' : ''}`} />
           </Button>
@@ -223,6 +228,7 @@ export function ChatView() {
 
       {/* Messages Area */}
       <div
+        data-testid="chat-messages-list"
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 gap-2.5 flex flex-col-reverse scrollbar-hide relative scroll-smooth"

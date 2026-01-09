@@ -57,7 +57,8 @@ export function NewMessageModal({
       size="md"
       isDismissable={false}
       isKeyboardDismissDisabled={true}
-      shouldCloseOnInteractOutside={() => false}
+
+
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
         header: 'border-b border-industrial-800',
@@ -67,7 +68,7 @@ export function NewMessageModal({
     >
       <ModalContent>
         {() => (
-          <>
+          <div>
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 {isBroadcast ? (
@@ -111,7 +112,7 @@ export function NewMessageModal({
                 {t('new_message.view_chat')}
               </Button>
             </ModalFooter>
-          </>
+          </div>
         )}
       </ModalContent>
     </Modal>

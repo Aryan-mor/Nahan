@@ -1,15 +1,16 @@
 /* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
-import { Button, HeroUIProvider, useDisclosure } from '@heroui/react';
+import { Avatar, Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-  Download,
-  FileUser,
-  Lock,
-  MessageSquare,
-  QrCode,
-  Settings as SettingsIcon,
-  Users,
+    ClipboardPaste,
+    Download,
+    FileUser,
+    Lock,
+    MessageSquare,
+    QrCode,
+    Settings as SettingsIcon,
+    Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,9 +32,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-  DetectionResult,
-  useClipboardDetection,
-  useClipboardPermission,
+    DetectionResult,
+    useClipboardDetection,
+    useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -58,6 +59,7 @@ export default function App() {
     setShowStealthModal,
     sessionPassphrase,
     setActiveChat,
+    handleUniversalInput,
   } = useAppStore();
 
   const {
@@ -143,6 +145,8 @@ export default function App() {
 
   // QR Modal
   const qrModal = useDisclosure();
+  // Manual Paste Modal
+  const manualPasteModal = useDisclosure();
 
   // Clipboard permission management
   const clipboardPermission = useClipboardPermission();
@@ -280,6 +284,69 @@ export default function App() {
     }
   };
 
+  /**
+   * Handle manual paste from the top header
+   * Supports detecting Stealth IDs, Messages (Text/Image), and Contact Intros
+   */
+  const handleManualPaste = async (content: string) => {
+    try {
+      // Use universal input handler (same as ChatList)
+      const result = await handleUniversalInput(content, undefined, true);
+
+      // If a message was detected, show the new message modal
+      if (result && result.type === 'message') {
+        setNewMessageResult(result);
+        setShowNewMessageModal(true);
+      }
+
+      // Close manual paste modal on success
+      manualPasteModal.onClose();
+    } catch (error: unknown) {
+      const err = error as {
+        message?: string;
+        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
+      };
+
+      // Handle Contact Intro Detection (Protocol standard)
+      if (err.message === 'CONTACT_INTRO_DETECTED') {
+        manualPasteModal.onClose();
+        if (detectionResult) {
+            // Let's manually trigger the detection flow
+            if (err.keyData) {
+              const contactName = err.keyData.name || err.keyData.username || 'Unknown';
+              const contactPublicKey = err.keyData.publicKey || err.keyData.key;
+              if (contactPublicKey) {
+                // Determine if it's ID or Update
+                handleDetection({
+                  type: 'id',
+                  contactName: contactName,
+                  contactPublicKey: contactPublicKey,
+                });
+              }
+            }
+        } else {
+             // Fallback if no prior detection state - direct call
+             if (err.keyData) {
+              const contactName = err.keyData.name || err.keyData.username || 'Unknown';
+              const contactPublicKey = err.keyData.publicKey || err.keyData.key;
+              if (contactPublicKey) {
+                handleDetection({
+                  type: 'id',
+                  contactName: contactName,
+                  contactPublicKey: contactPublicKey,
+                });
+              }
+            }
+        }
+        return;
+      }
+
+      // Generic error
+      logger.error('Manual paste failed:', error);
+      toast.error(t('chat.list.process_error'));
+    }
+  };
+
   // Handle new message from clipboard detection
   const handleNewMessage = (result: {
     type: 'message' | 'contact';
@@ -290,20 +357,16 @@ export default function App() {
     // Unify modal logic: If we have a specific message result, use detection modal first
     // This ensures consistency with the new unified modal flow
     if (result.type === 'message') {
-      // Re-construct a DetectionResult to reuse the main modal logic
-      const detectionResult: DetectionResult = {
+      // UNIFICATION: Use NewMessageModal for messages to ensure consistent UI and testability
+      setNewMessageResult({
         type: 'message',
-        contactFingerprint: result.fingerprint,
-        contactName: result.senderName,
-        // We don't have the full encryptedData here, but the modal might handle it
-        // If this path is used, ensure DetectionModal can handle missing encryptedData
-        // or fetch it from storage if needed.
-        // For now, prioritize the main notification modal.
-      };
-
-      setDetectionResult(detectionResult);
-      setShowDetectionModal(true);
+        fingerprint: result.fingerprint,
+        isBroadcast: result.isBroadcast,
+        senderName: result.senderName,
+      });
+      setShowNewMessageModal(true);
     } else {
+      // This path likely won't be hit for contacts based on current logic, but kept for safety
       setNewMessageResult(result);
       setShowNewMessageModal(true);
     }
@@ -514,6 +577,17 @@ export default function App() {
         {/* My QR Modal */}
         <MyQRModal isOpen={qrModal.isOpen} onOpenChange={qrModal.onOpenChange} />
 
+        {/* Manual Paste Modal */}
+        {/* Manual Paste Modal */}
+        {/* Manual Paste Modal */}
+        {manualPasteModal.isOpen && (
+          <ManualPasteModal
+            isOpen={manualPasteModal.isOpen}
+            onClose={manualPasteModal.onClose}
+            onSubmit={handleManualPaste}
+          />
+        )}
+
         {/* Full Screen Chat View Overlay */}
         <AnimatePresence>{activeChat && <ChatView />}</AnimatePresence>
 
@@ -555,6 +629,17 @@ export default function App() {
                     variant="flat"
                     size="sm"
                     className="bg-industrial-800 text-industrial-300"
+                    onPress={manualPasteModal.onOpen}
+                    title="Manual Paste"
+                    data-testid="home-manual-paste-icon"
+                  >
+                    <ClipboardPaste className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    variant="flat"
+                    size="sm"
+                    className="bg-industrial-800 text-industrial-300"
                     onPress={handleCopyIdentity}
                     title="Copy Identity"
                     data-testid="copy-identity-home"
@@ -587,7 +672,7 @@ export default function App() {
 
         <div className="flex-1 flex flex-col md:flex-row max-w-6xl mx-auto w-full overflow-hidden">
           {/* Desktop Sidebar Navigation */}
-          <nav className="hidden md:block w-64 shrink-0 bg-industrial-900 border-e border-industrial-800 min-h-[calc(100vh-64px)] p-4 sticky top-[64px] h-[calc(100vh-64px)] overflow-y-auto">
+          <nav className="hidden md:flex flex-col w-64 shrink-0 bg-industrial-900 border-e border-industrial-800 min-h-[calc(100vh-64px)] p-4 sticky top-[64px] h-[calc(100vh-64px)] overflow-y-auto">
             <div className="space-y-2">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -619,6 +704,26 @@ export default function App() {
               </div>
               <p className="text-xs text-industrial-400">{t('app.security.notice')}</p>
             </div>
+
+            {/* User Profile (Desktop Bottom) */}
+            {identity && (
+              <div className="mt-auto pt-4 border-t border-industrial-800">
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    name={identity.name}
+                    classNames={{
+                      base: "flex-shrink-0 bg-gradient-to-br from-industrial-700 to-industrial-800 text-industrial-200"
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-industrial-100 truncate">{identity.name}</p>
+                    <div className="flex items-center gap-1 text-xs text-industrial-500">
+                      <span className="truncate" dir="ltr">{identity.fingerprint.slice(0, 8)}...{identity.fingerprint.slice(-8)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </nav>
 
           {/* Main Content */}

@@ -111,8 +111,7 @@ export function DetectionModal({
       size="md"
       isDismissable={false}
       isKeyboardDismissDisabled={true}
-      shouldCloseOnInteractOutside={() => false}
-      data-testid="detection-modal" // E2E
+
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
         header: 'border-b border-industrial-800',
@@ -122,7 +121,7 @@ export function DetectionModal({
     >
       <ModalContent>
         {() => (
-          <>
+          <div data-testid="detection-modal">
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 {type === 'id' ? (
@@ -191,7 +190,7 @@ export function DetectionModal({
                 </Button>
               )}
             </ModalFooter>
-          </>
+          </div>
         )}
       </ModalContent>
     </Modal>

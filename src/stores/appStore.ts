@@ -39,3 +39,8 @@ export const useAppStore = create<AppState>()(
     },
   ),
 );
+
+if (typeof window !== 'undefined') {
+  // @ts-expect-error - testing
+  window.useAppStore = useAppStore;
+}

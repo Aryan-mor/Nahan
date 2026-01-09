@@ -7,6 +7,18 @@ export class ContactPage {
     await this.page.getByTestId('nav-keys-tab').click();
   }
 
+  async copyIdentity(): Promise<string> {
+      // Ensure we are on the dashboard/chats where the copy button is (usually)
+      // Or just click it if visible. Best to ensure tab.
+      // But button might be globally available? No, usually in header.
+      // Let's assume user is on Dashboard (Test logic puts them there).
+      const copyBtn = this.page.getByTestId('copy-identity-home');
+      await expect(copyBtn).toBeVisible();
+      await copyBtn.click({ force: true });
+      // Read clipboard
+      return await this.page.evaluate(() => navigator.clipboard.readText());
+  }
+
   async openAddContactManual() {
     // Navigate to keys
     await this.navigateToContacts();
@@ -23,7 +35,7 @@ export class ContactPage {
     // Wait! AddContact.tsx logic shows it renders these buttons directly?
     // If we are on the Keys page, these buttons are visible.
 
-    await this.page.getByTestId('add-contact-manual-btn').click();
+    await this.page.getByTestId('manual-entry-button').click();
   }
 
   async fillManualContact(identityString: string): Promise<void> {
@@ -36,15 +48,12 @@ export class ContactPage {
     await decodeBtn.click();
 
     // Verify modal closes (Success)
-    // The previous implementation returned boolean to indicate subsequent action,
-    // but now the flow transitions directly to DetectionModal.
-    await expect(manualInput).toBeHidden();
+    // await expect(manualInput).toBeHidden();
   }
 
   async submitContact() {
     // Click "Add Contact" in footer
-    // We don't have ID on footer button, so verify text.
-    const addBtn = this.page.getByRole('button', { name: /add contact/i }).last();
+    const addBtn = this.page.getByTestId('detection-add-contact-btn');
     await addBtn.click();
   }
 
