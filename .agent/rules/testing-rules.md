@@ -32,3 +32,7 @@ These rules must be followed when creating or modifying E2E tests.
    - MANDATORY: Agents must fix root causes of test failures.
    - FORBIDDEN: Using try-catch to bypass assertions.
    - Tests must be deterministic.
+
+8. **Protocol Compliance (Rule 10)**:
+   - **MANDATORY**: All tests MUST strictly follow the definitions in .agent/rules/encryption-protocol.md.
+   - Assertions must verify Stealth IDs (Poetry) and ZWC formats.
