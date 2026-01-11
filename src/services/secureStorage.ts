@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import * as logger from '../utils/logger';
 
 
@@ -134,9 +135,20 @@ export async function decryptWithKey(encryptedData: string, key: CryptoKey): Pro
     throw new Error(`Unsupported encryption version: ${obj.version}. Migration required.`);
   }
 
-  const iv = Uint8Array.from(atob(obj.iv), c => c.charCodeAt(0));
-  const ciphertext = Uint8Array.from(atob(obj.encrypted), c => c.charCodeAt(0));
-  const tag = Uint8Array.from(atob(obj.tag), c => c.charCodeAt(0));
+  // Optimized Base64 Decoding
+  const fromBase64 = (base64: string): Uint8Array => {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  };
+
+  const iv = fromBase64(obj.iv);
+  const ciphertext = fromBase64(obj.encrypted);
+  const tag = fromBase64(obj.tag);
 
   const encryptedWithTag = new Uint8Array(ciphertext.length + tag.length);
   encryptedWithTag.set(ciphertext, 0);
@@ -164,7 +176,7 @@ export async function decryptWithKey(encryptedData: string, key: CryptoKey): Pro
 
 // Worker instance for auth operations
 let _authWorker: Worker | null = null;
-const _pendingAuthRequests = new Map<string, { resolve: (value: any) => void; reject: (reason: any) => void }>();
+const _pendingAuthRequests = new Map<string, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }>();
 
 function getAuthWorker(): Worker {
   if (!_authWorker) {
