@@ -5,7 +5,8 @@ import {
     ModalBody,
     ModalContent,
     ModalFooter,
-    ModalHeader
+    ModalHeader,
+    Textarea,
 } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import { useRef, useState } from 'react';

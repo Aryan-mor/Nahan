@@ -61,11 +61,10 @@ export async function generateMasterKey(): Promise<CryptoKey> {
 /**
  * Encrypt data using the currently loaded Master Key (Version 2)
  */
-export async function encryptData(data: string, _legacyPassphraseIgnored?: string): Promise<string> {
-  if (!_activeMasterKey) {
-    throw new Error('Master Key not loaded - cannot encrypt');
-  }
-
+/**
+ * Pure Encryption Utility (Worker Compatible)
+ */
+export async function encryptWithKey(data: string, key: CryptoKey): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
 
   const encoder = new TextEncoder();
@@ -74,7 +73,7 @@ export async function encryptData(data: string, _legacyPassphraseIgnored?: strin
       name: 'AES-GCM',
       iv: iv,
     },
-    _activeMasterKey,
+    key,
     encoder.encode(data)
   );
 
@@ -103,6 +102,16 @@ export async function encryptData(data: string, _legacyPassphraseIgnored?: strin
   };
 
   return JSON.stringify(obj);
+}
+
+/**
+ * Encrypt data using the currently loaded Master Key (Version 2)
+ */
+export async function encryptData(data: string, _legacyPassphraseIgnored?: string): Promise<string> {
+  if (!_activeMasterKey) {
+    throw new Error('Master Key not loaded - cannot encrypt');
+  }
+  return encryptWithKey(data, _activeMasterKey);
 }
 
 /**
@@ -153,43 +162,73 @@ export async function decryptWithKey(encryptedData: string, key: CryptoKey): Pro
  * KEY WRAPPING UTILITIES (For System Settings)
  */
 
+// Worker instance for auth operations
+let _authWorker: Worker | null = null;
+const _pendingAuthRequests = new Map<string, { resolve: (value: any) => void; reject: (reason: any) => void }>();
+
+function getAuthWorker(): Worker {
+  if (!_authWorker) {
+    _authWorker = new Worker(new URL('../workers/auth.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    _authWorker.onmessage = (event) => {
+      const { id, success, data, error } = event.data;
+      const request = _pendingAuthRequests.get(id);
+      if (request) {
+        _pendingAuthRequests.delete(id);
+        if (success) {
+          request.resolve(data);
+        } else {
+          request.reject(new Error(error));
+        }
+      }
+    };
+  }
+  return _authWorker;
+}
+
 /**
  * Derive a Key-Wrapping Key (KWK) from PIN + Hardware Secret
- * using PBKDF2
+ * using PBKDF2 in a WORKER
  */
 async function deriveWrapperKey(pin: string, hardwareSecret: Uint8Array): Promise<CryptoKey> {
   const encoder = new TextEncoder();
-  const pinBuffer = encoder.encode(pin);
-
-  // Combine PIN and Hardware Secret
-  const combinedMaterial = new Uint8Array(pinBuffer.length + hardwareSecret.length);
-  combinedMaterial.set(pinBuffer, 0);
-  combinedMaterial.set(hardwareSecret, pinBuffer.length);
-
-  const baseKey = await crypto.subtle.importKey(
-    'raw',
-    combinedMaterial,
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
-
-  // Use a fixed salt for the wrapper key (we rely on the hardware secret for entropy)
-  // Or we could store a salt too. Let's use a static salt for simplicity + hardware strength.
+  // match salt in worker
   const salt = encoder.encode('nahan-wrapper-salt-v1');
 
-  return await crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    baseKey,
-    { name: 'AES-KW', length: 256 }, // AES-KW for wrapping
-    false,
-    ['wrapKey', 'unwrapKey']
-  );
+  const worker = getAuthWorker();
+
+  return new Promise((resolve, reject) => {
+    const id = crypto.randomUUID();
+    _pendingAuthRequests.set(id, {
+      resolve: async (jwk: JsonWebKey) => {
+        // Import the JWK back to a CryptoKey on the main thread
+        try {
+          const key = await crypto.subtle.importKey(
+            'jwk',
+            jwk,
+            { name: 'AES-KW', length: 256 },
+            false,
+            ['wrapKey', 'unwrapKey']
+          );
+          resolve(key);
+        } catch (e) {
+          reject(e);
+        }
+      },
+      reject
+    });
+
+    worker.postMessage({
+      id,
+      type: 'deriveWrapperKey',
+      payload: {
+        pin,
+        hardwareSecret,
+        salt
+      }
+    });
+  });
 }
 
 /**

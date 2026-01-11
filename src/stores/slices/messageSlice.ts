@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, no-console */
 /* eslint-disable max-lines-per-function */
 import { StateCreator } from 'zustand';
 
@@ -212,6 +212,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
       }, sessionPassphrase);
 
       const now = Date.now();
+      const messageFingerprint = isBroadcast ? 'BROADCAST' : activeChat.fingerprint;
 
       set((state) => {
         const currentIds = state.messages.ids;
@@ -226,14 +227,20 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
           const removedId = newIds.pop(); // Remove oldest (last in array)
           if (removedId) {
             delete newEntities[removedId];
-            // Here we would also trigger URL.revokeObjectURL if we had reference counting
           }
         }
+
+        // O(1) INCREMENTAL UPDATE: Update only this contact's summary inline
+        const updatedSummaries = {
+          ...state.chatSummaries,
+          [messageFingerprint]: newMessage
+        };
 
         return {
           messages: { ids: newIds, entities: newEntities },
           messageInput: '',
           lastStorageUpdate: now,
+          chatSummaries: updatedSummaries, // O(1) - no DB call
         };
       });
 
@@ -315,25 +322,50 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
   },
 
   refreshChatSummaries: async () => {
+    const perfStart = performance.now();
+    console.log(`[PERF][UI] refreshChatSummaries Start`);
+
     const { sessionPassphrase, getContactsWithBroadcast } = get();
-    if (!sessionPassphrase) return;
+    if (!sessionPassphrase) {
+      console.log(`[PERF][UI] refreshChatSummaries Skipped (no passphrase) - Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
+      return;
+    }
 
     const allContacts = getContactsWithBroadcast();
     const fingerprints = allContacts
       .filter((c) => c.fingerprint !== 'BROADCAST')
       .map((c) => c.fingerprint);
 
+    console.log(`[PERF][UI] Fetching summaries for ${fingerprints.length} contacts`);
+    const dbStart = performance.now();
     const summaries = await storageService.getChatSummaries(fingerprints, sessionPassphrase);
+    console.log(`[PERF][UI] getChatSummaries DB call - Duration: ${(performance.now() - dbStart).toFixed(2)}ms`);
+
     const map: Record<string, SecureMessage | undefined> = { ...summaries };
 
     const broadcastContact = allContacts.find((c) => c.fingerprint === 'BROADCAST');
     if (broadcastContact) {
+      const broadcastStart = performance.now();
       const broadcastMessages = await storageService.getMessagesPaginated('BROADCAST', sessionPassphrase, 1);
+      console.log(`[PERF][UI] Broadcast fetch - Duration: ${(performance.now() - broadcastStart).toFixed(2)}ms`);
       const latestBroadcast = broadcastMessages.length > 0 ? broadcastMessages[0] : undefined;
       map['BROADCAST'] = latestBroadcast;
     }
 
     set({ chatSummaries: map });
+    console.log(`[PERF][UI] refreshChatSummaries End - Total Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
+  },
+
+  // O(1) INCREMENTAL UPDATE: Update only a single contact's summary without DB call
+  updateSummaryForContact: (fingerprint, lastMessage) => {
+    const start = performance.now();
+    set((state) => ({
+      chatSummaries: {
+        ...state.chatSummaries,
+        [fingerprint]: lastMessage
+      }
+    }));
+    console.log(`[PERF][Storage] updateSummaryForContact - Duration: ${(performance.now() - start).toFixed(4)}ms`);
   },
 
   processPendingMessages: async () => {

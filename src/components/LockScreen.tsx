@@ -1,7 +1,7 @@
 /* eslint-disable max-lines-per-function */
 import { } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ export function LockScreen() {
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [, startTransition] = useTransition();
   const isVerifyingRef = useRef(false);
   const isMounted = useRef(true);
   const instanceId = useRef(Math.random().toString(36).substring(7));
@@ -59,7 +60,7 @@ export function LockScreen() {
         setTimeout(() => {
           logger.warn(`[LockScreen:${instanceId.current}] Unlock timed out`);
           resolve(false);
-        }, 15000); // 15 seconds timeout (PBKDF2 can be slow on mobile)
+        }, 45000); // 45 seconds timeout (PBKDF2 can be slow on mobile)
       });
 
       const isValid = await Promise.race([unlockPromise, timeoutPromise]);
@@ -132,8 +133,10 @@ export function LockScreen() {
       setTimeout(() => {
         logger.debug(`[LockScreen:${instanceId.current}] Safety reset executed`);
         try {
-          setIsVerifying(false);
-          isVerifyingRef.current = false;
+           startTransition(() => {
+             setIsVerifying(false);
+           });
+           isVerifyingRef.current = false;
         } catch (_) {
           // ignore
         }

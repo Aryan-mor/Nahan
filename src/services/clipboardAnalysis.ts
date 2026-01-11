@@ -15,7 +15,7 @@ export interface ProcessingContext {
 }
 
 export interface ProcessedResult {
-  type: 'message' | 'contact' | 'none';
+  type: 'message' | 'id' | 'none';
   fingerprint?: string;
   senderName?: string;
   isBroadcast?: boolean;
@@ -144,7 +144,72 @@ export async function analyzeClipboard(
   const { handleUniversalInput } = context;
   const { previousText, previousImageHash } = options;
 
-  // 1. Try Image Detection first (Steganography takes precedence if valid)
+  // EXIT SILENTLY if document not focused (Silent Focus-Aware Clipboard rule)
+  if (!document.hasFocus()) {
+    logger.debug('[ClipboardAnalysis] Document not focused - exiting silently');
+    return { processed: null };
+  }
+
+  // OPTIMIZATION: Try Text Detection FIRST (Faster, covers 90% of cases)
+  // This avoids the 2s delay often caused by navigator.clipboard.read() for images
+  try {
+    console.log(`[PERF][TRACE] 1. Navigator readText started`);
+    const text = await navigator.clipboard.readText();
+    if (text && text.trim()) {
+      console.log(`[PERF][TRACE] 2. Text acquired (length: ${text.length}) - matches previous: ${previousText === text}`);
+      if (previousText && text === previousText) {
+          // If text matches last check, we can skip text processing.
+          // BUT if we haven't checked for images yet, and text didn't yield a result last time,
+          // checking images might still be needed?
+          // However, if the clipboard hasn't changed, the image implies it hasn't changed either (single clipboard entry).
+          return { processed: null, textContent: text };
+      }
+
+      let result;
+      try {
+        console.log(`[PERF][TRACE] 3a. Calling handleUniversalInput...`);
+        result = await handleUniversalInput(text, undefined, true);
+        console.log(`[PERF][TRACE] 3b. handleUniversalInput returned type:`, result?.type);
+      } catch (error: any) {
+        if (error.message === 'CONTACT_INTRO_DETECTED') {
+          return {
+            processed: { type: 'id', data: error.keyData, source: 'text' },
+            textContent: text,
+          };
+        }
+        // Known "soft" errors - treat as "handled but no result"
+        if (error.message === 'SENDER_UNKNOWN' || error.message === 'DUPLICATE_MESSAGE') {
+           logger.debug(`[ClipboardAnalysis] ${error.message} - suppressing loop`);
+           // If it was a duplicate message, we STOP here. We don't check for images.
+           return { processed: null, textContent: text };
+        }
+        // For other errors (e.g. invalid format), we might still want to check for images?
+        // E.g. if I copied a stego image, readText might return "garbage" or nothing.
+        // If it throws, we continue to Image check.
+      }
+
+      // If we got a valid text result, return it immediately
+      if (result) {
+        let processed: ProcessedResult | null = null;
+        if (result.type === 'message') {
+          processed = {
+            type: 'message',
+            fingerprint: result.fingerprint,
+            senderName: result.senderName,
+            isBroadcast: result.isBroadcast,
+            source: 'text',
+          };
+        } else if (result.type === 'id' || result.type === 'contact') {
+          processed = { type: 'id', data: result, source: 'text' };
+        }
+        if (processed) return { processed, textContent: text };
+      }
+    }
+  } catch (err) {
+    // Ignore text read errors (continue to image)
+  }
+
+  // 2. Try Image Detection (Slower, fallback or stego)
   if (navigator.clipboard && navigator.clipboard.read) {
     try {
       const items = await navigator.clipboard.read();
@@ -155,7 +220,6 @@ export async function analyzeClipboard(
           const hash = await getImageHash(blob);
 
           if (previousImageHash && hash === previousImageHash) {
-             // Skip duplicate image
              return { processed: null, contentHash: hash };
           }
 
@@ -165,22 +229,12 @@ export async function analyzeClipboard(
                 return { processed: stegoResult, contentHash: hash };
             }
           } catch (err) {
-            // Not a stego image or decode failed.
-            // We should treat this as "image handled but no message found"
-            // unless we want to propagate error?
-            // For unified detector, we usually ignore non-stego images.
+            // Not a stego image or decode failed
           }
-
-          // If we are here, image was found but not processed as message.
-          // We return the hash so we don't re-check this image.
-          // But we continue to check text?
-          // Usually if there is an image, we don't check text?
-          // Browser clipboard usually has one or the other as "primary".
-          // If we have an image, we probably stop.
-          // return { processed: null, contentHash: hash };
-
-          // Actually, let's fall through to text if image yielded nothing.
-          // But we must return the hash so we know we checked this image.
+           // Image found but not stego. Return hash to avoid re-process.
+           // return { processed: null, contentHash: hash };
+           // Actually, if we found an image and processed it (even if failed), we should update the hash.
+           return { processed: null, contentHash: hash };
         }
       }
     } catch (err) {
@@ -188,72 +242,6 @@ export async function analyzeClipboard(
     }
   }
 
-  // 2. Try Text Detection
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text && text.trim()) {
-      if (previousText && text === previousText) {
-          return { processed: null, textContent: text };
-      }
-
-      let result;
-      try {
-        result = await handleUniversalInput(text, undefined, true);
-      } catch (error: any) {
-        if (error.message === 'CONTACT_INTRO_DETECTED') {
-          return {
-            processed: {
-              type: 'contact',
-              data: error.keyData,
-              source: 'text',
-            },
-            textContent: text,
-          };
-        }
-
-        // Ensure we stop the loop for these known "soft" errors
-        if (error.message === 'SENDER_UNKNOWN' || error.message === 'DUPLICATE_MESSAGE') {
-           logger.debug(`[ClipboardAnalysis] ${error.message} - suppressing loop`);
-           return { processed: null, textContent: text };
-        }
-
-        throw error;
-      }
-
-      let processed: ProcessedResult | null = null;
-      if (result && result.type === 'message') {
-        processed = {
-          type: 'message',
-          fingerprint: result.fingerprint,
-          senderName: result.senderName,
-          isBroadcast: result.isBroadcast,
-          source: 'text',
-        };
-      } else if (result && result.type === 'contact') {
-        processed = {
-          type: 'contact',
-          data: result,
-          source: 'text',
-        };
-      } else if (result && result.type === 'id') {
-         // Some handleUniversalInput implementations return 'id' for contacts
-          processed = {
-            type: 'contact', // Map to contact
-            data: result,
-            source: 'text',
-          };
-      }
-
-      return { processed, textContent: text };
-    }
-  } catch (err) {
-    // If it's a permission error, ignore.
-    if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
-        // ignore
-    } else {
-        throw err;
-    }
-  }
-
   return { processed: null };
 }
+

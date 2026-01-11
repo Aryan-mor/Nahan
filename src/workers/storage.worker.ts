@@ -1,6 +1,6 @@
 
 import { IDBPDatabase, openDB } from 'idb';
-import { decryptWithKey } from '../services/secureStorage';
+import { decryptWithKey, encryptWithKey } from '../services/secureStorage';
 
 const ctx: Worker = self as unknown as Worker;
 
@@ -11,12 +11,18 @@ const ID_PREFIX_MESSAGE = 'msg_';
 
 interface WorkerRequest {
   id: string;
-  type: 'getMessages';
+  type: 'getMessages' | 'storeMessage';
   payload: {
-    fingerprint: string;
-    limit: number;
-    offset: number;
-    masterKey: CryptoKey; // Transferred key
+    // Shared
+    masterKey: CryptoKey;
+
+    // getMessages
+    fingerprint?: string;
+    limit?: number;
+    offset?: number;
+
+    // storeMessage
+    message?: any; // We'll keep it loose or import types if possible
   };
 }
 
@@ -91,12 +97,36 @@ const handleGetMessages = async (payload: WorkerRequest['payload']) => {
   return results.filter(Boolean).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
+const handleStoreMessage = async (payload: WorkerRequest['payload']) => {
+  const { message, masterKey } = payload;
+  const db = await initializeDB();
+
+  // Encrypt the message using the passed Master Key (pure worker logic)
+  // We use encryptWithKey which we must import from secureStorage
+  // Note: encryptWithKey must be available. We added it to secureStorage.ts.
+  const encryptedPayload = await encryptWithKey(JSON.stringify(message), masterKey);
+
+  const entry = {
+    id: message.id,
+    payload: encryptedPayload,
+  };
+
+  const tx = db.transaction('secure_vault', 'readwrite');
+  await tx.objectStore('secure_vault').put(entry);
+  await tx.done;
+
+  return message;
+};
+
 ctx.onmessage = async (event: MessageEvent) => {
   const { id, type, payload } = event.data as WorkerRequest;
 
   try {
     if (type === 'getMessages') {
       const result = await handleGetMessages(payload);
+      ctx.postMessage({ id, success: true, data: result });
+    } else if (type === 'storeMessage') {
+      const result = await handleStoreMessage(payload);
       ctx.postMessage({ id, success: true, data: result });
     }
   } catch (error) {

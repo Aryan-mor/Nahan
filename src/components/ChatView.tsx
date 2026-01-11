@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+/* eslint-disable max-lines-per-function, no-console */
 import {
     Avatar,
     Button,
@@ -9,7 +9,7 @@ import {
 } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ChevronDown, MoreVertical, Shield } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -23,9 +23,26 @@ import { MessageBubble } from './MessageBubble';
 import { TemporarySteganographyMessage } from './steganography/TemporarySteganographyMessage';
 
 export function ChatView() {
-  const { activeChat, messages, setActiveChat, clearChatHistory } = useAppStore();
-  const { encodingStatus } = useSteganographyStore();
-  const { scrollPositions, setScrollPosition } = useUIStore();
+  // [PERF] Re-render counter for telemetry
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+  console.log(`[PERF][RENDER] ChatView - Render Count: ${renderCountRef.current} - Time: ${performance.now().toFixed(2)}ms`);
+
+  // [PERF] DOM Commit Phase - fires after React updates DOM but before browser paint
+  useLayoutEffect(() => {
+    console.log(`[PERF][UI] Layout Commit for ChatView at ${performance.now().toFixed(2)}ms`);
+  });
+
+  // ATOMIC SELECTORS: Each selector only re-renders when its specific state changes
+  const activeChat = useAppStore(state => state.activeChat);
+  const messages = useAppStore(state => state.messages);
+  const setActiveChat = useAppStore(state => state.setActiveChat);
+  const clearChatHistory = useAppStore(state => state.clearChatHistory);
+
+  const encodingStatus = useSteganographyStore(state => state.encodingStatus);
+  const scrollPositions = useUIStore(state => state.scrollPositions);
+  const setScrollPosition = useUIStore(state => state.setScrollPosition);
+
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'fa';
 

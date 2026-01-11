@@ -5,8 +5,8 @@
  * Uses unified handleUniversalInput for all detection logic
  */
 
-/* eslint-disable max-lines-per-function */
-import { useEffect, useRef, useState } from 'react';
+/* eslint-disable max-lines-per-function, no-console */
+import { useEffect, useRef, useState, useTransition } from 'react';
 
 import { analyzeClipboard } from '../services/clipboardAnalysis';
 import { useAppStore } from '../stores/appStore';
@@ -117,41 +117,114 @@ export function useClipboardDetection(
   enabled: boolean,
   onDetection: (result: DetectionResult) => void,
   onNewMessage?: (result: {
-    type: 'message' | 'contact';
+    type: 'message';
     fingerprint: string;
     isBroadcast: boolean;
     senderName: string;
   }) => void,
 ) {
-  const { handleUniversalInput, identity, sessionPassphrase, contacts } = useAppStore();
-  const [lastCheckedClipboard, setLastCheckedClipboard] = useState<string>('');
+  const { handleUniversalInput, identity, sessionPassphrase, contacts, activeChat, updateSummaryForContact } = useAppStore();
 
-  // SYNC BLOCKING: Use ref to track last processed clipboard text synchronously
-  // This prevents the "quick re-open" loop by blocking re-detection within the same event cycle
-  const lastProcessedRef = useRef<string>('');
+  // SYNC BLOCKING: Use refs to track last processed clipboard text synchronously
+  // This prevents the "quick re-open" loop and avoids state-triggered re-renders
+  const lastCheckedClipboardRef = useRef<string>('');
   const lastProcessedImageRef = useRef<string>('');
   const isProcessingRef = useRef(false);
 
-  useEffect(() => {
-    if (!enabled) return;
+  // CONCURRENT UI: Use React 18 transitions for non-blocking modal updates
+  const [, startTransition] = useTransition();
 
-    const checkClipboard = async () => {
-      if (isProcessingRef.current) return;
+  // STABLE REFS: Keep latest callback and state references alive without triggering re-renders
+  const onDetectionRef = useRef(onDetection);
+  const onNewMessageRef = useRef(onNewMessage);
+  const handleUniversalInputRef = useRef(handleUniversalInput);
+  const identityRef = useRef(identity);
+  const sessionPassphraseRef = useRef(sessionPassphrase);
+  const activeChatRef = useRef(activeChat);
+  const updateSummaryForContactRef = useRef(updateSummaryForContact);
+  const contactsRef = useRef(contacts); // Added contactsRef
+
+  // Sync refs on every render (cheap)
+  useEffect(() => {
+    onDetectionRef.current = onDetection;
+    onNewMessageRef.current = onNewMessage;
+    handleUniversalInputRef.current = handleUniversalInput;
+    identityRef.current = identity;
+    sessionPassphraseRef.current = sessionPassphrase;
+    activeChatRef.current = activeChat;
+    updateSummaryForContactRef.current = updateSummaryForContact;
+    contactsRef.current = contacts; // Sync contactsRef
+  }); // Run on every render to keep refs fresh
+
+  // THE FREEZING EFFECT: Only re-run if 'enabled' state changes.
+  useEffect(() => {
+    // CLEANUP/RESET: When enabled becomes false (Lock), or on unmount of effect.
+    // However, useEffect cleanup runs BEFORE the next effect run.
+    if (!enabled) {
+      // Clear refs to ensure fresher detection when re-enabled
+      lastCheckedClipboardRef.current = '';
+      lastProcessedImageRef.current = '';
+      isProcessingRef.current = false;
+      return;
+    }
+
+    console.log(`[PERF][Hook] ClipboardDetection Effect - INIT (Enabled: ${enabled})`);
+
+    const checkClipboard = async (eventType: string = 'initial') => {
+      const perfStart = performance.now();
+      // Access current state via refs inside the closure
+      const _onDetection = onDetectionRef.current;
+      const _onNewMessage = onNewMessageRef.current;
+      const _handleUniversalInput = handleUniversalInputRef.current;
+      const _identity = identityRef.current;
+      const _sessionPassphrase = sessionPassphraseRef.current;
+      const _activeChat = activeChatRef.current;
+      const _updateSummaryForContact = updateSummaryForContactRef.current;
+      const _contacts = contactsRef.current; // Access contacts via ref
+
+      console.log(`[PERF][Clipboard] Event Start: ${eventType} at ${perfStart.toFixed(2)}ms`);
+
+      if (isProcessingRef.current) {
+        console.log(`[PERF][Clipboard] Skipped (already processing) - Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
+        console.log(`[PERF][TRACE] Check skipped because: already processing`);
+        return;
+      }
       isProcessingRef.current = true;
 
       try {
+        // EARLY DUPLICATE CHECK: Read clipboard text first to compare with last processed
+        // This prevents calling the worker/analyzer for already-processed content
+        let clipboardText: string | null = null;
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            clipboardText = await navigator.clipboard.readText();
+          }
+        } catch {
+          // Clipboard read failed - let analyzeClipboard handle it
+        }
+
+        if (clipboardText && clipboardText === lastCheckedClipboardRef.current) {
+           console.log(`[PERF][Clipboard] Skipped (duplicate text cache) - Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
+           isProcessingRef.current = false;
+           return;
+        }
+
+        // REMOVED PRE-UPDATE: Fixes logic deadlock. Ref is updated ONLY after analysis.
+
+        console.log(`[PERF][TRACE] 3. Calling analyzeClipboard... (text len: ${clipboardText?.length})`);
         const { processed, contentHash, textContent } = await analyzeClipboard(
           {
-            identity,
-            sessionPassphrase,
-            contacts,
-            handleUniversalInput,
+            handleUniversalInput: _handleUniversalInput,
+            identity: _identity,
+            sessionPassphrase: _sessionPassphrase,
+            contacts: _contacts,
           },
           {
-            previousText: lastCheckedClipboard,
+            previousText: lastCheckedClipboardRef.current,
             previousImageHash: lastProcessedImageRef.current,
-          },
+          }
         );
+        console.log(`[PERF][TRACE] 4. analyzeClipboard returned result:`, processed ? processed.type : 'null');
 
         // Update tracking refs
         if (contentHash) {
@@ -159,61 +232,40 @@ export function useClipboardDetection(
         }
 
         if (textContent) {
-          lastProcessedRef.current = textContent;
-          setLastCheckedClipboard(textContent);
+          lastCheckedClipboardRef.current = textContent;
         } else {
           // If no text detected (and no error), clear text tracking
           // This allows re-detection if user clears clipboard then copies same text
-          if (lastProcessedRef.current) {
-            lastProcessedRef.current = '';
-            setLastCheckedClipboard('');
+          if (lastCheckedClipboardRef.current) {
+            lastCheckedClipboardRef.current = '';
           }
         }
 
         // Handle successful detection
         if (processed) {
-          if (processed.type === 'message') {
-            logger.log('[Detector] Message detected, signaling App.tsx', processed);
-            if (onNewMessage) {
-              onNewMessage({
-                type: 'message',
-                fingerprint: processed.fingerprint!,
-                isBroadcast: processed.isBroadcast || false,
-                senderName: processed.senderName || 'Unknown',
-              });
-            } else {
-              logger.warn('[Detector] onNewMessage callback not provided');
-            }
-
-            if (onDetection) {
-              // For images (stego), encryptedData is already stored/handled
-              // For text, we might want to pass it?
-              // The original code passed `clipboardText.trim()` for text messages.
-              // `analyzeClipboard` returns `textContent` if it was text.
-
-              onDetection({
-                type: 'message',
-                contactName: processed.senderName || 'Unknown',
-                contactFingerprint: processed.fingerprint,
-                encryptedData: processed.source === 'text' ? textContent : undefined,
-              });
-            }
-          } else if (processed.type === 'contact') {
-             // Handle contact/id detection if returned as processed result
-             // (Currently analyzeClipboard might return 'contact' type for text)
-             if (processed.data && onDetection) {
-                // Assuming processed.data is the result from handleUniversalInput which might be { type: 'contact', ... }
-                // But handleUniversalInput usually throws 'CONTACT_INTRO_DETECTED' or returns 'message'.
-                // If I modified analyzeClipboard to catch 'id' type:
-                const contactData = processed.data;
-                 onDetection({
-                    type: 'id',
-                    contactName: contactData.name || 'Unknown',
-                    contactPublicKey: contactData.publicKey || contactData.key,
+          startTransition(() => {
+            if (processed.type === 'message') {
+              if (_onNewMessage) {
+                 console.log(`[PERF][TRACE] 5. Invoking callback: onNewMessage`);
+                 _onNewMessage({
+                    type: processed.type,
+                    fingerprint: processed.fingerprint!,
+                    isBroadcast: !!processed.isBroadcast,
+                    senderName: processed.senderName || 'Unknown',
                  });
-             }
-          }
+              }
+            } else if (processed.type === 'id' && _onDetection) {
+               console.log(`[PERF][TRACE] 5. Invoking callback: onDetection`);
+               _onDetection({
+                 type: 'id',
+                 contactName: processed.senderName || processed.data?.name || 'Unknown',
+                 contactFingerprint: processed.fingerprint,
+                 contactPublicKey: processed.data?.publicKey || processed.data?.key,
+               });
+            }
+          });
         }
+
       } catch (error: unknown) {
         // Handle errors re-thrown by analyzeClipboard (from handleUniversalInput)
         const err = error as Error;
@@ -268,6 +320,7 @@ export function useClipboardDetection(
         }
       } finally {
         isProcessingRef.current = false;
+        console.log(`[PERF][Clipboard] Event Complete: ${eventType} - Total Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
       }
     };
 
@@ -279,7 +332,7 @@ export function useClipboardDetection(
     const handleFocus = () => {
       // SECURITY: Only check clipboard if the document is focused to avoid background data access flags
       if (document.hasFocus()) {
-        checkClipboard();
+        checkClipboard('focus');
       }
     };
 
@@ -290,7 +343,7 @@ export function useClipboardDetection(
       // SECURITY: Ensure document is visible and focused before reading clipboard
       if (document.visibilityState === 'visible') {
         // Optional: Add a small delay or check user activation if possible in the future
-        checkClipboard();
+        checkClipboard('visibilitychange');
       }
     };
 
@@ -298,9 +351,12 @@ export function useClipboardDetection(
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      console.log(`[PERF][Hook] ClipboardDetection Effect - CLEANUP`);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (document.hasFocus()) {
+         lastCheckedClipboardRef.current = '';
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, handleUniversalInput, identity, lastCheckedClipboard, onDetection, onNewMessage]);
+  }, [enabled]);
 }

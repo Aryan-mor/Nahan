@@ -1,28 +1,28 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, no-console */
 /* eslint-disable max-lines-per-function */
 import {
-    Avatar,
-    Button,
-    Card,
-    CardBody,
-    Input,
-    Modal,
-    ModalBody,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    useDisclosure,
+  Avatar,
+  Button,
+  Card,
+  CardBody,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-    ClipboardPaste,
-    ImageDown,
-    Image as ImageIcon,
-    MessageSquare,
-    Plus,
-    Search,
+  ClipboardPaste,
+  ImageDown,
+  Image as ImageIcon,
+  MessageSquare,
+  Plus,
+  Search,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -45,26 +45,30 @@ export function ChatList({
   onNewChat: () => void;
   onDetection?: (result: DetectionResult) => void;
 }) {
+  // [PERF] Re-render counter for telemetry
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+  console.log(`[PERF][RENDER] ChatList - Render Count: ${renderCountRef.current} - Time: ${performance.now().toFixed(2)}ms`);
+
   const { t } = useTranslation();
-  const {
-    contacts,
-    getContactsWithBroadcast,
-    setActiveChat,
-    handleUniversalInput,
-    lastStorageUpdate,
-    chatSummaries,
-    refreshChatSummaries,
-    identity,
-    sessionPassphrase,
-  } = useAppStore();
-  const {
-    decodingStatus,
-    setDecodingStatus,
-    setDecodedImageUrl,
-    setDecodingError,
-    resetDecoding,
-    decodedImageUrl,
-  } = useSteganographyStore();
+
+  // ATOMIC SELECTORS: Each selector only re-renders when its specific state changes
+  const contacts = useAppStore(state => state.contacts);
+  const getContactsWithBroadcast = useAppStore(state => state.getContactsWithBroadcast);
+  const setActiveChat = useAppStore(state => state.setActiveChat);
+  const handleUniversalInput = useAppStore(state => state.handleUniversalInput);
+  const chatSummaries = useAppStore(state => state.chatSummaries);
+  const refreshChatSummaries = useAppStore(state => state.refreshChatSummaries);
+  const identity = useAppStore(state => state.identity);
+  const sessionPassphrase = useAppStore(state => state.sessionPassphrase);
+
+  // ATOMIC SELECTORS for Steganography Store
+  const decodingStatus = useSteganographyStore(state => state.decodingStatus);
+  const setDecodingStatus = useSteganographyStore(state => state.setDecodingStatus);
+  const setDecodedImageUrl = useSteganographyStore(state => state.setDecodedImageUrl);
+  const setDecodingError = useSteganographyStore(state => state.setDecodingError);
+  const resetDecoding = useSteganographyStore(state => state.resetDecoding);
+  const decodedImageUrl = useSteganographyStore(state => state.decodedImageUrl);
   const stegoService = ImageSteganographyService.getInstance();
   const storageService = StorageService.getInstance();
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,7 +88,7 @@ export function ChatList({
 
   // New Message Modal
   const [newMessageResult, setNewMessageResult] = useState<{
-    type: 'message' | 'contact';
+    type: 'message';
     fingerprint: string;
     isBroadcast: boolean;
     senderName: string;
@@ -127,7 +131,7 @@ export function ChatList({
             senderName: processed.senderName || 'Unknown',
           });
           setShowNewMessageModal(true);
-        } else if (processed.type === 'contact') {
+        } else if (processed.type === 'id') {
           // Handle contact detection
           // analyzeClipboard might return contact type from handleUniversalInput
           if (processed.data) {
@@ -314,74 +318,75 @@ export function ChatList({
     }
   };
 
+  // INITIAL LOAD ONLY: Fetch summaries once on mount
+  // O(1) updates happen inline in sendMessage/handleUniversalInput
   useEffect(() => {
     refreshChatSummaries();
-    // REACTIVITY: Strictly tied to lastStorageUpdate to trigger re-fetch when IndexedDB changes
-    // This ensures ChatList updates when messages are imported via clipboard or sent
-  }, [lastStorageUpdate, contacts, refreshChatSummaries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Mount only - O(1) inline updates handle subsequent changes
+
+  // [PERF] UI Rendering Audit - measures time from store update to render commit
+
 
   // Get contacts with broadcast at index 0
   const allContacts = getContactsWithBroadcast();
-  const filteredContacts = allContacts
-    .filter(
-      (c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.fingerprint.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-    .sort((a, b) => {
-      // Two-Tier Sorting System: Pinned Broadcast + Chronological
 
-      // Tier 1 (Pinned): Broadcast Channel always at top
-      if (a.fingerprint === 'BROADCAST') {
-        return -1; // Broadcast always comes first
+  // MEMOIZED: Expensive filtering and sorting only runs when dependencies change
+  // Prevents re-sorting on every render (major performance improvement)
+  const filteredContacts = useMemo(() => {
+    const sortStart = performance.now();
+
+    // Helper to convert date to timestamp (handles all date formats consistently)
+    const getTime = (date: Date | string | number | undefined | null): number => {
+      if (!date) return 0;
+      if (date instanceof Date) {
+        const time = date.getTime();
+        return isNaN(time) ? 0 : time;
       }
-      if (b.fingerprint === 'BROADCAST') {
-        return 1; // Broadcast always comes first
+      if (typeof date === 'number') {
+        return isNaN(date) ? 0 : date;
       }
+      if (typeof date === 'string') {
+        const dateObj = new Date(date);
+        const time = dateObj.getTime();
+        return isNaN(time) ? 0 : time;
+      }
+      return 0;
+    };
 
-      // Tier 2 (Chronological): All other contacts sorted by newest first
-      const msgA = chatSummaries[a.fingerprint];
-      const msgB = chatSummaries[b.fingerprint];
+    const result = allContacts
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.fingerprint.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+      .sort((a, b) => {
+        // Tier 1: Broadcast always at top
+        if (a.fingerprint === 'BROADCAST') return -1;
+        if (b.fingerprint === 'BROADCAST') return 1;
 
-      // Helper to convert date to timestamp (handles all date formats consistently)
-      // Supports: Date objects, ISO strings, timestamp numbers, and invalid dates
-      const getTime = (date: Date | string | number | undefined | null): number => {
-        if (!date) return 0;
+        // Tier 2: Chronological (newest first)
+        const msgA = chatSummaries[a.fingerprint];
+        const msgB = chatSummaries[b.fingerprint];
+        const timeA = msgA ? getTime(msgA.createdAt) : getTime(a.createdAt);
+        const timeB = msgB ? getTime(msgB.createdAt) : getTime(b.createdAt);
+        return timeB - timeA;
+      });
 
-        // Handle Date objects
-        if (date instanceof Date) {
-          const time = date.getTime();
-          return isNaN(time) ? 0 : time;
-        }
+    console.log(`[PERF][UI] Contacts Sorting - Duration: ${(performance.now() - sortStart).toFixed(2)}ms - Count: ${result.length}`);
+    return result;
+  }, [allContacts, searchQuery, chatSummaries]);
 
-        // Handle numbers (timestamps)
-        if (typeof date === 'number') {
-          return isNaN(date) ? 0 : date;
-        }
+  // [PERF] DOM Commit Phase - fires after React updates DOM but before browser paint
+  useLayoutEffect(() => {
+    console.log(`[PERF][UI] DOM Commit Phase Finished at ${performance.now().toFixed(2)}ms`);
+  });
 
-        // Handle strings (ISO format, etc.)
-        if (typeof date === 'string') {
-          const dateObj = new Date(date);
-          const time = dateObj.getTime();
-          return isNaN(time) ? 0 : time;
-        }
-
-        return 0;
-      };
-
-      // Sort Logic: Newest messages/contacts MUST be at the top
-      // timeB - timeA ensures descending order (newest first)
-      const timeA = msgA ? getTime(msgA.createdAt) : getTime(a.createdAt);
-      const timeB = msgB ? getTime(msgB.createdAt) : getTime(b.createdAt);
-      return timeB - timeA; // Correct: newest at top
-    });
-
-  // Log sorting result
-  const broadcastCount = filteredContacts.filter((c) => c.fingerprint === 'BROADCAST').length;
-  const regularContactsCount = filteredContacts.length - broadcastCount;
-  logger.debug(
-    `[UI] Chat list sorted: Broadcast pinned, ${regularContactsCount} contacts chronological`,
-  );
+  // Log sorting result (only in dev)
+  if (process.env.NODE_ENV === 'development') {
+    const broadcastCount = filteredContacts.filter((c) => c.fingerprint === 'BROADCAST').length;
+    logger.debug(`[UI] Chat list: ${filteredContacts.length - broadcastCount} contacts`);
+  }
 
   // Filter out broadcast contact from modal (only show real contacts)
   const modalFilteredContacts = contacts.filter(

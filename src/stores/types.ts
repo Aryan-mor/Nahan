@@ -38,13 +38,14 @@ export interface MessageSlice {
   clearChatHistory: (fingerprint: string) => Promise<void>;
   refreshMessages: () => Promise<void>;
   refreshChatSummaries: () => Promise<void>;
+  updateSummaryForContact: (fingerprint: string, lastMessage: SecureMessage) => void; // O(1) incremental update
   processPendingMessages: () => Promise<number>;
   clearAllMessages: () => Promise<void>;
 }
 
 export interface ProcessingSlice {
-  processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
-  handleUniversalInput: (input: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message' | 'contact'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
+  processIncomingMessage: (encryptedText: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
+  handleUniversalInput: (input: string, targetContactFingerprint?: string, skipNavigation?: boolean) => Promise<{ type: 'message'; fingerprint: string; isBroadcast: boolean; senderName: string } | null>;
 }
 
 export interface StealthSlice {

@@ -9,7 +9,21 @@ export type WorkerTaskType =
   | 'steganography'
   | 'image_process'
   | 'base64ToBinary'
-  | 'binaryToBase64';
+  | 'binaryToBase64'
+  | 'analyzeInput';
+
+/**
+ * Result of analyzing input for Nahan content.
+ * Mirrors the interface in processing.worker.ts
+ */
+export interface AnalysisResult {
+  type: 'message' | 'id' | 'broadcast' | 'unknown';
+  extractedBinary: Uint8Array | null;
+  isZWC: boolean; // kept boolean
+  keyData?: { name: string; publicKey: string };
+  protocolVersion?: number;
+  coverText?: string;
+}
 
 export interface WorkerTask<T = unknown> {
   id: string;
@@ -182,6 +196,14 @@ export class WorkerService {
       }
     }
     return lastHighIndex;
+  }
+
+  /**
+   * Analyze input for Nahan content (ZWC, keys, messages).
+   * This is a high-priority task to keep clipboard detection responsive.
+   */
+  async analyzeInput(input: string): Promise<AnalysisResult> {
+    return this.execute<AnalysisResult>('analyzeInput', { input }, { priority: 'HIGH' });
   }
 
   /**

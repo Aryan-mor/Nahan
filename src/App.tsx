@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, no-console */
 /* eslint-disable max-lines-per-function */
 import { Avatar, Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
@@ -12,7 +12,7 @@ import {
     Settings as SettingsIcon,
     Users,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast, Toaster } from 'sonner';
 
@@ -23,6 +23,7 @@ import { DetectionModal } from './components/DetectionModal';
 import { KeyExchange } from './components/KeyExchange';
 import { LanguageSelector } from './components/LanguageSelector';
 import { LockScreen } from './components/LockScreen';
+import { ManualPasteModal } from './components/ManualPasteModal';
 import { MyQRModal } from './components/MyQRModal';
 import { NewMessageModal } from './components/NewMessageModal';
 import { Onboarding } from './components/Onboarding';
@@ -46,33 +47,40 @@ import * as logger from './utils/logger';
 type TabType = 'chats' | 'keys' | 'settings';
 
 export default function App() {
+  // [PERF] Re-render counter for telemetry
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+  console.log(`[PERF][RENDER] App - Render Count: ${renderCountRef.current} - Time: ${performance.now().toFixed(2)}ms`);
+
   useOfflineSync();
   usePWA();
 
-  const {
-    initializeApp,
-    isLoading,
-    error,
-    identity,
-    activeChat,
-    showStealthModal,
-    setShowStealthModal,
-    sessionPassphrase,
-    setActiveChat,
-    handleUniversalInput,
-  } = useAppStore();
+  // ATOMIC SELECTORS: Each selector only re-renders when its specific state changes
+  const initializeApp = useAppStore(state => state.initializeApp);
+  const isLoading = useAppStore(state => state.isLoading);
+  const error = useAppStore(state => state.error);
+  const identity = useAppStore(state => state.identity);
+  const activeChat = useAppStore(state => state.activeChat);
+  const showStealthModal = useAppStore(state => state.showStealthModal);
+  const setShowStealthModal = useAppStore(state => state.setShowStealthModal);
+  const sessionPassphrase = useAppStore(state => state.sessionPassphrase);
+  const setActiveChat = useAppStore(state => state.setActiveChat);
+  const handleUniversalInput = useAppStore(state => state.handleUniversalInput);
 
-  const {
-    language,
-    isLocked,
-    setLocked,
-    activeTab,
-    setActiveTab,
-    camouflageLanguage,
-    isStandalone,
-    deferredPrompt,
-    setInstallPromptVisible,
-  } = useUIStore();
+  // ATOMIC SELECTORS for UI Store
+  const language = useUIStore(state => state.language);
+  const isLocked = useUIStore(state => state.isLocked);
+  const setLocked = useUIStore(state => state.setLocked);
+  const activeTab = useUIStore(state => state.activeTab);
+  const setActiveTab = useUIStore(state => state.setActiveTab);
+  const camouflageLanguage = useUIStore(state => state.camouflageLanguage);
+  const isStandalone = useUIStore(state => state.isStandalone);
+  const deferredPrompt = useUIStore(state => state.deferredPrompt);
+  const setInstallPromptVisible = useUIStore(state => state.setInstallPromptVisible);
+
+  // [PERF] Selector stability telemetry - track which selectors are changing
+  console.log(`[PERF][RENDER] App - Selectors: { identity: ${!!identity}, activeChat: ${activeChat?.fingerprint || 'null'}, isLocked: ${isLocked}, isLoading: ${isLoading} }`);
+
   const { t, i18n } = useTranslation();
 
   // Update document direction based on language
@@ -159,7 +167,7 @@ export default function App() {
 
   // New message modal state
   const [newMessageResult, setNewMessageResult] = useState<{
-    type: 'message' | 'contact';
+    type: 'message';
     fingerprint: string;
     isBroadcast: boolean;
     senderName: string;
@@ -205,18 +213,46 @@ export default function App() {
     }
   }, [clipboardPermission.state, isLocked, identity, sessionPassphrase]);
 
-  // Handle clipboard detection results
-  const handleDetection = async (result: DetectionResult) => {
+  // STABLE REFS for Handlers (Prevent Hook Thrashing)
+  const identityRef = useRef(identity);
+  const showDetectionModalRef = useRef(showDetectionModal);
+  const detectionResultRef = useRef(detectionResult);
+  const showNewMessageModalRef = useRef(showNewMessageModal);
+  const newMessageResultRef = useRef(newMessageResult);
+
+  useEffect(() => {
+    identityRef.current = identity;
+    showDetectionModalRef.current = showDetectionModal;
+    detectionResultRef.current = detectionResult;
+    showNewMessageModalRef.current = showNewMessageModal;
+    newMessageResultRef.current = newMessageResult;
+  }, [identity, showDetectionModal, detectionResult, showNewMessageModal, newMessageResult]);
+
+  // Handle clipboard detection results - STABILIZED (No dependencies)
+  const handleDetection = useCallback(async (result: DetectionResult) => {
+    console.log(`[PERF][TRACE] 6. App.tsx received detection result: ${result.contactFingerprint}`);
+
+    // Access state via Refs or Store getter to keep handler stable
+    const _identity = identityRef.current;
+    const _showDetectionModal = showDetectionModalRef.current;
+    const _detectionResult = detectionResultRef.current;
+
+    // DUPLICATE PREVENTION: If modal is already open for same fingerprint, ignore
+    if (_showDetectionModal && _detectionResult?.contactFingerprint === result.contactFingerprint) {
+      logger.debug('App: Ignoring duplicate detection - modal already open');
+      return;
+    }
+
     // Safety check: Prevent showing modal for user's own identity
     // CRITICAL: Only block if fingerprint matches exactly - don't accidentally block valid new contacts
-    if (result.type === 'id' && result.contactPublicKey && identity) {
+    if (result.type === 'id' && result.contactPublicKey && _identity) {
       try {
         const { CryptoService } = await import('./services/crypto');
         const cryptoService = CryptoService.getInstance();
         const detectedFingerprint = await cryptoService.getFingerprint(result.contactPublicKey);
 
         // Compare with user's own fingerprint - only block if exact match
-        if (detectedFingerprint === identity.fingerprint) {
+        if (detectedFingerprint === _identity.fingerprint) {
           // This is the user's own identity - silently ignore
           logger.debug('App: Ignoring own identity detection');
           return;
@@ -245,14 +281,9 @@ export default function App() {
             sessionPassphrase,
           );
           if (duplicate) {
-            logger.debug('App: Duplicate message found, showing navigation modal');
-            setDetectionResult({
-               ...result,
-               type: 'duplicate_message',
-               // Use stored contact fingerprint if available to ensure correct navigation
-               contactFingerprint: result.contactFingerprint
-            });
-            setShowDetectionModal(true);
+            // SILENT SKIP: Duplicate messages from background clipboard checks should NOT show modals
+            // This prevents annoying "Duplicate message" popups when user switches tabs
+            logger.debug('App: Duplicate message detected - silently ignoring (background check)');
             return;
           }
         }
@@ -262,6 +293,7 @@ export default function App() {
 
         // Show modal for user to decide when to navigate
         setDetectionResult(result);
+        console.log(`[PERF][TRACE] 7. Setting modal state: DetectionModal to true`);
         setShowDetectionModal(true);
       } catch (error) {
         // Check if it's a duplicate message error
@@ -275,102 +307,85 @@ export default function App() {
         // Show error toast but still show modal for manual retry
         toast.error('Failed to import message. Please try again.');
         setDetectionResult(result);
+        console.log(`[PERF][TRACE] 7. Setting modal state: DetectionModal to true`);
         setShowDetectionModal(true);
       }
     } else {
       // For ID packets, just show modal
       setDetectionResult(result);
+      console.log(`[PERF][TRACE] 7. Setting modal state: DetectionModal to true`);
       setShowDetectionModal(true);
     }
-  };
+  }, []); // STABLE: Empty dependency array guarantees hook never re-inits
 
   /**
    * Handle manual paste from the top header
-   * Supports detecting Stealth IDs, Messages (Text/Image), and Contact Intros
    */
-  const handleManualPaste = async (content: string) => {
+  const handleManualPaste = async () => {
+    // MANUAL PASTE: When user manually clicks paste code
+    // This uses navigator.clipboard.readText() which requires prompt if not granted
+    // Then it calls handleUniversalInput
     try {
-      // Use universal input handler (same as ChatList)
-      const result = await handleUniversalInput(content, undefined, true);
-
-      // If a message was detected, show the new message modal
-      if (result && result.type === 'message') {
-        setNewMessageResult(result);
-        setShowNewMessageModal(true);
-      }
-
-      // Close manual paste modal on success
-      manualPasteModal.onClose();
-    } catch (error: unknown) {
-      const err = error as {
-        message?: string;
-        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
-      };
-
-      // Handle Contact Intro Detection (Protocol standard)
-      if (err.message === 'CONTACT_INTRO_DETECTED') {
-        manualPasteModal.onClose();
-        if (detectionResult) {
-            // Let's manually trigger the detection flow
-            if (err.keyData) {
-              const contactName = err.keyData.name || err.keyData.username || 'Unknown';
-              const contactPublicKey = err.keyData.publicKey || err.keyData.key;
-              if (contactPublicKey) {
-                // Determine if it's ID or Update
-                handleDetection({
-                  type: 'id',
-                  contactName: contactName,
-                  contactPublicKey: contactPublicKey,
-                });
-              }
-            }
-        } else {
-             // Fallback if no prior detection state - direct call
-             if (err.keyData) {
-              const contactName = err.keyData.name || err.keyData.username || 'Unknown';
-              const contactPublicKey = err.keyData.publicKey || err.keyData.key;
-              if (contactPublicKey) {
-                handleDetection({
-                  type: 'id',
-                  contactName: contactName,
-                  contactPublicKey: contactPublicKey,
-                });
-              }
-            }
-        }
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        toast.error('Clipboard is empty');
         return;
       }
 
-      // Generic error
-      logger.error('Manual paste failed:', error);
-      toast.error(t('chat.list.process_error'));
+      try {
+         // handleUniversalInput handles everything: parsing, decrypting, storing
+         const result = await handleUniversalInput(text, undefined, true);
+         if (result && result.type === 'message') {
+            // Success - show manual paste modal populated?
+            // Or just navigate?
+            // Current flow usually shows ManualPasteModal or toast
+            // For now, let's toast success or show detection logic if appropriate
+            toast.success('Message imported successfully');
+         }
+      } catch (err) {
+         logger.error('Manual paste failed:', err);
+         toast.error('Invalid code or message');
+         manualPasteModal.onOpen(); // Fallback to manual entry
+      }
+
+    } catch (err) {
+      if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+         toast.error('Clipboard permission denied');
+      } else {
+         manualPasteModal.onOpen();
+      }
     }
   };
 
-  // Handle new message from clipboard detection
-  const handleNewMessage = (result: {
-    type: 'message' | 'contact';
+
+
+  // Handle new message from clipboard detection - STABILIZED
+  const handleNewMessage = useCallback((result: {
+    type: 'message';
     fingerprint: string;
     isBroadcast: boolean;
     senderName: string;
   }) => {
-    // Unify modal logic: If we have a specific message result, use detection modal first
-    // This ensures consistency with the new unified modal flow
-    if (result.type === 'message') {
-      // UNIFICATION: Use NewMessageModal for messages to ensure consistent UI and testability
-      setNewMessageResult({
-        type: 'message',
-        fingerprint: result.fingerprint,
-        isBroadcast: result.isBroadcast,
-        senderName: result.senderName,
-      });
-      setShowNewMessageModal(true);
-    } else {
-      // This path likely won't be hit for contacts based on current logic, but kept for safety
-      setNewMessageResult(result);
-      setShowNewMessageModal(true);
+    console.log(`[PERF][TRACE] 6. App.tsx received detection result: ${result.fingerprint}`);
+    const _showNewMessageModal = showNewMessageModalRef.current;
+    const _newMessageResult = newMessageResultRef.current;
+
+    // DUPLICATE PREVENTION: If modal is already open for same fingerprint, ignore
+    if (_showNewMessageModal && _newMessageResult?.fingerprint === result.fingerprint) {
+      logger.debug('App: Ignoring duplicate new message - modal already open');
+      return;
     }
-  };
+
+    // UNIFICATION: Use NewMessageModal for messages to ensure consistent UI and testability
+    setNewMessageResult({
+      type: 'message',
+      fingerprint: result.fingerprint,
+      isBroadcast: result.isBroadcast,
+      senderName: result.senderName,
+    });
+    console.log(`[PERF][TRACE] 7. Setting modal state: NewMessageModal to true`);
+    setShowNewMessageModal(true);
+  }, []); // STABLE: Empty dependency array guarantees hook never re-inits
 
   const handleCopyIdentity = async () => {
     if (!identity) return;
@@ -422,11 +437,13 @@ export default function App() {
     const startLockTimer = () => {
       if (lockTimeoutRef.current) return;
 
+      console.log(`[PERF][Security] startLockTimer triggered at ${performance.now().toFixed(2)}ms`);
       // Lock timeout: 5 minutes in dev mode, 1 minute in production
       const lockTimeout = import.meta.env.DEV ? 300000 : 60000; // 5 minutes : 1 minute
 
       lockTimeoutRef.current = setTimeout(() => {
         if (identity) {
+          console.log(`[PERF][Security] Lock timeout exceeded at ${performance.now().toFixed(2)}ms, locking app`);
           setLocked(true);
         }
         lockTimeoutRef.current = null;
@@ -435,6 +452,7 @@ export default function App() {
 
     const cancelLockTimer = () => {
       if (lockTimeoutRef.current) {
+        console.log(`[PERF][Security] cancelLockTimer triggered at ${performance.now().toFixed(2)}ms`);
         clearTimeout(lockTimeoutRef.current);
         lockTimeoutRef.current = null;
       }

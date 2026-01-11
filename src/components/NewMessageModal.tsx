@@ -93,7 +93,7 @@ export function NewMessageModal({
                       {isBroadcast ? t('new_message.broadcast_from', { name: senderName }) : senderName}
                     </p>
                     <p className="text-sm text-industrial-500 truncate">
-                      {senderFingerprint.slice(-8)}
+                      {senderFingerprint ? senderFingerprint.slice(-8) : 'Unknown'}
                     </p>
                   </div>
                 </div>

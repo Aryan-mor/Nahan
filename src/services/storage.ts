@@ -74,13 +74,54 @@ export class StorageService {
   private readonly DB_NAME = 'nahan_secure_v1';
   private readonly DB_VERSION = 3; // Increment to trigger migration for system_settings
 
-  private constructor() {}
+  private worker: Worker | null = null;
+  private pendingRequests = new Map<string, { resolve: (value: any) => void; reject: (reason: any) => void }>();
+
+  private constructor() {
+    this.initializeWorker();
+  }
 
   static getInstance(): StorageService {
     if (!StorageService.instance) {
       StorageService.instance = new StorageService();
     }
     return StorageService.instance;
+  }
+
+  private initializeWorker() {
+    if (typeof Worker !== 'undefined') {
+      this.worker = new Worker(new URL('../workers/storage.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      this.worker.onmessage = this.handleWorkerMessage.bind(this);
+      this.worker.onerror = (error) => {
+        logger.error('Storage Worker Error:', error);
+      };
+    }
+  }
+
+  private handleWorkerMessage(event: MessageEvent) {
+    const { id, success, data, error } = event.data;
+    const request = this.pendingRequests.get(id);
+
+    if (request) {
+      this.pendingRequests.delete(id);
+      if (success) {
+        request.resolve(data);
+      } else {
+        request.reject(new Error(error));
+      }
+    }
+  }
+
+  private executeWorkerTask<T>(type: string, payload: any): Promise<T> {
+    if (!this.worker) throw new Error('Storage Worker not initialized');
+
+    return new Promise((resolve, reject) => {
+      const id = crypto.randomUUID();
+      this.pendingRequests.set(id, { resolve, reject });
+      this.worker!.postMessage({ id, type, payload });
+    });
   }
 
   /**
@@ -452,8 +493,28 @@ export class StorageService {
       createdAt: message.createdAt || new Date(),
     };
 
-    await this.storeInVault(messageId, completeMessage, passphrase);
-    logger.debug(`[Storage] Message saved to ${conversationFingerprint}`);
+    // WORKER OFFLOAD: Move encryption and DB write to worker
+    // Main thread just prepares the object and keys
+    // We need the MasterKey (CryptoKey) to pass to worker
+    // Note: passphrase arg is legacy/ignored in V2 if we use getMasterKey directly in secureStorage
+    // But here we need to get the key.
+    // secureStorage.getMasterKey() is synch.
+
+    // Dynamic import to avoid circular dependency if needed, or assume global import
+    const { getMasterKey } = await import('./secureStorage');
+    const masterKey = getMasterKey();
+
+    if (!masterKey) {
+       throw new Error('Master Key not available for worker storage');
+    }
+
+    const start = performance.now();
+    await this.executeWorkerTask('storeMessage', {
+      message: completeMessage,
+      masterKey
+    });
+    logger.debug(`[PERF][Storage] Worker Store Message - Duration: ${(performance.now() - start).toFixed(2)}ms`);
+
     return completeMessage;
   }
 
