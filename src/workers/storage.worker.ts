@@ -22,6 +22,7 @@ interface WorkerRequest {
     offset?: number;
 
     // storeMessage
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     message?: any; // We'll keep it loose or import types if possible
   };
 }
@@ -45,6 +46,7 @@ const initializeDB = async () => {
 
 // eslint-disable-next-line max-lines-per-function
 const handleGetMessages = async (payload: WorkerRequest['payload']) => {
+  const start = performance.now();
   const { fingerprint, limit, offset, masterKey } = payload;
   const db = await initializeDB();
 
@@ -56,17 +58,23 @@ const handleGetMessages = async (payload: WorkerRequest['payload']) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawEntries: any[] = [];
 
+  const cursorStart = performance.now();
   let cursor = await store.openCursor(range, 'prev');
   if (offset > 0 && cursor) await cursor.advance(offset);
 
+  let scannedCount = 0;
   while (cursor && rawEntries.length < limit) {
+     scannedCount++;
+     // Double check prefix (bound should handle it, but for safety/perf check)
      if (cursor.value.id.startsWith(prefix)) {
        rawEntries.push(cursor.value);
      }
      cursor = await cursor.continue();
   }
+  const scanDuration = performance.now() - cursorStart;
 
   // Parallel Decryption & Image Processing
+  const decryptStart = performance.now();
   const results = await Promise.all(
     rawEntries.map(async (entry) => {
       try {
@@ -93,6 +101,10 @@ const handleGetMessages = async (payload: WorkerRequest['payload']) => {
       return null;
     })
   );
+  const decryptDuration = performance.now() - decryptStart;
+
+  // eslint-disable-next-line no-console
+  console.log(`[PERF][Worker] getMessages('${fingerprint}') - Scan: ${scanDuration.toFixed(2)}ms (${scannedCount} items), Decrypt: ${decryptDuration.toFixed(2)}ms, Total: ${(performance.now() - start).toFixed(2)}ms`);
 
   return results.filter(Boolean).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
