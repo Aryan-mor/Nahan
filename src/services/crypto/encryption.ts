@@ -7,8 +7,8 @@ import * as logger from '../../utils/logger';
 
 import { decryptPrivateKey, generateFingerprint } from './keys';
 import {
-  deserializeEncryptedMessage,
-  serializeEncryptedMessage,
+    deserializeEncryptedMessage,
+    serializeEncryptedMessage,
 } from './serialization';
 
 /**
@@ -42,10 +42,10 @@ export async function encryptMessage(
     }
 
     // 1. Compress the message using pako BEFORE encryption
-    const messageBytes = typeof message === 'string' 
-      ? new TextEncoder().encode(message) 
+    const messageBytes = typeof message === 'string'
+      ? new TextEncoder().encode(message)
       : message;
-      
+
     const compressed = pako.deflate(messageBytes);
 
     // 2. Encrypt using nacl.box (X25519 + XSalsa20-Poly1305)
@@ -95,7 +95,7 @@ export async function decryptMessage(
   recipientPrivateKey: string,
   passphrase: string,
   senderPublicKeys: string[] = [],
-  options?: { 
+  options?: {
     binary?: boolean;
     forcePeerPublicKey?: string; // Use this public key instead of the one in the header for decryption (needed for sender to decrypt own message)
   },
@@ -140,6 +140,14 @@ export async function decryptMessage(
 
     // Decrypt using nacl.box (X25519 authenticated encryption)
     // nacl.box.open automatically verifies the Poly1305 MAC, providing authentication
+
+    // DEBUG: Log if we are forcing a peer key (Sender Flow) vs Standard Flow
+    if (options?.forcePeerPublicKey) {
+      if (!peerPublicKeyBytes || peerPublicKeyBytes.length !== 32) {
+         logger.warn('[CRYPTO] Invalid forced peer key', { length: peerPublicKeyBytes?.length });
+      }
+    }
+
     const decrypted = nacl.box.open(
       encryptedPayload,
       nonce,
@@ -191,8 +199,8 @@ export async function decryptMessage(
 
     // Decompress the message
     const decompressed = pako.inflate(decrypted);
-    const data = options?.binary 
-      ? decompressed 
+    const data = options?.binary
+      ? decompressed
       : new TextDecoder().decode(decompressed);
 
     return {

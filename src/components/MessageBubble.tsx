@@ -90,8 +90,23 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
     if (message?.type === 'image_stego' && imageUrl && !decodedSrc && !decodedText && !decodeFailed && identity && sessionPassphrase && isVisible) {
       const decode = async () => {
         try {
+          // Fix: Resolve peer key for outgoing messages from contacts list if activeChat is unavailable or mismatched.
+          // This is critical for the "Sender Flow" (decrypting own sent strings/images).
+          // We need to pair our Private Key with the Recipient's Public Key.
+          const contacts = useAppStore.getState().contacts;
+          const recipientContact = isOutgoing
+            ? (activeChat?.fingerprint === message.recipientFingerprint ? activeChat : contacts.find(c => c.fingerprint === message.recipientFingerprint))
+            : null;
+
           const senderKey = isOutgoing ? identity.publicKey : activeChat?.publicKey;
-          const decryptionPeerKey = isOutgoing ? activeChat?.publicKey : undefined;
+          const decryptionPeerKey = isOutgoing ? recipientContact?.publicKey : undefined;
+
+          if (isOutgoing && !decryptionPeerKey) {
+             logger.warn('Decryption warning: Could not resolve recipient public key for outgoing message', {
+               recipientFingerprint: message.recipientFingerprint
+             });
+             // We continue, but decryption will likely fail if it relies on forcePeerPublicKey
+          }
 
           // FETCHING: fetch blob from URL (or base64)
           // Since imageUrl is likely base64 from IDB, we can use it directly?

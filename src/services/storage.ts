@@ -114,7 +114,7 @@ export class StorageService {
     }
   }
 
-  private executeWorkerTask<T>(type: string, payload: any): Promise<T> {
+  private executeWorkerTask<T>(type: string, payload: unknown): Promise<T> {
     if (!this.worker) throw new Error('Storage Worker not initialized');
 
     return new Promise((resolve, reject) => {
@@ -131,8 +131,7 @@ export class StorageService {
     try {
       this.db = (await openDB<NahanDB>(this.DB_NAME, this.DB_VERSION, {
         upgrade(db, oldVersion) {
-          // Delete all old tables (migration to vault)
-          if (oldVersion < 2) {
+
             // Delete old tables if they exist
             if (db.objectStoreNames.contains('user_identity')) {
               db.deleteObjectStore('user_identity');
@@ -140,10 +139,7 @@ export class StorageService {
             if (db.objectStoreNames.contains('contacts')) {
               db.deleteObjectStore('contacts');
             }
-            if (db.objectStoreNames.contains('messages')) {
-              db.deleteObjectStore('messages');
-            }
-          }
+
 
           // Create secure_vault table (single table for all encrypted data)
           if (!db.objectStoreNames.contains('secure_vault')) {
@@ -476,7 +472,7 @@ export class StorageService {
    * Message ID format: msg_{recipientFingerprint}_{uuid}
    * This enables efficient IndexedDB key range queries for message retrieval
    */
-  async storeMessage(message: Omit<SecureMessage, 'createdAt' | 'id'> & { createdAt?: Date; id?: string }, passphrase: string): Promise<SecureMessage> {
+  async storeMessage(message: Omit<SecureMessage, 'createdAt' | 'id'> & { createdAt?: Date; id?: string }, _passphrase: string): Promise<SecureMessage> {
     // Use recipient fingerprint in message ID for efficient key range queries
     // For outgoing messages, recipientFingerprint is the contact's fingerprint
     // For incoming messages, recipientFingerprint is the user's fingerprint (conversation partner)
