@@ -23,6 +23,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
     ids: [],
     entities: {}
   },
+  isLoadingMessages: false,
   chatSummaries: {},
   messageInput: '',
   lastStorageUpdate: Date.now(),
@@ -30,13 +31,16 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
   setActiveChat: async (contact) => {
     set({ activeChat: contact });
     if (contact) {
+      set({ isLoadingMessages: true });
       const { sessionPassphrase } = get();
       if (!sessionPassphrase) {
+        set({ isLoadingMessages: false });
         throw new Error('SecureStorage: Missing key');
       }
 
       const activeMasterKey = getMasterKey();
       if (!activeMasterKey) {
+        set({ isLoadingMessages: false });
         throw new Error('SecureStorage: Master Key not loaded');
       }
 
@@ -68,35 +72,42 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         });
       });
 
-      const messages = await fetchPromise;
+      try {
+        const messages = await fetchPromise;
 
-      // Post-Processing: Create Object URLs from Blobs (Main Thread is fast at this)
-      messages.forEach(msg => {
-        if (msg.content.imageBlob) {
-           msg.content.image = URL.createObjectURL(msg.content.imageBlob);
-           delete msg.content.imageBlob; // cleanup
+        // Post-Processing: Create Object URLs from Blobs (Main Thread is fast at this)
+        messages.forEach(msg => {
+          if (msg.content.imageBlob) {
+             msg.content.image = URL.createObjectURL(msg.content.imageBlob);
+             delete msg.content.imageBlob; // cleanup
+          }
+        });
+
+        // Normalize
+        const ids: string[] = [];
+        const entities: Record<string, SecureMessage> = {};
+
+        messages.forEach(msg => {
+          ids.push(msg.id);
+          entities[msg.id] = msg;
+        });
+
+        set({
+          messages: { ids, entities },
+          isLoadingMessages: false
+        });
+
+        if (contact.id !== 'system_broadcast') {
+          await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
         }
-      });
-
-      // Normalize
-      const ids: string[] = [];
-      const entities: Record<string, SecureMessage> = {};
-
-      messages.forEach(msg => {
-        ids.push(msg.id);
-        entities[msg.id] = msg;
-      });
-
-      set({
-        messages: { ids, entities }
-      });
-
-      if (contact.id !== 'system_broadcast') {
-        await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
+      } catch (error) {
+        set({ isLoadingMessages: false });
+        throw error;
       }
     } else {
       set({
-        messages: { ids: [], entities: {} }
+        messages: { ids: [], entities: {} },
+        isLoadingMessages: false
       });
     }
   },

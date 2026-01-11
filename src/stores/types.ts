@@ -27,6 +27,7 @@ export interface MessageSlice {
     ids: string[];
     entities: Record<string, SecureMessage>;
   };
+  isLoadingMessages: boolean;
   chatSummaries: Record<string, SecureMessage | undefined>;
   messageInput: string;
   lastStorageUpdate: number;

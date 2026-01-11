@@ -19,6 +19,7 @@ import { useUIStore } from '../stores/uiStore';
 import * as logger from '../utils/logger';
 
 import { ChatInput } from './ChatInput';
+import { ChatSkeleton } from './ChatSkeleton';
 import { MessageBubble } from './MessageBubble';
 import { TemporarySteganographyMessage } from './steganography/TemporarySteganographyMessage';
 
@@ -36,6 +37,7 @@ export function ChatView() {
   // ATOMIC SELECTORS: Each selector only re-renders when its specific state changes
   const activeChat = useAppStore(state => state.activeChat);
   const messages = useAppStore(state => state.messages);
+  const isLoadingMessages = useAppStore(state => state.isLoadingMessages);
   const setActiveChat = useAppStore(state => state.setActiveChat);
   const clearChatHistory = useAppStore(state => state.clearChatHistory);
 
@@ -254,7 +256,9 @@ export function ChatView() {
         <div ref={messagesEndRef} />
 
         {encodingStatus !== 'idle' && <TemporarySteganographyMessage />}
-        {messages.ids.length === 0 && encodingStatus === 'idle' ? (
+        {isLoadingMessages ? (
+          <ChatSkeleton />
+        ) : messages.ids.length === 0 && encodingStatus === 'idle' ? (
           <div className="flex flex-col items-center justify-center h-full text-industrial-500 space-y-4 opacity-50">
             <Shield className="w-16 h-16" />
             <p className="text-center max-w-xs text-sm">
