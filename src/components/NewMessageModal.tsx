@@ -6,6 +6,7 @@
 /* eslint-disable max-lines-per-function */
 import { Avatar, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { MessageSquare, Radio } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAppStore } from '../stores/appStore';
@@ -30,8 +31,10 @@ export function NewMessageModal({
   const { setActiveChat } = useAppStore();
   const { setActiveTab } = useUIStore();
   const { t } = useTranslation();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleViewChat = async () => {
+    setIsProcessing(true);
     try {
       // CRITICAL: Unified navigation - always use senderFingerprint to find contact
       // No special broadcast handling - messages are stored by sender's fingerprint
@@ -47,16 +50,18 @@ export function NewMessageModal({
       logger.error('[NewMessageModal] Failed to navigate to chat:', error);
       // Still close modal even if navigation fails
       onClose();
+    } finally {
+        setIsProcessing(false);
     }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={isProcessing ? undefined : onClose}
       size="md"
-      isDismissable={false}
-      isKeyboardDismissDisabled={true}
+      isDismissable={!isProcessing}
+      isKeyboardDismissDisabled={isProcessing}
 
 
       classNames={{
@@ -105,10 +110,10 @@ export function NewMessageModal({
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button color="danger" variant="light" onPress={onClose}>
+              <Button color="danger" variant="light" onPress={onClose} isDisabled={isProcessing}>
                 {t('new_message.dismiss')}
               </Button>
-              <Button color="primary" onPress={handleViewChat}>
+              <Button color="primary" onPress={handleViewChat} isLoading={isProcessing}>
                 {t('new_message.view_chat')}
               </Button>
             </ModalFooter>

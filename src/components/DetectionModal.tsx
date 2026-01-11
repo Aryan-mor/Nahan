@@ -5,6 +5,7 @@
 
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { MessageSquare, UserPlus, X } from 'lucide-react';
+import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { CryptoService } from '../services/crypto';
@@ -38,10 +39,12 @@ export function DetectionModal({
 
   const { setActiveTab } = useUIStore();
   const { t } = useTranslation();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAddContact = async () => {
     if (!contactPublicKey) return;
 
+    setIsProcessing(true);
     try {
       // Generate fingerprint from public key
       const fingerprint = await cryptoService.getFingerprint(contactPublicKey);
@@ -79,17 +82,24 @@ export function DetectionModal({
       onClose();
     } catch (error) {
       logger.error('Failed to add contact:', error);
+    } finally {
+        setIsProcessing(false);
     }
   };
 
   const handleGoToChat = async () => {
     if (!contactFingerprint) return;
 
-    const contact = contacts.find((c) => c.fingerprint === contactFingerprint);
-    if (contact) {
-      setActiveChat(contact);
-      setActiveTab('chats');
-      onClose();
+    setIsProcessing(true);
+    try {
+        const contact = contacts.find((c) => c.fingerprint === contactFingerprint);
+        if (contact) {
+            await setActiveChat(contact); // Await to ensure smooth transition
+            setActiveTab('chats');
+            onClose();
+        }
+    } finally {
+        setIsProcessing(false);
     }
   };
 
@@ -107,10 +117,10 @@ export function DetectionModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={isProcessing ? undefined : onClose}
       size="md"
-      isDismissable={false}
-      isKeyboardDismissDisabled={true}
+      isDismissable={!isProcessing}
+      isKeyboardDismissDisabled={isProcessing}
 
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
@@ -168,14 +178,15 @@ export function DetectionModal({
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button variant="light" onPress={onClose} startContent={<X className="w-4 h-4" />}>
+              <Button variant="light" onPress={onClose} startContent={<X className="w-4 h-4" />} isDisabled={isProcessing}>
                 {t('detection.dismiss')}
               </Button>
               {type === 'id' ? (
                 <Button
                   color="primary"
                   onPress={handleAddContact}
-                  startContent={<UserPlus className="w-4 h-4" />}
+                  startContent={!isProcessing && <UserPlus className="w-4 h-4" />}
+                  isLoading={isProcessing}
                   data-testid="detection-add-contact-btn"
                 >
                   {t('detection.add_chat')}
@@ -184,7 +195,8 @@ export function DetectionModal({
                 <Button
                   color="primary"
                   onPress={handleGoToChat}
-                  startContent={<MessageSquare className="w-4 h-4" />}
+                  startContent={!isProcessing && <MessageSquare className="w-4 h-4" />}
+                  isLoading={isProcessing}
                 >
                   {t('detection.view_chat')}
                 </Button>

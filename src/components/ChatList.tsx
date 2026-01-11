@@ -1,26 +1,26 @@
 /* eslint-disable max-lines, no-console */
 /* eslint-disable max-lines-per-function */
 import {
-  Avatar,
-  Button,
-  Card,
-  CardBody,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
+    Avatar,
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-  ClipboardPaste,
-  ImageDown,
-  Image as ImageIcon,
-  MessageSquare,
-  Plus,
-  Search,
+    ClipboardPaste,
+    ImageDown,
+    Image as ImageIcon,
+    MessageSquare,
+    Plus,
+    Search,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -150,8 +150,9 @@ export function ChatList({
           }
         }
       } else {
-        // Nothing found
+        // Nothing found - smart fallback to manual paste
         toast.info(t('chat.list.clipboard_empty', 'Clipboard empty or format not supported'));
+        setIsManualPasteOpen(true);
       }
     } catch (error: unknown) {
       setDecodingStatus('error');
@@ -162,13 +163,6 @@ export function ChatList({
       };
 
       if (err.message === 'SENDER_UNKNOWN') {
-        // How to handle sender unknown for analyzeClipboard?
-        // If it was text, we have the text?
-        // analyzeClipboard doesn't return the text on error.
-        // We might need to manually read text here if we want to support "Select Sender" flow?
-        // The previous code read text and setPendingMessage(clipboardText).
-
-        // For now, let's just log and show error, or try to recover text?
         try {
           const text = await navigator.clipboard.readText();
           if (text) {
@@ -176,7 +170,8 @@ export function ChatList({
             setIsSenderSelectOpen(true);
           }
         } catch {
-          toast.error(t('chat.list.process_error'));
+          // Fallback to manual if clipboard read fails
+          setIsManualPasteOpen(true);
         }
       } else if (err.message === 'CONTACT_INTRO_DETECTED') {
         if (onDetection && err.keyData) {
@@ -197,18 +192,11 @@ export function ChatList({
           onNewChat();
         }
       } else {
-        toast.error(t('chat.list.process_error'));
         logger.error('[UniversalInput] Error:', error);
 
-        // Check if manual paste needed (Permission denied, Focus lost, etc.)
-        if (
-          err.message?.includes('Clipboard') ||
-          err.message?.includes('read') ||
-          err.message?.includes('focus') ||
-          err.message?.includes('permission')
-        ) {
-          setIsManualPasteOpen(true);
-        }
+        // SMART FALLBACK: For any other error (invalid format, permission denied, etc.),
+        // just open the manual paste modal so user can try manually.
+        setIsManualPasteOpen(true);
       }
     } finally {
       setIsProcessingPaste(false);

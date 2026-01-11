@@ -3,14 +3,13 @@
 import { Avatar, Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-    ClipboardPaste,
-    Download,
-    FileUser,
-    Lock,
-    MessageSquare,
-    QrCode,
-    Settings as SettingsIcon,
-    Users,
+  Download,
+  FileUser,
+  Lock,
+  MessageSquare,
+  QrCode,
+  Settings as SettingsIcon,
+  Users
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,9 +32,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-    DetectionResult,
-    useClipboardDetection,
-    useClipboardPermission,
+  DetectionResult,
+  useClipboardDetection,
+  useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -642,17 +641,7 @@ export default function App() {
 
               {identity && (
                 <div className="flex items-center gap-2">
-                  <Button
-                    isIconOnly
-                    variant="flat"
-                    size="sm"
-                    className="bg-industrial-800 text-industrial-300"
-                    onPress={manualPasteModal.onOpen}
-                    title="Manual Paste"
-                    data-testid="home-manual-paste-icon"
-                  >
-                    <ClipboardPaste className="w-4 h-4" />
-                  </Button>
+
                   <Button
                     isIconOnly
                     variant="flat"

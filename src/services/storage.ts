@@ -75,6 +75,7 @@ export class StorageService {
   private readonly DB_VERSION = 3; // Increment to trigger migration for system_settings
 
   private worker: Worker | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pendingRequests = new Map<string, { resolve: (value: any) => void; reject: (reason: any) => void }>();
 
   private constructor() {

@@ -153,10 +153,8 @@ export async function analyzeClipboard(
   // OPTIMIZATION: Try Text Detection FIRST (Faster, covers 90% of cases)
   // This avoids the 2s delay often caused by navigator.clipboard.read() for images
   try {
-    console.log(`[PERF][TRACE] 1. Navigator readText started`);
     const text = await navigator.clipboard.readText();
     if (text && text.trim()) {
-      console.log(`[PERF][TRACE] 2. Text acquired (length: ${text.length}) - matches previous: ${previousText === text}`);
       if (previousText && text === previousText) {
           // If text matches last check, we can skip text processing.
           // BUT if we haven't checked for images yet, and text didn't yield a result last time,
@@ -167,9 +165,7 @@ export async function analyzeClipboard(
 
       let result;
       try {
-        console.log(`[PERF][TRACE] 3a. Calling handleUniversalInput...`);
         result = await handleUniversalInput(text, undefined, true);
-        console.log(`[PERF][TRACE] 3b. handleUniversalInput returned type:`, result?.type);
       } catch (error: any) {
         if (error.message === 'CONTACT_INTRO_DETECTED') {
           return {
