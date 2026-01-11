@@ -467,7 +467,18 @@ export function UnifiedStealthDrawer() {
                 </Button>
                 <Button
                   color="primary"
-                  onPress={() => confirmStealthSend(finalTextOutput)}
+                  onPress={async () => {
+                    try {
+                      await navigator.clipboard.writeText(finalTextOutput);
+                      await confirmStealthSend(finalTextOutput);
+                      toast.success(t('stealth.send_success_copy', 'Sent & Copied to clipboard'));
+                    } catch (error) {
+                      logger.error('Failed to copy/send text:', error);
+                      // Still try to send even if copy fails
+                      await confirmStealthSend(finalTextOutput);
+                      toast.success(t('common.send_success', 'Sent'));
+                    }
+                  }}
                   isDisabled={!finalTextOutput}
                 >
                   {t('stealth.send', 'Send Stealth Message')}
