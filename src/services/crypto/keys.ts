@@ -70,6 +70,11 @@ export async function encryptPrivateKey(
   return naclUtil.encodeBase64(serialized);
 }
 
+// Simple in-memory cache to avoid repeated expensive PBKDF2 derivations
+// Security Note: We already hold the passphrase in memory, so holding the derived key
+// doesn't significantly lower the security posture of the active session.
+let privateKeyCache: { encryptedKey: string; passphrase: string; decryptedKey: Uint8Array } | null = null;
+
 /**
  * Decrypt private key with passphrase
  */
@@ -77,6 +82,15 @@ export async function decryptPrivateKey(
   encryptedKey: string,
   passphrase: string,
 ): Promise<Uint8Array> {
+  // check cache first
+  if (
+    privateKeyCache &&
+    privateKeyCache.encryptedKey === encryptedKey &&
+    privateKeyCache.passphrase === passphrase
+  ) {
+    return privateKeyCache.decryptedKey;
+  }
+
   const serialized = naclUtil.decodeBase64(encryptedKey);
 
   // Extract salt, nonce, and encrypted data
@@ -94,7 +108,22 @@ export async function decryptPrivateKey(
     throw new Error('Invalid passphrase or corrupted key');
   }
 
+  // Update cache
+  privateKeyCache = {
+    encryptedKey,
+    passphrase,
+    decryptedKey: decrypted,
+  };
+
   return decrypted;
+}
+
+/**
+ * Clear the private key cache
+ * Should be called on logout or lock
+ */
+export function clearPrivateKeyCache() {
+  privateKeyCache = null;
 }
 
 /**
