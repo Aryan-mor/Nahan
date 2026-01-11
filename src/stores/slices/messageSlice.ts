@@ -132,6 +132,9 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         return '';
       }
 
+      const start = performance.now();
+      logger.log('[PERF] sendMessage START');
+
       let payloadToEncrypt = text;
       const messageType = type === 'image_stego' ? 'image_stego' : (image ? 'image' : 'text');
       const timestamp = Date.now();
@@ -156,6 +159,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
       }
 
       let encryptedContent: string;
+      const cryptoStart = performance.now();
 
       if (isBroadcast) {
         encryptedContent = await cryptoService.signMessage(
@@ -174,6 +178,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
           sessionPassphrase,
         ) as string;
       }
+      logger.log(`[PERF] sendMessage Crypto - Duration: ${(performance.now() - cryptoStart).toFixed(2)}ms`);
 
       const isOffline = !navigator.onLine;
 
@@ -195,6 +200,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
          customId = `msg_BROADCAST_${hashHex}`;
       }
 
+      const storeStart = performance.now();
       const newMessage = await storageService.storeMessage({
         id: customId,
         senderFingerprint: identity.fingerprint,
@@ -210,6 +216,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         status: isOffline ? 'pending' : 'sent',
         createdAt: new Date(timestamp), // Ensure consistent creation time
       }, sessionPassphrase);
+      logger.log(`[PERF] sendMessage Storage - Duration: ${(performance.now() - storeStart).toFixed(2)}ms`);
 
       const now = Date.now();
       const messageFingerprint = isBroadcast ? 'BROADCAST' : activeChat.fingerprint;
@@ -244,6 +251,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         };
       });
 
+      logger.log(`[PERF] sendMessage END - Total Duration: ${(performance.now() - start).toFixed(2)}ms`);
       return encryptedContent;
     } catch (error) {
       logger.error('Failed to send message:', error);

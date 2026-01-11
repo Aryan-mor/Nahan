@@ -165,10 +165,14 @@ export const createStealthSlice: StateCreator<AppState, [], [], StealthSlice> = 
     }
 
     try {
+      const start = performance.now();
+      logger.log(`[PERF] sendAutoStealthMessage START - Broadcast: ${activeChat.id === 'system_broadcast'}`);
+
       let binaryPayload: Uint8Array;
       let isBroadcast = false;
 
       // Check if we're in broadcast mode
+      const cryptoStart = performance.now();
       if (activeChat.id === 'system_broadcast') {
         // Broadcast mode: sign message instead of encrypting
         binaryPayload = await cryptoService.signMessage(
@@ -188,18 +192,24 @@ export const createStealthSlice: StateCreator<AppState, [], [], StealthSlice> = 
           { binary: true }
         ) as Uint8Array;
       }
+      logger.log(`[PERF] Crypto Ops (Sign/Encrypt) - Duration: ${(performance.now() - cryptoStart).toFixed(2)}ms`);
 
       // Step 2: Generate random cover text
       // Use getRecommendedCover (recommendation only, no enforcement)
+      const coverStart = performance.now();
       const coverText = camouflageService.getRecommendedCover(
         binaryPayload.length,
         camouflageLanguage || 'fa'
       );
+      logger.log(`[PERF] generateCover - Duration: ${(performance.now() - coverStart).toFixed(2)}ms`);
 
       // Step 3: Embed binary into cover text
+      const embedStart = performance.now();
       const finalOutput = camouflageService.embed(binaryPayload, coverText, camouflageLanguage || 'fa');
+      logger.log(`[PERF] embed (ZWC) - Duration: ${(performance.now() - embedStart).toFixed(2)}ms`);
 
       // Step 4: Store message in database
+      const persistStart = performance.now();
       await persistMessageAndState(set, get, {
         activeChat,
         identity,
@@ -208,10 +218,12 @@ export const createStealthSlice: StateCreator<AppState, [], [], StealthSlice> = 
         sessionPassphrase,
         isBroadcast
       });
+      logger.log(`[PERF] persistMessageAndState - Duration: ${(performance.now() - persistStart).toFixed(2)}ms`);
 
       // Clear input after successful auto-stealth send
       set({ messageInput: '' });
 
+      logger.log(`[PERF] sendAutoStealthMessage END - Total Duration: ${(performance.now() - start).toFixed(2)}ms`);
       return finalOutput;
     } catch (error) {
       logger.error('Failed to send auto-stealth message:', error);

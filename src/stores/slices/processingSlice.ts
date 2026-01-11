@@ -161,11 +161,12 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
         const hashBuffer = await crypto.subtle.digest('SHA-256', dataToHash);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        const customId = `msg_BROADCAST_${hashHex}`;
+        const validId = `msg_${sender.fingerprint}_BROADCAST_${hashHex}`;
+        logger.log(`[Processing] Persisting broadcast with ID: ${validId}`);
 
         const newMessage = await storageService.storeMessage(
           {
-            id: customId,
+            id: validId,
             senderFingerprint: sender.fingerprint,
             recipientFingerprint: identity.fingerprint,
             content: {
