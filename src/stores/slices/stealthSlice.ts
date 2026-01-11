@@ -35,7 +35,7 @@ const persistMessageAndState = async (
 
   if (isBroadcast) {
     // Broadcast mode: store message with recipientFingerprint: 'BROADCAST'
-    await storageService.storeMessage({
+    const newMessage = await storageService.storeMessage({
       senderFingerprint: identity.fingerprint,
       recipientFingerprint: 'BROADCAST',
       content: {
@@ -50,11 +50,24 @@ const persistMessageAndState = async (
 
     // Update lastStorageUpdate to trigger UI reactivity
     const now = Date.now();
-    // Refresh if active chat is broadcast
-    if (activeChat.id === 'system_broadcast') {
-       await get().refreshMessages();
-    }
-    set({ lastStorageUpdate: now });
+
+    // Normalized Update for Broadcast
+    set((state) => {
+       // Check if currently active chat is broadcast
+       if (state.activeChat?.id !== 'system_broadcast') return {};
+
+       const { ids, entities } = state.messages;
+       // Avoid duplication
+       if (ids.includes(newMessage.id)) return {};
+
+       const newIds = [newMessage.id, ...ids];
+       const newEntities = { ...entities, [newMessage.id]: newMessage };
+
+       return {
+         messages: { ids: newIds, entities: newEntities },
+         lastStorageUpdate: now,
+       };
+    });
   } else {
     // Standard mode: store message for single recipient (NOT broadcast)
     const newMessage = await storageService.storeMessage({
