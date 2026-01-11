@@ -54,7 +54,7 @@ const checkCapacity = (width: number, height: number, payloadLength: number) => 
  */
 export const embedPayload = async (carrier: HTMLCanvasElement, payload: string): Promise<Blob> => {
   logger.debug(`[Stego] Embedding payload: ${payload.length} chars`);
-  const ctx = carrier.getContext('2d');
+  const ctx = carrier.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
   if (!ctx) throw new Error(i18next.t('errors.canvasInitFailed', 'Failed to initialize canvas'));
 
   // CRITICAL: Disable smoothing to preserve precise pixel values for steganography
@@ -112,7 +112,7 @@ const reconstructString = (payloadBytes: Uint8Array): string => {
 };
 
 const getCanvasData = (carrier: HTMLCanvasElement) => {
-  const ctx = carrier.getContext('2d');
+  const ctx = carrier.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
   if (!ctx) throw new Error(i18next.t('errors.canvasInitFailed', 'Failed to initialize canvas'));
   const { width, height } = carrier;
   return { data: ctx.getImageData(0, 0, width, height).data, width, height };

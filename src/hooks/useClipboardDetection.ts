@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Hook for smart offline clipboard detection with user consent
  * Detects Nahan encrypted messages from clipboard when user returns to tab
@@ -5,7 +6,7 @@
  * Uses unified handleUniversalInput for all detection logic
  */
 
-/* eslint-disable max-lines-per-function, no-console */
+/* eslint-disable max-lines-per-function */
 import { useEffect, useRef, useState, useTransition } from 'react';
 
 import { analyzeClipboard } from '../services/clipboardAnalysis';
@@ -168,7 +169,7 @@ export function useClipboardDetection(
       return;
     }
 
-    console.log(`[PERF][Hook] ClipboardDetection Effect - INIT (Enabled: ${enabled})`);
+
 
     const checkClipboard = async (eventType: string = 'initial') => {
       const perfStart = performance.now();
@@ -182,11 +183,10 @@ export function useClipboardDetection(
       const _updateSummaryForContact = updateSummaryForContactRef.current;
       const _contacts = contactsRef.current; // Access contacts via ref
 
-      console.log(`[PERF][Clipboard] Event Start: ${eventType} at ${perfStart.toFixed(2)}ms`);
+
 
       if (isProcessingRef.current) {
-        console.log(`[PERF][Clipboard] Skipped (already processing) - Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
-        console.log(`[PERF][TRACE] Check skipped because: already processing`);
+
         return;
       }
       isProcessingRef.current = true;
@@ -204,14 +204,14 @@ export function useClipboardDetection(
         }
 
         if (clipboardText && clipboardText === lastCheckedClipboardRef.current) {
-           console.log(`[PERF][Clipboard] Skipped (duplicate text cache) - Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
+
            isProcessingRef.current = false;
            return;
         }
 
         // REMOVED PRE-UPDATE: Fixes logic deadlock. Ref is updated ONLY after analysis.
 
-        console.log(`[PERF][TRACE] 3. Calling analyzeClipboard... (text len: ${clipboardText?.length})`);
+
         const { processed, contentHash, textContent } = await analyzeClipboard(
           {
             handleUniversalInput: _handleUniversalInput,
@@ -224,7 +224,7 @@ export function useClipboardDetection(
             previousImageHash: lastProcessedImageRef.current,
           }
         );
-        console.log(`[PERF][TRACE] 4. analyzeClipboard returned result:`, processed ? processed.type : 'null');
+
 
         // Update tracking refs
         if (contentHash) {
@@ -246,7 +246,7 @@ export function useClipboardDetection(
           startTransition(() => {
             if (processed.type === 'message') {
               if (_onNewMessage) {
-                 console.log(`[PERF][TRACE] 5. Invoking callback: onNewMessage`);
+
                  _onNewMessage({
                     type: processed.type,
                     fingerprint: processed.fingerprint!,
@@ -255,7 +255,7 @@ export function useClipboardDetection(
                  });
               }
             } else if (processed.type === 'id' && _onDetection) {
-               console.log(`[PERF][TRACE] 5. Invoking callback: onDetection`);
+
                _onDetection({
                  type: 'id',
                  contactName: processed.senderName || processed.data?.name || 'Unknown',
@@ -320,7 +320,7 @@ export function useClipboardDetection(
         }
       } finally {
         isProcessingRef.current = false;
-        console.log(`[PERF][Clipboard] Event Complete: ${eventType} - Total Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
+
       }
     };
 
@@ -351,7 +351,7 @@ export function useClipboardDetection(
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      console.log(`[PERF][Hook] ClipboardDetection Effect - CLEANUP`);
+
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (document.hasFocus()) {

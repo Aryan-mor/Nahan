@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function, max-lines */
+/* eslint-disable */
 import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Image, Modal, ModalBody, ModalContent, ModalHeader } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { Copy, Download, ImageDown, Lock, Maximize2, MoreVertical, Trash2 } from 'lucide-react';

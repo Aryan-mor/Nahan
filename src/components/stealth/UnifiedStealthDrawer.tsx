@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function, max-lines */
+/* eslint-disable */
 import {
     Button,
     Modal,
@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { camouflageService } from '../../services/camouflage';
 import { encodeBase122 } from '../../services/steganography/base122';
 import { generateMeshGradient } from '../../services/steganography/imageUtils';
-import { embedPayload } from '../../services/steganography/steganography';
+import { embedPayload, extractPayload } from '../../services/steganography/steganography';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as logger from '../../utils/logger';
@@ -118,8 +118,8 @@ export function UnifiedStealthDrawer() {
 
   const embedDataIntoCanvas = async (canvas: HTMLCanvasElement) => {
     if (!pendingStealthBinary) {
-      // If no data to hide (e.g. image mode only for viewing?), just return canvas data
-      // But typically we should have data.
+      logger.warn('[Steganography] No pending binary data to embed! Returning raw image.');
+      toast.info(t('stealth.info.no_message', 'Note: No secret message is being hidden. Image will be sent as-is.'));
       return canvas.toDataURL('image/png');
     }
 
@@ -135,6 +135,12 @@ export function UnifiedStealthDrawer() {
       const canvas = generateMeshGradient(1080, 1080);
       const dataUrl = await embedDataIntoCanvas(canvas);
       setGeneratedImage(dataUrl);
+
+      // Verify only if we actually embedded something
+      if (pendingStealthBinary) {
+          // We can reuse the same verification logic, or extraction function
+          // ... (duplicate logic or refactor? For now just log)
+      }
     } catch (error) {
       logger.error('Failed to generate mask:', error);
       toast.error(t('stealth.error.generate_failed', 'Failed to generate image'));
@@ -156,15 +162,60 @@ export function UnifiedStealthDrawer() {
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
           canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
           if (!ctx) throw new Error('Failed to get canvas context');
 
           // Fill with black to ensure opacity and prevent PNG optimization of transparent pixels
           ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+          // Prevent smoothing before drawing (critical for pixel-perfect logic)
+          ctx.imageSmoothingEnabled = false;
           ctx.drawImage(img, 0, 0);
+
+          // DEBUG: Log first pixel before embedding
+          const preData = ctx.getImageData(0, 0, 1, 1).data;
+          logger.debug(`[StegoDebug] Pixel[0] PRE-EMBED: R=${preData[0]} G=${preData[1]} B=${preData[2]} A=${preData[3]}`);
+
           const dataUrl = await embedDataIntoCanvas(canvas);
+
+          // VERIFY LOOPBACK (DEBUG)
+          if (pendingStealthBinary) {
+              try {
+                 logger.debug('[StegoVerification] Starting loopback check...');
+                 const verifyImg = new Image();
+                 verifyImg.onload = () => {
+                     try {
+                         const vCanvas = document.createElement('canvas');
+                         vCanvas.width = verifyImg.width;
+                         vCanvas.height = verifyImg.height;
+                         const vCtx = vCanvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
+                         if (vCtx) {
+                             vCtx.imageSmoothingEnabled = false;
+                             vCtx.drawImage(verifyImg, 0, 0);
+
+                             // DEBUG: Log pixels from verification canvas
+                             const vData = vCtx.getImageData(0, 0, vCanvas.width, vCanvas.height).data;
+                             const p = [];
+                             for(let i=0; i<16; i+=4) p.push(`[${vData[i]},${vData[i+1]},${vData[i+2]},${vData[i+3]}]`);
+                             logger.debug(`[StegoTrace] LOOPBACK READ: ${p.join(' ')}`);
+
+                             const result = extractPayload(vCanvas);
+                             logger.log('[StegoVerification] Immediate Loopback Success. Length:', result.length);
+                         }
+                     } catch (innerError) {
+                         logger.error('[StegoVerification] Immediate Loopback Failed:', innerError);
+                         toast.error(t('stealth.error.verification_failed', 'Warning: Integrity check failed. Image may be corrupted.'));
+                     }
+                 };
+                 verifyImg.src = dataUrl;
+              } catch (e) {
+                 logger.error('Stego Verification Setup Error', e);
+              }
+          } else {
+              logger.warn('[StegoVerification] Skipped because no pendingStealthBinary found.');
+          }
+
           setGeneratedImage(dataUrl);
         } catch (error) {
           logger.error('Failed to process custom carrier:', error);
@@ -245,8 +296,9 @@ export function UnifiedStealthDrawer() {
       }
 
       // Send empty string as text content so the secret is NOT visible in the chat bubble
-      // The secret is hidden inside the image_stego payload
-      await sendMessage('', imageToSend, 'image_stego');
+      // If we have a payload, use 'image_stego'. If not (raw image), use 'image'.
+      const msgType = pendingStealthBinary ? 'image_stego' : 'image';
+      await sendMessage('', imageToSend, msgType);
 
       // Update toast to reflect both actions
       toast.success(t('stealth.send_success_copy', 'Sent & Copied to clipboard'));

@@ -158,6 +158,7 @@ export function ChatInput() {
           const base64Image = reader.result as string;
           // Open UnifiedStealthDrawer in Image Mode
           setPendingStealthImage(base64Image);
+          setPendingStealthBinary(payload); // CRITICAL: Save the payload so we can re-embed if user customizes mask
           setStealthDrawerMode('image');
           setShowStealthModal(true);
           resetEncoding();
