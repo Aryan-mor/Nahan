@@ -1,39 +1,42 @@
 /* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Divider,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Switch,
-  useDisclosure,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    Divider,
+    Input,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Select,
+    SelectItem,
+    Switch,
+    useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-  AlertTriangle,
-  Clock,
-  Download,
-  Eye,
-  EyeOff,
-  Globe,
-  Info,
-  Lock,
-  Settings as SettingsIcon,
-  Shield,
-  Trash2,
+    AlertTriangle,
+    Clock,
+    Download,
+    Eye,
+    EyeOff,
+    Globe,
+    Info,
+    Lock,
+    Settings as SettingsIcon,
+    Shield,
+    Trash2
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+
+import { useClipboardPermission } from '../hooks/useClipboardDetection';
+import { ClipboardPermissionPrompt } from './ClipboardPermissionPrompt';
 
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
@@ -63,6 +66,14 @@ export function Settings() {
     onOpen: onLogoutOpen,
     onOpenChange: onLogoutOpenChange,
   } = useDisclosure();
+
+  const {
+    isOpen: isClipboardModalOpen,
+    onOpen: onClipboardModalOpen,
+    onOpenChange: onClipboardModalOpenChange,
+  } = useDisclosure();
+
+  const clipboardPermission = useClipboardPermission();
 
   const [autoClearClipboard, setAutoClearClipboard] = useState(true);
   const [clipboardTimeout, setClipboardTimeout] = useState(60);
@@ -125,7 +136,7 @@ export function Settings() {
         toast.error(t('settings.errors.missing_key'));
         return;
       }
-      
+
       const allContacts = await storageService.getContacts(passphrase);
 
       const exportData = {
@@ -308,26 +319,57 @@ export function Settings() {
               />
             </div>
 
-            {autoClearClipboard && (
-              <div className="ml-8 space-y-2">
-                <label className="text-sm font-medium text-industrial-300">
-                  {t('settings.general.clipboard.timeout')}
-                </label>
-                <Input
-                  type="number"
-                  value={clipboardTimeout.toString()}
-                  onChange={(e) => setClipboardTimeout(parseInt(e.target.value) || 60)}
-                  min={10}
-                  max={300}
-                  className="max-w-xs"
-                  classNames={{
-                    input: 'text-industrial-100',
-                    inputWrapper:
-                      'bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-industrial-500',
-                  }}
-                />
+
+
+            <div className="ml-8 space-y-4">
+              {autoClearClipboard && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-industrial-300">
+                    {t('settings.general.clipboard.timeout')}
+                  </label>
+                  <Input
+                    type="number"
+                    value={clipboardTimeout.toString()}
+                    onChange={(e) => setClipboardTimeout(parseInt(e.target.value) || 60)}
+                    min={10}
+                    max={300}
+                    className="max-w-xs"
+                    classNames={{
+                      input: 'text-industrial-100',
+                      inputWrapper:
+                        'bg-industrial-950 border-industrial-700 hover:border-industrial-600 focus-within:!border-industrial-500',
+                    }}
+                  />
+                </div>
+              )}
+
+              {clipboardPermission.state !== 'granted' && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-industrial-950 border border-industrial-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-400">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-industrial-100">
+                      {t('settings.general.clipboard.permission_title', 'Clipboard Access')}
+                    </p>
+                    <p className="text-xs text-industrial-400">
+                      {t('settings.general.clipboard.permission_needed', 'Permission required for auto-detection')}
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="primary"
+                  onPress={onClipboardModalOpen}
+                >
+                  {t('settings.general.clipboard.grant_button', 'Allow Access')}
+                </Button>
               </div>
             )}
+            </div>
           </div>
         </CardBody>
       </Card>
@@ -670,6 +712,17 @@ export function Settings() {
           )}
         </ModalContent>
       </Modal>
+
+      {/* Clipboard Permission Modal */}
+      <ClipboardPermissionPrompt
+        isOpen={isClipboardModalOpen}
+        onClose={() => onClipboardModalOpenChange()}
+        onPermissionGranted={() => {
+          // Force re-check or just toast
+          toast.success(t('clipboard.permission.granted', 'Clipboard permission granted'));
+          onClipboardModalOpenChange();
+        }}
+      />
     </motion.div>
   );
 }

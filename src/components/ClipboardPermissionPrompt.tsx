@@ -17,7 +17,7 @@ interface ClipboardPermissionPromptProps {
   onPermissionGranted: () => void;
 }
 
-/* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines-per-function */
 export function ClipboardPermissionPrompt({
   isOpen,
   onClose,
@@ -25,31 +25,40 @@ export function ClipboardPermissionPrompt({
 }: ClipboardPermissionPromptProps) {
   const { t } = useTranslation();
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isDenied, setIsDenied] = useState(false);
   // const permissionStatus = useClipboardPermission(); // Removed unused var
 
   const handleGrantPermission = async () => {
     setIsRequesting(true);
+    setIsDenied(false);
     try {
       const granted = await requestClipboardPermission();
       if (granted) {
         onPermissionGranted();
         onClose();
       } else {
-        // Permission was denied - user will see browser's denial message
-        // We can show a helpful message
+        // Permission was denied - user will see browser's denial message or has previously denied
+        // Show help message
+        setIsDenied(true);
         logger.warn('Clipboard permission denied by user');
       }
     } catch (error) {
       logger.error('Failed to request clipboard permission:', error);
+      setIsDenied(true);
     } finally {
       setIsRequesting(false);
     }
   };
 
+  const handleClose = () => {
+    setIsDenied(false);
+    onClose();
+  };
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       size="lg"
       isDismissable={false}
       isKeyboardDismissDisabled={true}
@@ -71,6 +80,28 @@ export function ClipboardPermissionPrompt({
               </div>
             </ModalHeader>
             <ModalBody>
+              {isDenied ? (
+                <div className="space-y-4">
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                       <Shield className="w-4 h-4" />
+                       {t('clipboard.permission.denied_title', 'Permission Denied')}
+                    </h3>
+                    <p className="text-sm text-yellow-200/80 mb-3">
+                      {t('clipboard.permission.denied_desc', 'It looks like clipboard access was blocked. Browser security blocks access after a denial.')}
+                    </p>
+                    <p className="text-sm text-yellow-200 font-medium">
+                      {t('clipboard.permission.how_to_enable', 'How to enable:')}
+                    </p>
+                    <ol className="list-decimal list-inside text-sm text-yellow-200/80 mt-1 space-y-1">
+                      <li>{t('clipboard.permission.step_1', 'Click the lock or settings icon in your address bar')}</li>
+                      <li>{t('clipboard.permission.step_2', 'Find "Clipboard" or "Permissions"')}</li>
+                      <li>{t('clipboard.permission.step_3', 'Change setting to "Allow" or "Ask"')}</li>
+                      <li>{t('clipboard.permission.step_4', 'Refresh the page')}</li>
+                    </ol>
+                  </div>
+                </div>
+              ) : (
               <div className="space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-industrial-200 mb-2 flex items-center gap-2">
@@ -102,11 +133,13 @@ export function ClipboardPermissionPrompt({
                   <p>• {t('clipboard.permission.privacy_points.revoke')}</p>
                 </div>
               </div>
+              )}
             </ModalBody>
             <ModalFooter>
-              <Button variant="light" onPress={onClose}>
-                {t('clipboard.permission.not_now')}
+              <Button variant="light" onPress={handleClose}>
+                {isDenied ? t('common.close', 'Close') : t('clipboard.permission.not_now')}
               </Button>
+              {!isDenied && (
               <Button
                 color="primary"
                 onPress={handleGrantPermission}
@@ -115,6 +148,7 @@ export function ClipboardPermissionPrompt({
               >
                 {t('clipboard.permission.grant')}
               </Button>
+              )}
             </ModalFooter>
           </>
         )}
