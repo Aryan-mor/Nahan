@@ -25,90 +25,159 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
   },
   isLoadingMessages: false,
   chatSummaries: {},
+  chatCache: {},
   messageInput: '',
   lastStorageUpdate: Date.now(),
 
   setActiveChat: async (contact) => {
     set({ activeChat: contact });
     if (contact) {
-      set({ isLoadingMessages: true });
-      const { sessionPassphrase } = get();
-      if (!sessionPassphrase) {
-        set({ isLoadingMessages: false });
-        throw new Error('SecureStorage: Missing key');
-      }
-
-      const activeMasterKey = getMasterKey();
-      if (!activeMasterKey) {
-        set({ isLoadingMessages: false });
-        throw new Error('SecureStorage: Master Key not loaded');
-      }
-
+      const { chatCache } = get();
       const fingerprint = contact.id === 'system_broadcast' ? 'BROADCAST' : contact.fingerprint;
 
-      // WORKER FETCH
-      const fetchPromise = new Promise<SecureMessage[]>((resolve, reject) => {
-        const id = crypto.randomUUID();
-
-        const handler = (event: MessageEvent) => {
-          const { id: responseId, success, data, error } = event.data;
-          if (responseId === id) {
-             storageWorker.removeEventListener('message', handler);
-             if (success) resolve(data);
-             else reject(new Error(error));
-          }
-        };
-
-        storageWorker.addEventListener('message', handler);
-        storageWorker.postMessage({
-          id,
-          type: 'getMessages',
-          payload: {
-            fingerprint,
-            limit: MAX_MESSAGES_IN_MEMORY,
-            offset: 0,
-            masterKey: activeMasterKey // Transferable CryptoKey
-          }
-        });
+      const cachedChat = chatCache[fingerprint];
+      console.log(`[CACHE] SetActiveChat: ${fingerprint}`, {
+          hasCache: !!cachedChat,
+          cacheSize: cachedChat?.ids.length
       });
 
-      try {
-        const messages = await fetchPromise;
-
-        // Post-Processing: Create Object URLs from Blobs (Main Thread is fast at this)
-        messages.forEach(msg => {
-          if (msg.content.imageBlob) {
-             msg.content.image = URL.createObjectURL(msg.content.imageBlob);
-             delete msg.content.imageBlob; // cleanup
-          }
-        });
-
-        // Normalize
-        const ids: string[] = [];
-        const entities: Record<string, SecureMessage> = {};
-
-        messages.forEach(msg => {
-          ids.push(msg.id);
-          entities[msg.id] = msg;
-        });
-
+      if (cachedChat && cachedChat.ids.length > 0) {
+        // INSTANT LOAD FROM CACHE
+        console.log(`[CACHE] HIT - Instant Load`);
         set({
-          messages: { ids, entities },
-          isLoadingMessages: false
+            messages: cachedChat,
+            isLoadingMessages: false
         });
 
-        if (contact.id !== 'system_broadcast') {
-          await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
+        // Background refresh to get new messages (offset 0, limit 50)
+        performFetch(fingerprint, 0, MAX_MESSAGES_IN_MEMORY, true).catch(console.error);
+      } else {
+        // First load or empty cache
+        console.log(`[CACHE] MISS - Loading Skeleton`);
+        set({
+            messages: { ids: [], entities: {} },
+            isLoadingMessages: true
+        });
+
+        try {
+            await performFetch(fingerprint, 0, MAX_MESSAGES_IN_MEMORY, false);
+        } catch (error) {
+            set({ isLoadingMessages: false });
+            throw error;
         }
-      } catch (error) {
-        set({ isLoadingMessages: false });
-        throw error;
       }
     } else {
-      set({
-        messages: { ids: [], entities: {} },
-        isLoadingMessages: false
-      });
+      // Navigating away
+      set({ isLoadingMessages: false });
+    }
+
+    // Helper defined inside closure to capture 'get' and 'set' safely
+    async function performFetch(targetFingerprint: string, offset: number, limit: number, isBackground: boolean) {
+        const { sessionPassphrase } = get();
+        if (!sessionPassphrase) return;
+
+        const activeMasterKey = getMasterKey();
+        if (!activeMasterKey) return;
+
+        const fetchPromise = new Promise<SecureMessage[]>((resolve, reject) => {
+            const id = crypto.randomUUID();
+            const handler = (event: MessageEvent) => {
+                const { id: responseId, success, data, error } = event.data;
+                if (responseId === id) {
+                   storageWorker.removeEventListener('message', handler);
+                   if (success) resolve(data);
+                   else reject(new Error(error));
+                }
+            };
+            storageWorker.addEventListener('message', handler);
+            storageWorker.postMessage({
+                id,
+                type: 'getMessages',
+                payload: {
+                    fingerprint: targetFingerprint,
+                    limit,
+                    offset,
+                    masterKey: activeMasterKey
+                }
+            });
+        });
+
+        try {
+            const fetchedMessages = await fetchPromise;
+
+            // Post-Processing
+            fetchedMessages.forEach(msg => {
+                if (msg.content.imageBlob) {
+                   msg.content.image = URL.createObjectURL(msg.content.imageBlob);
+                   delete msg.content.imageBlob;
+                }
+            });
+
+            // Normalize
+            const ids: string[] = [];
+            const entities: Record<string, SecureMessage> = {};
+            fetchedMessages.forEach(msg => {
+                ids.push(msg.id);
+                entities[msg.id] = msg;
+            });
+
+            set((state) => {
+                // If loading more (offset > 0), simple merge?
+                // For now, let's assume this helper is just for the initial fetch/refresh (offset 0)
+                // or we need better merging logic for pagination.
+                // UPDATED: Merging logic for pagination support
+                let finalIds = ids;
+                let finalEntities = entities;
+
+                if (offset > 0) {
+                     // MERGE with existing
+                     const currentCache = state.chatCache[targetFingerprint];
+                     if (currentCache) {
+                         // Append new messages (older) to the end
+                         finalIds = [...currentCache.ids, ...ids]; // Duplicates handled? Ideally fetched shouldn't overlap hard
+                         finalEntities = { ...currentCache.entities, ...entities };
+
+                         // Deduplicate IDs
+                         finalIds = Array.from(new Set(finalIds));
+                     }
+                }
+
+                const finalState = { ids: finalIds, entities: finalEntities };
+
+                // Update Cache
+                const newCache = {
+                    ...state.chatCache,
+                    [targetFingerprint]: finalState
+                };
+
+                // If this is still the active chat, update the view
+                const currentActive = state.activeChat;
+                const currentFingerprint = currentActive
+                    ? (currentActive.id === 'system_broadcast' ? 'BROADCAST' : currentActive.fingerprint)
+                    : null;
+
+                if (currentFingerprint === targetFingerprint) {
+                    return {
+                        chatCache: newCache,
+                        messages: finalState,
+                        isLoadingMessages: false
+                    };
+                }
+
+                return { chatCache: newCache };
+            });
+
+            if (!isBackground && contact && contact.id !== 'system_broadcast' && offset === 0) {
+                 await storageService.updateContactLastUsed(contact.fingerprint, sessionPassphrase);
+            }
+
+        } catch (error) {
+            console.error('[MessageSlice] Fetch failed:', error);
+            if (!isBackground) {
+                set({ isLoadingMessages: false });
+                throw error;
+            }
+        }
     }
   },
 
@@ -233,6 +302,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
       const messageFingerprint = isBroadcast ? 'BROADCAST' : activeChat.fingerprint;
 
       set((state) => {
+        const { chatCache } = state;
         const currentIds = state.messages.ids;
         const currentEntities = state.messages.entities;
 
@@ -248,6 +318,12 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
           }
         }
 
+        // UPDATE CACHE
+        const newCache = {
+            ...chatCache,
+            [messageFingerprint]: { ids: newIds, entities: newEntities }
+        };
+
         // O(1) INCREMENTAL UPDATE: Update only this contact's summary inline
         const updatedSummaries = {
           ...state.chatSummaries,
@@ -256,6 +332,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
         return {
           messages: { ids: newIds, entities: newEntities },
+          chatCache: newCache,
           messageInput: '',
           lastStorageUpdate: now,
           chatSummaries: updatedSummaries, // O(1) - no DB call
@@ -282,12 +359,31 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
 
       await storageService.deleteMessage(id);
       set((state) => {
-        const newIds = state.messages.ids.filter((msgId) => msgId !== id);
-        const newEntities = { ...state.messages.entities };
+        const { chatCache, messages, activeChat } = state;
+        const newIds = messages.ids.filter((msgId) => msgId !== id);
+        const newEntities = { ...messages.entities };
         delete newEntities[id];
 
+        let newCache = chatCache;
+        // Efficiently find which chat this belongs to?
+        // Or deeper: we don't know the fingerprint easily here without looking it up.
+        // But activeChat is known. If the message interacts with activeChat, we update it.
+        // Ideally we update the cache for the specific fingerprint.
+        // For simplicity/safety, we update the cache for the active chat if it exists.
+
+        if (activeChat) {
+             const fp = activeChat.id === 'system_broadcast' ? 'BROADCAST' : activeChat.fingerprint;
+             if (chatCache[fp]) {
+                 const cachedIds = chatCache[fp].ids.filter(mid => mid !== id);
+                 const cachedEntities = { ...chatCache[fp].entities };
+                 delete cachedEntities[id];
+                 newCache = { ...chatCache, [fp]: { ids: cachedIds, entities: cachedEntities } };
+             }
+        }
+
         return {
-          messages: { ids: newIds, entities: newEntities }
+          messages: { ids: newIds, entities: newEntities },
+          chatCache: newCache
         };
       });
     } catch (error) {
@@ -305,12 +401,22 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
     try {
       await storageService.deleteMessagesByFingerprint(fingerprint, sessionPassphrase);
 
-      const { activeChat } = get();
-      if (activeChat && activeChat.fingerprint === fingerprint) {
-        set({
-          messages: { ids: [], entities: {} }
-        });
-      }
+      set((state) => {
+          const { chatCache } = state;
+          // Clear Cache
+          const newCache = { ...chatCache };
+          delete newCache[fingerprint]; // Or set to empty: { ids: [], entities: {} }
+
+          const { activeChat } = state;
+
+          if (activeChat && (activeChat.fingerprint === fingerprint || (activeChat.id === 'system_broadcast' && fingerprint === 'BROADCAST'))) {
+             return {
+                 messages: { ids: [], entities: {} },
+                 chatCache: newCache
+             };
+          }
+          return { chatCache: newCache };
+      });
     } catch (error) {
       logger.error('Failed to clear chat history:', error);
       throw error;
@@ -422,5 +528,94 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
     set({
       messages: { ids: [], entities: {} }
     });
+  },
+
+  loadMoreMessages: async () => {
+      const { activeChat, messages } = get();
+      if (!activeChat) return;
+
+      const fingerprint = activeChat.id === 'system_broadcast' ? 'BROADCAST' : activeChat.fingerprint;
+      const currentCount = messages.ids.length;
+
+      console.log(`[PAGINATION] loadMoreMessages: fetch offset ${currentCount}`);
+
+      // We reuse the verify logic or just duplicate fetch logic?
+      // Since 'performFetch' is inside setActiveChat closure, we can't call it here easily.
+      // We should really move performFetch to be a stand-alone helper or a slice method method.
+      // BUT for now, to avoid massive refactor risk, I'll duplicate the worker call with offset.
+      // Re-duplication is safer than breaking setActiveChat.
+
+      const { sessionPassphrase } = get();
+      if (!sessionPassphrase) return;
+
+      const activeMasterKey = getMasterKey();
+      if (!activeMasterKey) return;
+
+      const fetchPromise = new Promise<SecureMessage[]>((resolve, reject) => {
+        const id = crypto.randomUUID();
+        const handler = (event: MessageEvent) => {
+            const { id: responseId, success, data, error } = event.data;
+            if (responseId === id) {
+               storageWorker.removeEventListener('message', handler);
+               if (success) resolve(data);
+               else reject(new Error(error));
+            }
+        };
+        storageWorker.addEventListener('message', handler);
+        storageWorker.postMessage({
+            id,
+            type: 'getMessages',
+            payload: {
+                fingerprint,
+                limit: MAX_MESSAGES_IN_MEMORY,
+                offset: currentCount, // Pagination!
+                masterKey: activeMasterKey
+            }
+        });
+      });
+
+      try {
+        const fetchedMessages = await fetchPromise;
+         if (fetchedMessages.length === 0) return;
+
+         fetchedMessages.forEach(msg => {
+            if (msg.content.imageBlob) {
+               msg.content.image = URL.createObjectURL(msg.content.imageBlob);
+               delete msg.content.imageBlob;
+            }
+         });
+
+         const ids: string[] = [];
+         const entities: Record<string, SecureMessage> = {};
+         fetchedMessages.forEach(msg => {
+            ids.push(msg.id);
+            entities[msg.id] = msg;
+         });
+
+         set((state) => {
+             const prevIds = state.messages.ids;
+             const prevEntities = state.messages.entities;
+
+             // Append to end (oldest messages)
+             const newIds = [...prevIds, ...ids];
+             const newEntities = { ...prevEntities, ...entities };
+
+             const uniqueIds = Array.from(new Set(newIds));
+             const finalState = { ids: uniqueIds, entities: newEntities };
+
+             // Update Cache
+             const newCache = {
+                 ...state.chatCache,
+                 [fingerprint]: finalState
+             };
+
+             return {
+                 messages: finalState,
+                 chatCache: newCache
+             };
+         });
+      } catch (error) {
+        console.error('[PAGINATION] Failed to load more:', error);
+      }
   },
 });

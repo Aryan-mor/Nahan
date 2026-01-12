@@ -27,6 +27,7 @@ export interface MessageSlice {
     ids: string[];
     entities: Record<string, SecureMessage>;
   };
+  chatCache: Record<string, { ids: string[]; entities: Record<string, SecureMessage> }>;
   isLoadingMessages: boolean;
   chatSummaries: Record<string, SecureMessage | undefined>;
   messageInput: string;
@@ -42,6 +43,7 @@ export interface MessageSlice {
   updateSummaryForContact: (fingerprint: string, lastMessage: SecureMessage) => void; // O(1) incremental update
   processPendingMessages: () => Promise<number>;
   clearAllMessages: () => Promise<void>;
+  loadMoreMessages: () => Promise<void>;
 }
 
 export interface ProcessingSlice {

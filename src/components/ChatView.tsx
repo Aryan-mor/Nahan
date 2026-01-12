@@ -256,17 +256,30 @@ export function ChatView() {
         <div ref={messagesEndRef} />
 
         {encodingStatus !== 'idle' && <TemporarySteganographyMessage />}
-        {isLoadingMessages ? (
-          <ChatSkeleton />
-        ) : messages.ids.length === 0 && encodingStatus === 'idle' ? (
+
+        {/* Render Messages */}
+        {messages.ids.map((id) => <MessageBubble key={id} id={id} />)}
+
+        {/* History Loading Skeleton - Renders at TOP (End of DOM in flex-col-reverse) */}
+        {isLoadingMessages && messages.ids.length > 0 && (
+          <div className="py-8 opacity-60">
+             <ChatSkeleton className="h-auto" />
+          </div>
+        )}
+
+        {/* Full Page Initial Loading */}
+        {isLoadingMessages && messages.ids.length === 0 && (
+          <ChatSkeleton className="h-full" />
+        )}
+
+        {/* Empty State */}
+        {!isLoadingMessages && messages.ids.length === 0 && encodingStatus === 'idle' && (
           <div className="flex flex-col items-center justify-center h-full text-industrial-500 space-y-4 opacity-50">
             <Shield className="w-16 h-16" />
             <p className="text-center max-w-xs text-sm">
               {t('chat.encrypted_notice', { name: activeChat.name })}
             </p>
           </div>
-        ) : (
-          messages.ids.map((id) => <MessageBubble key={id} id={id} />)
         )}
       </div>
 

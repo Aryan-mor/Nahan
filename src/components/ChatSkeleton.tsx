@@ -1,8 +1,8 @@
-import { Skeleton } from '@heroui/react';
+import { Skeleton, cn } from '@heroui/react';
 
-export function ChatSkeleton() {
+export function ChatSkeleton({ className }: { className?: string }) {
   return (
-    <div className="w-full h-full flex flex-col justify-end p-4 space-y-4">
+    <div className={cn("w-full flex flex-col justify-end p-4 space-y-4", className)}>
       {/* Sent Message Skeleton */}
       <div className="flex justify-end">
         <div className="max-w-[70%]">

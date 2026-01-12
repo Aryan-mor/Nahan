@@ -325,44 +325,52 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
     const now = Date.now();
 
     // ATOMIC STATE UPDATE: Batch all changes into a single set() call
-    const { activeChat } = get();
-    const shouldUpdateStore = !activeChat || (activeChat.fingerprint === sender.fingerprint);
-
     const setStart = performance.now();
-    if (shouldUpdateStore) {
-      set((state) => {
-        const { ids, entities } = state.messages;
-        if (ids.includes(newMessage.id)) {
-          return { messageInput: '', lastStorageUpdate: now };
-        }
 
-        const newIds = [newMessage.id, ...ids];
-        const newEntities = { ...entities, [newMessage.id]: newMessage };
+    set((state) => {
+        const { chatCache, chatSummaries, messages, activeChat } = state;
+        const fingerprint = sender.fingerprint;
 
-        // O(1) INCREMENTAL UPDATE: Update only this contact's summary inline
-        const updatedSummaries = {
-          ...state.chatSummaries,
-          [sender.fingerprint]: newMessage
+        // 1. Update Cache (Create if missing)
+        const cachedChat = chatCache[fingerprint] || { ids: [], entities: {} };
+        const newIds = [newMessage.id, ...cachedChat.ids];
+        const newEntities = { ...cachedChat.entities, [newMessage.id]: newMessage };
+        const newCache = { ...chatCache, [fingerprint]: { ids: newIds, entities: newEntities } };
+
+        // 2. Update Summaries
+        const newSummaries = {
+            ...chatSummaries,
+            [fingerprint]: newMessage
         };
 
-        return {
-          messages: { ids: newIds, entities: newEntities },
-          messageInput: '',
-          lastStorageUpdate: now,
-          chatSummaries: updatedSummaries, // O(1) - no DB call
+        const commonUpdates = {
+            messageInput: '',
+            lastStorageUpdate: now,
+            chatSummaries: newSummaries,
+            chatCache: newCache
         };
-      });
-    } else {
-      // Not viewing this chat, but still update the summary
-      set((state) => ({
-        messageInput: '',
-        lastStorageUpdate: now,
-        chatSummaries: {
-          ...state.chatSummaries,
-          [sender.fingerprint]: newMessage
+
+        // 3. Update Active View if match
+        // If activeChat is null, we rely on setActiveChat navigation to load the view,
+        // so we don't strictly need to update 'messages' here unless we want to populate it for the transition?
+        // But setActiveChat reads from Cache. So updating Cache is key.
+        const isActive = activeChat && (activeChat.fingerprint === fingerprint);
+
+        if (isActive) {
+            const { ids, entities } = messages;
+            if (ids.includes(newMessage.id)) {
+                return commonUpdates;
+            }
+            const newIds = [newMessage.id, ...ids];
+            const newEntities = { ...entities, [newMessage.id]: newMessage };
+            return {
+                ...commonUpdates,
+                messages: { ids: newIds, entities: newEntities }
+            };
         }
-      }));
-    }
+
+        return commonUpdates;
+    });
     console.log(`[PERF][Processing] set() atomic update - Duration: ${(performance.now() - setStart).toFixed(2)}ms`);
     console.log(`[PERF][Processing] handleUniversalInput Complete - Total Duration: ${(performance.now() - perfStart).toFixed(2)}ms`);
 
