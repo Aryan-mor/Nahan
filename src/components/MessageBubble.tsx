@@ -296,6 +296,7 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
   return (
     <>
       <motion.div
+        data-testid="message-bubble"
         ref={bubbleRef}
         initial={{ opacity: 0, y: 10, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -363,7 +364,7 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
 
             {/* Message Content (or Decoded Text if Plain is Missing) */}
             {(message.content.plain || (decodedText && !decodedSrc)) && (
-              <div className="whitespace-pre-wrap">{message.content.plain || decodedText}</div>
+              <div data-testid="message-content" className="whitespace-pre-wrap">{message.content.plain || decodedText}</div>
             )}
 
             {/* Decoded Steganography Text (Only if DIFFERENT from main content and NOT already shown as main content) */}
@@ -450,6 +451,7 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
               })}
             </span>
             <button
+              data-testid="copy-block-btn"
               onClick={copyEncrypted}
               className="text-[10px] flex items-center gap-1 text-industrial-500 hover:text-primary-400 transition-colors"
             >

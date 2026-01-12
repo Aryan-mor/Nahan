@@ -564,6 +564,7 @@ export function ChatInput() {
 
         <div className="flex-1 relative">
           <Textarea
+            data-testid="chat-input"
             ref={textareaRef}
             value={messageInput}
             onValueChange={setMessageInput}
@@ -587,6 +588,7 @@ export function ChatInput() {
         {messageInput.trim() ? (
           <Tooltip content={t('chat.input.long_press_tooltip')}>
             <Button
+              data-testid="chat-send-btn"
               isIconOnly
               color="primary"
               variant="shadow"

@@ -549,13 +549,41 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
       if (shouldUpdateStore) {
         set((state) => {
-          const { ids, entities } = state.messages;
-          if (ids.includes(newMessage.id)) return {};
+          const { chatCache, messages } = state;
+          const fingerprint = sender.fingerprint;
+          const timestamp = Date.now();
 
-          const newIds = [newMessage.id, ...ids];
-          const newEntities = { ...entities, [newMessage.id]: newMessage };
+          // 1. Update Cache to ensure history is preserved for re-renders/navigation
+          const cachedChat = chatCache[fingerprint] || { ids: [], entities: {} };
+
+          // Deduplicate based on cache
+          if (cachedChat.ids.includes(newMessage.id)) {
+             return { lastStorageUpdate: timestamp };
+          }
+
+          const newCachedIds = [newMessage.id, ...cachedChat.ids];
+          const newCachedEntities = { ...cachedChat.entities, [newMessage.id]: newMessage };
+          const newCache = { ...chatCache, [fingerprint]: { ids: newCachedIds, entities: newCachedEntities } };
+
+          // 2. Update Active Messages View if applicable
+          // We assume 'shouldUpdateStore' implies we are in the active chat or headless
+          let newMessagesState = messages;
+
+          // Verify we aren't overwriting history by ensuring we spread existing IDs
+          // Logic: If we are active, 'messages' should mirror 'cachedChat' + new message
+          if (messages.ids.includes(newMessage.id)) {
+              newMessagesState = messages;
+          } else {
+              newMessagesState = {
+                  ids: [newMessage.id, ...messages.ids],
+                  entities: { ...messages.entities, [newMessage.id]: newMessage }
+              };
+          }
+
           return {
-            messages: { ids: newIds, entities: newEntities }
+            chatCache: newCache,
+            messages: newMessagesState,
+            lastStorageUpdate: timestamp
           };
         });
       }

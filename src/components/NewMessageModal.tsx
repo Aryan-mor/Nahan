@@ -62,7 +62,7 @@ export function NewMessageModal({
       size="md"
       isDismissable={!isProcessing}
       isKeyboardDismissDisabled={isProcessing}
-
+      data-testid="detection-modal"
 
       classNames={{
         base: 'bg-industrial-950 border border-industrial-800',
@@ -113,7 +113,12 @@ export function NewMessageModal({
               <Button color="danger" variant="light" onPress={onClose} isDisabled={isProcessing}>
                 {t('new_message.dismiss')}
               </Button>
-              <Button color="primary" onPress={handleViewChat} isLoading={isProcessing}>
+              <Button
+                color="primary"
+                onPress={handleViewChat}
+                isLoading={isProcessing}
+                data-testid="detection-view-chat-btn"
+              >
                 {t('new_message.view_chat')}
               </Button>
             </ModalFooter>

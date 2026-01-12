@@ -197,6 +197,7 @@ export function DetectionModal({
                   onPress={handleGoToChat}
                   startContent={!isProcessing && <MessageSquare className="w-4 h-4" />}
                   isLoading={isProcessing}
+                  data-testid="detection-view-chat-btn"
                 >
                   {t('detection.view_chat')}
                 </Button>
