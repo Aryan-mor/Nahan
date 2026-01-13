@@ -320,6 +320,7 @@ export function UnifiedStealthDrawer() {
           size="sm"
           variant="light"
           isIconOnly
+          data-testid="stealth-regenerate-cover-btn"
           onPress={() => {
             if (pendingStealthBinary) {
               const suggestion = camouflageService.getRecommendedCover(
@@ -335,6 +336,7 @@ export function UnifiedStealthDrawer() {
       </div>
 
       <Textarea
+        data-testid="stealth-cover-text-input"
         value={coverText}
         onChange={(e) => setCoverText(e.target.value)}
         minRows={5}
@@ -519,6 +521,7 @@ export function UnifiedStealthDrawer() {
                 </Button>
                 <Button
                   color="primary"
+                  data-testid="stealth-send-btn"
                   onPress={async () => {
                     try {
                       await navigator.clipboard.writeText(finalTextOutput);
