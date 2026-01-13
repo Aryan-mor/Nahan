@@ -258,6 +258,83 @@ export function ChatList({
 
   const handleManualPaste = async (content: string) => {
     setIsProcessingPaste(true);
+    setDecodingStatus('processing');
+    setDecodedContact(null);
+    setDecodingError(null);
+
+    // Check for Data URL (Image Steganography)
+    if (content.startsWith('data:image')) {
+      try {
+        if (!identity || !sessionPassphrase) {
+          toast.error(t('auth.required'));
+          return;
+        }
+
+        // Convert Data URL to Blob/File
+        const res = await fetch(content);
+        const blob = await res.blob();
+        const file = new File([blob], "pasted_image.png", { type: blob.type });
+
+        // Decode
+        const { url, senderPublicKey } = await stegoService.decode(
+          file,
+          identity.privateKey,
+          sessionPassphrase,
+          contacts.map((c) => c.publicKey),
+        );
+        setDecodedImageUrl(url || null);
+
+        // Store message logic
+        if (senderPublicKey) {
+          const contact = contacts.find((c) => c.publicKey === senderPublicKey);
+          if (contact) {
+            setDecodedContact(contact);
+
+             // Store as 'image_stego'
+             await storageService.storeMessage(
+               {
+                 senderFingerprint: contact.fingerprint,
+                 recipientFingerprint: identity.fingerprint,
+                 type: 'image_stego',
+                 content: {
+                   plain: '',
+                   encrypted: '',
+                   image: content, // Use the original Data URL
+                 },
+                 isOutgoing: false,
+                 read: false,
+                 status: 'sent',
+               },
+               sessionPassphrase,
+             );
+
+            refreshChatSummaries();
+            toast.success(t('steganography.message_saved', 'Message saved to chat'));
+
+            // TRIGGER NEW MESSAGE MODAL
+            setNewMessageResult({
+               type: 'message',
+               fingerprint: contact.fingerprint,
+               isBroadcast: false,
+               senderName: contact.name,
+            });
+            setShowNewMessageModal(true);
+          } else {
+             toast.warning(t('steganography.unknown_sender', 'Decoded from unknown sender'));
+          }
+        }
+        setDecodingStatus('success');
+        setIsManualPasteOpen(false);
+      } catch (error) {
+        setDecodingStatus('error');
+        setDecodingError((error as Error).message);
+        toast.error(t('steganography.decode_error', 'Failed to decode image'));
+      } finally {
+        setIsProcessingPaste(false);
+      }
+      return;
+    }
+
     try {
       const result = await handleUniversalInput(content, undefined, true);
 

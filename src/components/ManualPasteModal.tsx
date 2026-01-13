@@ -42,7 +42,8 @@ export function ManualPasteModal({
       setError(t('manual_paste.error.too_short'));
       return;
     }
-    if (text.length > 5000) {
+    // Support large data URLs (images can be 2MB+)
+    if (text.length > 10000000) {
       setError(t('manual_paste.error.too_long'));
       return;
     }
@@ -119,10 +120,10 @@ export function ManualPasteModal({
                 )}
                 <div
                   className={`text-xs font-mono ${
-                    text.length > 5000 || text.length < 10 ? 'text-red-500' : 'text-industrial-500'
+                    text.length > 10000000 || text.length < 10 ? 'text-red-500' : 'text-industrial-500'
                   }`}
                 >
-                  {text.length}/5000
+                  {text.length}/10000000
                 </div>
               </div>
             </ModalBody>

@@ -368,7 +368,12 @@ export function UnifiedStealthDrawer() {
       {/* Image Preview / Placeholder */}
       <div className="relative w-full aspect-square bg-industrial-900 rounded-xl overflow-hidden border border-industrial-800 flex flex-col items-center justify-center">
         {generatedImage ? (
-          <img src={generatedImage} alt="Stealth Mask" className="w-full h-full object-cover" />
+          <img
+            src={generatedImage}
+            alt="Stealth Mask"
+            className="w-full h-full object-cover"
+            data-testid="stealth-generated-image"
+          />
         ) : (
           <div className="text-center p-6 flex flex-col items-center gap-4">
             <div className="w-16 h-16 bg-industrial-800 rounded-full flex items-center justify-center">
@@ -379,7 +384,12 @@ export function UnifiedStealthDrawer() {
             </p>
 
             <div className="flex gap-3">
-              <Button color="primary" onPress={handleGenerateMask} isLoading={isGenerating}>
+              <Button
+                color="primary"
+                onPress={handleGenerateMask}
+                isLoading={isGenerating}
+                data-testid="stealth-generate-mask-btn"
+              >
                 {t('stealth.generate_mask', 'Generate Mask')}
               </Button>
               <Button
@@ -424,6 +434,7 @@ export function UnifiedStealthDrawer() {
             size="lg"
             startContent={<Shield className="w-5 h-5" />}
             onPress={handleSendStealthImage}
+            data-testid="stealth-send-image-btn"
           >
             {t('stealth.send_now', 'Send Now')}
           </Button>
