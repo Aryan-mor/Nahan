@@ -10,7 +10,7 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
   launchOptions: {
-      slowMo: 500,
+      slowMo: 100,
   },
   },
   projects: [

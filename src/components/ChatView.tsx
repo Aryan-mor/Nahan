@@ -210,7 +210,10 @@ export function ChatView() {
               className="w-10 h-10 text-sm bg-primary-900 text-primary-200"
             />
             <div>
-              <h2 className="font-semibold text-industrial-100 leading-tight">
+              <h2
+                data-testid="chat-header-name"
+                className="font-semibold text-industrial-100 leading-tight"
+              >
                 {activeChat.fingerprint === 'BROADCAST' ? t('broadcast_channel') : activeChat.name}
               </h2>
               <p className="text-xs text-industrial-400 font-mono">
