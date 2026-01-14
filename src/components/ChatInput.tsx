@@ -2,22 +2,19 @@
 import { Button, Textarea, Tooltip } from '@heroui/react';
 import { Lock, Paperclip, Send } from 'lucide-react';
 /* eslint-disable max-lines-per-function */
-import React, { Fragment, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import * as naclUtil from 'tweetnacl-util';
 
 import { useLongPress } from '../hooks/useLongPress';
-import { CamouflageService } from '../services/camouflage';
 import { ImageSteganographyService } from '../services/steganography';
 import { useAppStore } from '../stores/appStore';
 import { useSteganographyStore } from '../stores/steganographyStore';
 import * as logger from '../utils/logger';
 
-import { ManualPasteModal } from './ManualPasteModal';
+import { ManualPasteButton } from './ManualPasteButton';
 import { SteganographyPreviewSheet } from './steganography/SteganographyPreviewSheet';
 
-const camouflageService = CamouflageService.getInstance();
 const steganographyService = ImageSteganographyService.getInstance();
 
 export function ChatInput() {
@@ -28,7 +25,6 @@ export function ChatInput() {
     setPendingStealthImage,
     setStealthDrawerMode,
     setPendingPlaintext,
-    processIncomingMessage,
     sendMessage,
     messageInput,
     setMessageInput,
@@ -53,7 +49,7 @@ export function ChatInput() {
   } = useSteganographyStore();
 
 
-  const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
+  // const [isManualPasteOpen, setIsManualPasteOpen] = useState(false); // Deprecated
   const [isAutoStealthEncoding, setIsAutoStealthEncoding] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -324,208 +320,7 @@ export function ChatInput() {
     await handleSingleClick();
   };
 
-  const processPasteContent = async (content: string) => {
-    // Never paste into input field - always try to decrypt first
 
-    try {
-      let encryptedData: string | null = null;
-
-      // 1. Check if it's a stealth message (ZWC-embedded)
-      const hasZWC = camouflageService.hasZWC(content);
-      logger.debug('TRACE [ChatInput] ZWC Detection:', { hasZWC, contentLength: content.length });
-
-      if (hasZWC) {
-        logger.debug('TRACE [ChatInput] ZWC detected, attempting extraction...');
-        try {
-          // First try strict decoding
-          let binary: Uint8Array;
-          try {
-            binary = camouflageService.decodeFromZWC(content, false);
-            logger.debug(
-              'TRACE [ChatInput] ZWC strict decode successful, binary length:',
-              binary.length,
-            );
-          } catch (strictError: unknown) {
-            // If strict fails with checksum error, try lenient mode
-            const error = strictError as Error;
-            if (
-              error.message?.includes('Checksum mismatch') ||
-              error.message?.includes('corrupted')
-            ) {
-              logger.warn(
-                'TRACE [ChatInput] ZWC strict decode failed (checksum), trying lenient mode...',
-                error.message,
-              );
-              binary = camouflageService.decodeFromZWC(content, true);
-              logger.debug(
-                'TRACE [ChatInput] ZWC lenient decode successful, binary length:',
-                binary.length,
-              );
-              toast.warning('Some invisible characters may have been lost, but message recovered.');
-            } else {
-              logger.error(
-                'TRACE [ChatInput] ZWC strict decode failed with non-checksum error:',
-                error.message,
-              );
-              throw strictError; // Re-throw if it's a different error
-            }
-          }
-          // Convert to base64 for decryption (processIncomingMessage expects string)
-          encryptedData = naclUtil.encodeBase64(binary);
-          logger.debug(
-            'TRACE [ChatInput] ZWC extraction complete, base64 length:',
-            encryptedData.length,
-          );
-        } catch (error: unknown) {
-          const err = error as Error;
-          logger.error('TRACE [ChatInput] ZWC extraction FAILED:', {
-            error: err.message,
-            errorType: err.name,
-            stack: err.stack,
-          });
-          // Provide specific error log about why ZWC was invalid
-          if (err.message?.includes('prefix signature')) {
-            logger.error(
-              'TRACE [ChatInput] ZWC Error: Missing or invalid prefix signature - message may be incomplete',
-            );
-            toast.error('Invalid stealth message format. Make sure you copied the entire message.');
-          } else if (
-            err.message?.includes('too many invisible characters') ||
-            err.message?.includes('corrupted')
-          ) {
-            logger.error(
-              'TRACE [ChatInput] ZWC Error: Message corrupted - invisible characters lost during transmission',
-            );
-            toast.error(
-              'Message is too corrupted to recover. Some invisible characters were lost.',
-            );
-          } else if (err.message?.includes('Data too short')) {
-            logger.error('TRACE [ChatInput] ZWC Error: Message too short - incomplete data');
-            toast.error('Message appears incomplete. Please copy the entire message.');
-          } else {
-            logger.error('TRACE [ChatInput] ZWC Error: Unknown extraction failure', err.message);
-            toast.error('Failed to extract hidden message. The message may be corrupted.');
-          }
-          // DO NOT fall back to PGP if ZWC was detected but failed - this is a specific error
-          // Throw error to prevent fallback to other formats
-          throw new Error(`ZWC extraction failed: ${err.message}`);
-        }
-      } else {
-        logger.debug('TRACE [ChatInput] No ZWC detected, checking other formats...');
-      }
-
-      // 2. Check if it's a PGP message (legacy format)
-      if (!encryptedData && content.includes('-----BEGIN PGP MESSAGE-----')) {
-        logger.debug('TRACE [ChatInput] PGP message detected');
-        encryptedData = content;
-      }
-
-      // 3. Check if it's a Nahan Compact Protocol message (base64)
-      if (!encryptedData) {
-        logger.debug('TRACE [ChatInput] Checking for Base64 Nahan Protocol message...');
-        // Try to decode as base64 and check if it has the protocol version byte
-        try {
-          const decoded = naclUtil.decodeBase64(content.trim());
-          // Nahan Compact Protocol: 0x01 = encrypted, 0x02 = signed broadcast
-          if (decoded.length > 0 && (decoded[0] === 0x01 || decoded[0] === 0x02)) {
-            logger.debug(
-              'TRACE [ChatInput] Base64 Nahan Protocol detected, version:',
-              `0x${decoded[0].toString(16).padStart(2, '0')}`,
-            );
-            encryptedData = content.trim();
-          } else {
-            logger.debug('TRACE [ChatInput] Base64 decoded but invalid version byte:', decoded[0]);
-          }
-        } catch {
-          logger.debug('TRACE [ChatInput] Not valid base64, skipping...');
-          // Not base64, continue
-        }
-      }
-
-      // Log which detection step succeeded
-      if (encryptedData) {
-        logger.debug(
-          'TRACE [ChatInput] Detection successful, encryptedData length:',
-          encryptedData.length,
-        );
-      } else {
-        logger.debug('TRACE [ChatInput] No encrypted data detected in any format');
-      }
-
-      // 4. If we found encrypted data, try to decrypt and add to chat
-      if (encryptedData) {
-        try {
-          await processIncomingMessage(encryptedData);
-          toast.success(t('chat.input.decrypt_success'));
-          setMessageInput(''); // Clear input
-          return;
-        } catch (processError: unknown) {
-          const procErr = processError as Error;
-          // Provide clear feedback based on error type
-          if (
-            procErr.message?.includes('Signature verification failed') ||
-            procErr.message?.includes('verify')
-          ) {
-            toast.error(
-              'Signature verification failed. The message may be corrupted or from an unknown sender.',
-            );
-          } else if (
-            procErr.message?.includes('decrypt') ||
-            procErr.message?.includes('Decryption failed')
-          ) {
-            toast.error(
-              'Decryption failed. The message may be corrupted or encrypted for a different recipient.',
-            );
-          } else if (procErr.message === 'SENDER_UNKNOWN') {
-            setIsManualPasteOpen(true);
-            toast.error('Unknown sender. Please select the sender manually.');
-            return;
-          } else if (procErr.name === 'DuplicateMessageError') {
-            // Silently ignore duplicates
-            setMessageInput('');
-            return;
-          } else {
-            toast.error(t('chat.input.decrypt_error'));
-          }
-          throw processError; // Re-throw to continue to manual paste modal if needed
-        }
-      }
-
-      // 5. No encrypted message detected - show modal for manual paste
-      logger.debug(
-        'TRACE [ChatInput] No encrypted data detected in any format, showing manual paste modal',
-      );
-      throw new Error('No encrypted message detected');
-    } catch (err: unknown) {
-      // If it's a decryption error or unknown sender, show modal
-      const error = err as Error;
-      logger.debug('TRACE [ChatInput] Error caught in processPasteContent:', {
-        message: error.message,
-        name: error.name,
-      });
-
-      if (
-        error.message === 'SENDER_UNKNOWN' ||
-        error.message === 'No encrypted message detected' ||
-        error.message?.includes('decrypt') ||
-        error.message?.includes('Failed') ||
-        error.message?.includes('verify') ||
-        error.message?.includes('ZWC extraction failed')
-      ) {
-        setIsManualPasteOpen(true);
-        // Don't show duplicate error toast here - already handled above
-        if (error.name !== 'DuplicateMessageError') {
-          // ZWC errors already have specific toasts, don't show generic error
-          if (!error.message?.includes('ZWC extraction failed')) {
-            toast.error(t('chat.input.decrypt_error'));
-          }
-        }
-      } else {
-        toast.error(t('chat.input.decrypt_error'));
-        logger.error(error);
-      }
-    }
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -600,7 +395,11 @@ export function ChatInput() {
             </Button>
           </Tooltip>
         ) : (
-          <Fragment/>
+          <ManualPasteButton
+            onNewChat={() => {}} // In chat, fallback might be no-op or handle specific nav
+            className="rounded-full w-8 h-8 min-w-8 mb-1 bg-industrial-800 text-industrial-300"
+            variant="flat"
+          />
         )}
       </div>
       <div className="text-center mt-1">
@@ -610,11 +409,7 @@ export function ChatInput() {
         </span>
       </div>
 
-      <ManualPasteModal
-        isOpen={isManualPasteOpen}
-        onClose={() => setIsManualPasteOpen(false)}
-        onSubmit={processPasteContent}
-      />
+
 
       <SteganographyPreviewSheet
         isOpen={isPreviewOpen}

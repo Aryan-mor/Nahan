@@ -1,42 +1,39 @@
 /* eslint-disable max-lines, no-console */
 /* eslint-disable max-lines-per-function */
 import {
-    Avatar,
-    Button,
-    Card,
-    CardBody,
-    Input,
-    Modal,
-    ModalBody,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    useDisclosure,
+  Avatar,
+  Button,
+  Card,
+  CardBody,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-    ClipboardPaste,
-    ImageDown,
-    Image as ImageIcon,
-    MessageSquare,
-    Plus,
-    Search,
+  ImageDown,
+  Image as ImageIcon,
+  MessageSquare,
+  Plus,
+  Search
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { DetectionResult } from '../hooks/useClipboardDetection';
-import { analyzeClipboard } from '../services/clipboardAnalysis';
 import { ImageSteganographyService } from '../services/steganography';
 import { Contact, StorageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useSteganographyStore } from '../stores/steganographyStore';
 import * as logger from '../utils/logger';
+import { ManualPasteButton } from './ManualPasteButton';
 
-import { ManualPasteModal } from './ManualPasteModal';
 import { MyQRModal } from './MyQRModal';
-import { NewMessageModal } from './NewMessageModal';
 
 export function ChatList({
   onNewChat,
@@ -56,7 +53,6 @@ export function ChatList({
   const contacts = useAppStore(state => state.contacts);
   const getContactsWithBroadcast = useAppStore(state => state.getContactsWithBroadcast);
   const setActiveChat = useAppStore(state => state.setActiveChat);
-  const handleUniversalInput = useAppStore(state => state.handleUniversalInput);
   const chatSummaries = useAppStore(state => state.chatSummaries);
   const refreshChatSummaries = useAppStore(state => state.refreshChatSummaries);
   const identity = useAppStore(state => state.identity);
@@ -78,310 +74,12 @@ export function ChatList({
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const qrModal = useDisclosure();
   const [modalSearch, setModalSearch] = useState('');
-  const [isProcessingPaste, setIsProcessingPaste] = useState(false);
-  const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
+
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Sender Selection Modal
-  const [isSenderSelectOpen, setIsSenderSelectOpen] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
-  // New Message Modal
-  const [newMessageResult, setNewMessageResult] = useState<{
-    type: 'message';
-    fingerprint: string;
-    isBroadcast: boolean;
-    senderName: string;
-  } | null>(null);
-  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
 
-  const handlePaste = async () => {
-    setIsProcessingPaste(true);
-    setDecodingStatus('processing');
-    let decodingOutcome: 'success' | 'error' | null = null;
 
-    try {
-      if (!identity || !sessionPassphrase) {
-        toast.error(t('auth.required'));
-        return;
-      }
-
-      const { processed } = await analyzeClipboard({
-        identity,
-        sessionPassphrase,
-        contacts,
-        handleUniversalInput,
-      });
-
-      if (processed) {
-        if (processed.type === 'message') {
-          // Message already stored by analyzeClipboard (if image) or handleUniversalInput (if text)
-          // We just need to update UI
-
-          if (processed.source === 'image') {
-            setDecodingStatus('success');
-            decodingOutcome = 'success';
-            toast.success(t('stealth.decode_success', 'Image decoded successfully'));
-          }
-
-          setNewMessageResult({
-            type: 'message',
-            fingerprint: processed.fingerprint!,
-            isBroadcast: processed.isBroadcast || false,
-            senderName: processed.senderName || 'Unknown',
-          });
-          setShowNewMessageModal(true);
-        } else if (processed.type === 'id') {
-          // Handle contact detection
-          // analyzeClipboard might return contact type from handleUniversalInput
-          if (processed.data) {
-            const contactData = processed.data;
-            // Use existing logic for contact intro
-            if (onDetection) {
-              onDetection({
-                type: 'id',
-                contactName: contactData.name || 'Unknown',
-                contactPublicKey: contactData.publicKey || contactData.key,
-              });
-            } else {
-              toast.info(t('chat.list.contact_key_detected'));
-              onNewChat();
-            }
-          }
-        }
-      } else {
-        // Nothing found - smart fallback to manual paste
-        toast.info(t('chat.list.clipboard_empty', 'Clipboard empty or format not supported'));
-        setIsManualPasteOpen(true);
-      }
-    } catch (error: unknown) {
-      setDecodingStatus('error');
-      decodingOutcome = 'error';
-      const err = error as {
-        message?: string;
-        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
-      };
-
-      if (err.message === 'SENDER_UNKNOWN') {
-        try {
-          const text = await navigator.clipboard.readText();
-          if (text) {
-            setPendingMessage(text);
-            setIsSenderSelectOpen(true);
-          }
-        } catch {
-          // Fallback to manual if clipboard read fails
-          setIsManualPasteOpen(true);
-        }
-      } else if (err.message === 'CONTACT_INTRO_DETECTED') {
-        if (onDetection && err.keyData) {
-          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
-          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
-          if (contactPublicKey) {
-            onDetection({
-              type: 'id',
-              contactName: contactName,
-              contactPublicKey: contactPublicKey,
-            });
-          } else {
-            toast.info(t('chat.list.contact_key_detected'));
-            onNewChat();
-          }
-        } else {
-          toast.info(t('chat.list.contact_key_detected'));
-          onNewChat();
-        }
-      } else {
-        logger.error('[UniversalInput] Error:', error);
-
-        // SMART FALLBACK: For any other error (invalid format, permission denied, etc.),
-        // just open the manual paste modal so user can try manually.
-        setIsManualPasteOpen(true);
-      }
-    } finally {
-      setIsProcessingPaste(false);
-      // Reset status if we didn't finish with success/error (e.g. text message or empty)
-      if (!decodingOutcome) {
-        setDecodingStatus('idle');
-      }
-    }
-  };
-
-  const handleSelectSender = async (fingerprint: string) => {
-    if (!pendingMessage) return;
-
-    setIsSenderSelectOpen(false);
-    setIsProcessingPaste(true);
-
-    try {
-      const result = await handleUniversalInput(pendingMessage, fingerprint, true);
-
-      // If a message was detected, show the new message modal
-      if (result && result.type === 'message') {
-        setNewMessageResult(result);
-        setShowNewMessageModal(true);
-      }
-
-      setPendingMessage(null);
-    } catch (error: unknown) {
-      const err = error as {
-        message?: string;
-        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
-      };
-      if (err.message === 'CONTACT_INTRO_DETECTED') {
-        // UNIFICATION: Handle contact ID detection the same way as auto-detector
-        if (onDetection && err.keyData) {
-          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
-          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
-          if (contactPublicKey) {
-            onDetection({
-              type: 'id',
-              contactName: contactName,
-              contactPublicKey: contactPublicKey,
-            });
-          } else {
-            toast.info(t('chat.list.contact_key_detected'));
-            onNewChat(); // Fallback: Navigate to keys tab if handler not available
-          }
-        } else {
-          toast.info(t('chat.list.contact_key_detected'));
-          onNewChat(); // Fallback: Navigate to keys tab if handler not available
-        }
-      } else {
-        logger.error('[UniversalInput] Error:', error);
-        toast.error(t('chat.list.import_error'));
-      }
-    } finally {
-      setIsProcessingPaste(false);
-    }
-  };
-
-  const handleManualPaste = async (content: string) => {
-    setIsProcessingPaste(true);
-    setDecodingStatus('processing');
-    setDecodedContact(null);
-    setDecodingError(null);
-
-    // Check for Data URL (Image Steganography)
-    if (content.startsWith('data:image')) {
-      try {
-        if (!identity || !sessionPassphrase) {
-          toast.error(t('auth.required'));
-          return;
-        }
-
-        // Convert Data URL to Blob/File
-        const res = await fetch(content);
-        const blob = await res.blob();
-        const file = new File([blob], "pasted_image.png", { type: blob.type });
-
-        // Decode
-        const { url, senderPublicKey } = await stegoService.decode(
-          file,
-          identity.privateKey,
-          sessionPassphrase,
-          contacts.map((c) => c.publicKey),
-        );
-        setDecodedImageUrl(url || null);
-
-        // Store message logic
-        if (senderPublicKey) {
-          const contact = contacts.find((c) => c.publicKey === senderPublicKey);
-          if (contact) {
-            setDecodedContact(contact);
-
-             // Store as 'image_stego'
-             await storageService.storeMessage(
-               {
-                 senderFingerprint: contact.fingerprint,
-                 recipientFingerprint: identity.fingerprint,
-                 type: 'image_stego',
-                 content: {
-                   plain: '',
-                   encrypted: '',
-                   image: content, // Use the original Data URL
-                 },
-                 isOutgoing: false,
-                 read: false,
-                 status: 'sent',
-               },
-               sessionPassphrase,
-             );
-
-            refreshChatSummaries();
-            toast.success(t('steganography.message_saved', 'Message saved to chat'));
-
-            // TRIGGER NEW MESSAGE MODAL
-            setNewMessageResult({
-               type: 'message',
-               fingerprint: contact.fingerprint,
-               isBroadcast: false,
-               senderName: contact.name,
-            });
-            setShowNewMessageModal(true);
-          } else {
-             toast.warning(t('steganography.unknown_sender', 'Decoded from unknown sender'));
-          }
-        }
-        setDecodingStatus('success');
-        setIsManualPasteOpen(false);
-      } catch (error) {
-        setDecodingStatus('error');
-        setDecodingError((error as Error).message);
-        toast.error(t('steganography.decode_error', 'Failed to decode image'));
-      } finally {
-        setIsProcessingPaste(false);
-      }
-      return;
-    }
-
-    try {
-      const result = await handleUniversalInput(content, undefined, true);
-
-      // If a message was detected, show the new message modal
-      if (result && result.type === 'message') {
-        setNewMessageResult(result);
-        setShowNewMessageModal(true);
-      }
-
-      setIsManualPasteOpen(false);
-    } catch (error: unknown) {
-      const err = error as {
-        message?: string;
-        keyData?: { name?: string; username?: string; publicKey?: string; key?: string };
-      };
-      if (err.message === 'SENDER_UNKNOWN') {
-        setPendingMessage(content);
-        setIsManualPasteOpen(false);
-        setIsSenderSelectOpen(true);
-      } else if (err.message === 'CONTACT_INTRO_DETECTED') {
-        // UNIFICATION: Handle contact ID detection the same way as auto-detector
-        setIsManualPasteOpen(false);
-        if (onDetection && err.keyData) {
-          const contactName = err.keyData.name || err.keyData.username || 'Unknown';
-          const contactPublicKey = err.keyData.publicKey || err.keyData.key;
-          if (contactPublicKey) {
-            onDetection({
-              type: 'id',
-              contactName: contactName,
-              contactPublicKey: contactPublicKey,
-            });
-          } else {
-            toast.info(t('chat.list.contact_key_detected'));
-            onNewChat(); // Fallback: Navigate to keys tab if handler not available
-          }
-        } else {
-          toast.info(t('chat.list.contact_key_detected'));
-          onNewChat(); // Fallback: Navigate to keys tab if handler not available
-        }
-      } else {
-        toast.error(t('chat.list.process_error'));
-        logger.error('[UniversalInput] Error:', error);
-      }
-    } finally {
-      setIsProcessingPaste(false);
-    }
-  };
 
   // INITIAL LOAD ONLY: Fetch summaries once on mount
   // O(1) updates happen inline in sendMessage/handleUniversalInput
@@ -569,17 +267,12 @@ export function ChatList({
                 }
               }}
             />
-            <Button
-              isIconOnly
-              variant="flat"
+            <ManualPasteButton
+              onNewChat={onNewChat}
+              onDetection={onDetection}
               className="rounded-full bg-industrial-800 text-industrial-300"
-              onPress={handlePaste}
-              isLoading={isProcessingPaste}
-              title={t('chat.list.paste_encrypted')}
-              data-testid="chat-list-manual-paste-icon"
-            >
-              <ClipboardPaste className="w-5 h-5" />
-            </Button>
+              variant="flat"
+            />
             <Button
               isIconOnly
               variant="flat"
@@ -835,99 +528,7 @@ export function ChatList({
           )}
         </ModalContent>
       </Modal>
-      {/* Sender Selection Modal */}
-      <Modal
-        isOpen={isSenderSelectOpen}
-        onOpenChange={setIsSenderSelectOpen}
-        isDismissable={false}
-        isKeyboardDismissDisabled={true}
-        shouldCloseOnInteractOutside={() => false}
-        classNames={{
-          base: 'bg-industrial-900 border border-industrial-800',
-          header: 'border-b border-industrial-800',
-          footer: 'border-t border-industrial-800',
-          closeButton: 'hover:bg-industrial-800 active:bg-industrial-700',
-        }}
-      >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex flex-col gap-1">
-                {t('chat.list.select_sender.title')}
-                <p className="text-sm font-normal text-industrial-400">
-                  {t('chat.list.select_sender.desc')}
-                </p>
-              </ModalHeader>
-              <ModalBody>
-                <Input
-                  placeholder={t('chat.list.search_contacts_placeholder')}
-                  startContent={<Search className="w-4 h-4 text-industrial-400" />}
-                  value={modalSearch}
-                  onValueChange={setModalSearch}
-                  classNames={{
-                    inputWrapper: 'bg-industrial-950 border-industrial-800',
-                  }}
-                  className="mb-4"
-                />
-                <div className="max-h-[300px] overflow-y-auto space-y-2">
-                  {modalFilteredContacts.length === 0 ? (
-                    <div className="text-center py-8 text-industrial-500">
-                      <p>{t('chat.list.no_contacts')}</p>
-                    </div>
-                  ) : (
-                    modalFilteredContacts.map((contact) => (
-                      <div
-                        key={contact.id}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-industrial-800 cursor-pointer transition-colors"
-                        onClick={() => handleSelectSender(contact.fingerprint)}
-                      >
-                        <Avatar
-                          name={contact.name}
-                          className="flex-shrink-0 bg-gradient-to-br from-industrial-700 to-industrial-800 text-industrial-200"
-                        />
-                        <div className="flex-1">
-                          <h4 className="text-industrial-100 font-medium">{contact.name}</h4>
-                          <p className="text-xs text-industrial-500 truncate">
-                            {contact.fingerprint.slice(-8)}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button color="danger" variant="light" onPress={onClose}>
-                  {t('chat.list.cancel')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
 
-      {isManualPasteOpen && (
-        <ManualPasteModal
-          isOpen={isManualPasteOpen}
-          onClose={() => setIsManualPasteOpen(false)}
-          onSubmit={handleManualPaste}
-          title={t('chat.list.import_title')}
-        />
-      )}
-
-      {/* New Message Modal */}
-      {newMessageResult && (
-        <NewMessageModal
-          isOpen={showNewMessageModal}
-          onClose={() => {
-            setShowNewMessageModal(false);
-            setNewMessageResult(null);
-          }}
-          senderName={newMessageResult.senderName}
-          senderFingerprint={newMessageResult.fingerprint}
-          isBroadcast={newMessageResult.isBroadcast}
-        />
-      )}
       {/* QR Modal */}
       <MyQRModal isOpen={qrModal.isOpen} onOpenChange={qrModal.onOpenChange} />
     </div>
