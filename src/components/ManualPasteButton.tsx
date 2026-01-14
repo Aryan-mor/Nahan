@@ -22,16 +22,18 @@ interface ManualPasteButtonProps {
   onDetection?: (result: DetectionResult) => void;
   className?: string;
   variant?: "solid" | "bordered" | "light" | "flat" | "faded" | "shadow";
+  testId?: string;
 }
 
 const stegoService = ImageSteganographyService.getInstance();
 const storageService = StorageService.getInstance();
 
-export function ManualPasteButton({ onNewChat, onDetection, className, variant = "flat" }: ManualPasteButtonProps) {
+export function ManualPasteButton({ onNewChat, onDetection, className, variant = "flat", testId }: ManualPasteButtonProps) {
   const { t } = useTranslation();
 
   // State
   const [isProcessingPaste, setIsProcessingPaste] = useState(false);
+
   const [isManualPasteOpen, setIsManualPasteOpen] = useState(false);
   const [isSenderSelectOpen, setIsSenderSelectOpen] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
@@ -330,7 +332,7 @@ export function ManualPasteButton({ onNewChat, onDetection, className, variant =
         onPress={handlePaste}
         isLoading={isProcessingPaste}
         title={t('chat.list.paste_encrypted')}
-        data-testid="chat-list-manual-paste-icon"
+        data-testid={testId || "chat-list-manual-paste-icon"}
       >
         <ClipboardPaste className="w-5 h-5" />
       </Button>

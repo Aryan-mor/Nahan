@@ -395,11 +395,14 @@ export function ChatInput() {
             </Button>
           </Tooltip>
         ) : (
-          <ManualPasteButton
-            onNewChat={() => {}} // In chat, fallback might be no-op or handle specific nav
-            className="rounded-full w-8 h-8 min-w-8 mb-1 bg-industrial-800 text-industrial-300"
-            variant="flat"
-          />
+          activeChat?.fingerprint !== 'BROADCAST' && (
+            <ManualPasteButton
+              onNewChat={() => {}} // In chat, fallback might be no-op or handle specific nav
+              className="rounded-full w-8 h-8 min-w-8 mb-1 bg-industrial-800 text-industrial-300"
+              variant="flat"
+              testId="chat-input-manual-paste-btn"
+            />
+          )
         )}
       </div>
       <div className="text-center mt-1">

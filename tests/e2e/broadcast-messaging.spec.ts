@@ -42,6 +42,9 @@ test.describe.serial('Broadcast Messaging (Multi-User)', () => {
 
              await expect(pageA.getByTestId('chat-view-container')).toBeVisible();
 
+             // Verify Manual Paste Button is Hidden in Broadcast Channel
+             await expect(pageA.getByTestId('chat-input-manual-paste-btn')).toBeHidden();
+
              // Send Message
              await pageA.getByTestId('chat-input').fill(broadcastMsg);
              await pageA.getByTestId('chat-send-btn').click();
