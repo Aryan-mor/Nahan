@@ -396,7 +396,7 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
                 placement={isOutgoing ? 'bottom-end' : 'bottom-start'}
               >
                 <DropdownTrigger>
-                  <Button isIconOnly size="sm" variant="light" className="text-industrial-400">
+                  <Button isIconOnly size="sm" variant="light" className="text-industrial-400" data-testid="message-options-btn">
                     <MoreVertical className="w-4 h-4" />
                   </Button>
                 </DropdownTrigger>
@@ -434,6 +434,7 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
                     color="danger"
                     startContent={<Trash2 className="w-4 h-4" />}
                     onPress={handleDelete}
+                    data-testid="delete-message-on-dropdown"
                   >
                     {t('chat.message.delete')}
                   </DropdownItem>

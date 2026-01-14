@@ -372,7 +372,7 @@ export function ChatList({
                 <Card
                   isPressable
                   onPress={() => setActiveChat(contact)}
-                  data-testid={`chat-item-${contact.name}`}
+                  data-testid={isBroadcast ? 'chat-list-item-BROADCAST' : `chat-item-${contact.name}`}
                   className={`w-full transition-colors ${
                     isBroadcast
                       ? 'bg-industrial-800/50 border-primary-500/20 hover:bg-industrial-800/70'

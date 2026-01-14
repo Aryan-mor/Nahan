@@ -38,7 +38,7 @@ test.describe.serial('Broadcast Messaging (Multi-User)', () => {
 
              // Click "Broadcast Channel"
              // Using regex for robustness against exact naming, but expecting "Broadcast"
-             await pageA.getByTestId(/chat-item-Broadcast/i).click();
+             await pageA.getByTestId('chat-list-item-BROADCAST').click();
 
              await expect(pageA.getByTestId('chat-view-container')).toBeVisible();
 
