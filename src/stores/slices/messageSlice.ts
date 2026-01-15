@@ -11,10 +11,8 @@ import { AppState, MessageSlice } from '../types';
 const cryptoService = CryptoService.getInstance();
 const MAX_MESSAGES_IN_MEMORY = 50;
 
-// Initialize Worker
-const storageWorker = new Worker(new URL('../../workers/storage.worker.ts', import.meta.url), {
-  type: 'module'
-});
+// Initialize Worker Service (replaces raw Worker)
+import { workerService } from '../../services/workerService';
 
 export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = (set, get) => ({
   activeChat: null,
@@ -50,6 +48,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         });
 
         // Background refresh to get new messages (offset 0, limit 50)
+        // BACKGROUND PRIORITY (Normal)
         performFetch(fingerprint, 0, MAX_MESSAGES_IN_MEMORY, true).catch(console.error);
       } else {
         // First load or empty cache
@@ -60,6 +59,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         });
 
         try {
+            // VIEWPORT PRIORITY (High) if user is waiting
             await performFetch(fingerprint, 0, MAX_MESSAGES_IN_MEMORY, false);
         } catch (error) {
             set({ isLoadingMessages: false });
@@ -79,31 +79,19 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
         const activeMasterKey = getMasterKey();
         if (!activeMasterKey) return;
 
-        const fetchPromise = new Promise<SecureMessage[]>((resolve, reject) => {
-            const id = crypto.randomUUID();
-            const handler = (event: MessageEvent) => {
-                const { id: responseId, success, data, error } = event.data;
-                if (responseId === id) {
-                   storageWorker.removeEventListener('message', handler);
-                   if (success) resolve(data);
-                   else reject(new Error(error));
-                }
-            };
-            storageWorker.addEventListener('message', handler);
-            storageWorker.postMessage({
-                id,
-                type: 'getMessages',
-                payload: {
+        try {
+            const fetchedMessages = await workerService.executeTask<SecureMessage[]>(
+                'getMessages',
+                {
                     fingerprint: targetFingerprint,
                     limit,
                     offset,
                     masterKey: activeMasterKey
+                },
+                {
+                    priority: isBackground ? 'normal' : 'high'
                 }
-            });
-        });
-
-        try {
-            const fetchedMessages = await fetchPromise;
+            );
 
             // Post-Processing
             fetchedMessages.forEach(msg => {
@@ -551,31 +539,19 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
       const activeMasterKey = getMasterKey();
       if (!activeMasterKey) return;
 
-      const fetchPromise = new Promise<SecureMessage[]>((resolve, reject) => {
-        const id = crypto.randomUUID();
-        const handler = (event: MessageEvent) => {
-            const { id: responseId, success, data, error } = event.data;
-            if (responseId === id) {
-               storageWorker.removeEventListener('message', handler);
-               if (success) resolve(data);
-               else reject(new Error(error));
-            }
-        };
-        storageWorker.addEventListener('message', handler);
-        storageWorker.postMessage({
-            id,
-            type: 'getMessages',
-            payload: {
+      try {
+        const fetchedMessages = await workerService.executeTask<SecureMessage[]>(
+            'getMessages',
+            {
                 fingerprint,
                 limit: MAX_MESSAGES_IN_MEMORY,
                 offset: currentCount, // Pagination!
                 masterKey: activeMasterKey
+            },
+            {
+                priority: 'normal' // Pagination is usually user-initiated but standard priority? Or High? Let's say Normal as it's "loading more"
             }
-        });
-      });
-
-      try {
-        const fetchedMessages = await fetchPromise;
+        );
          if (fetchedMessages.length === 0) return;
 
          fetchedMessages.forEach(msg => {

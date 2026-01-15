@@ -121,10 +121,10 @@ const MessageBubbleComponent = ({ id }: MessageBubbleProps) => {
 
           // Optimization: If URL is data URL, use worker. Otherwise fetch.
           if (imageUrl.startsWith('data:')) {
-             const binaryData = await workerService.execute<Uint8Array>(
+             const binaryData = await workerService.executeTask<Uint8Array>(
                  'base64ToBinary',
                  { base64: imageUrl },
-                 { priority: 'HIGH', signal: abortController.signal }
+                 { priority: 'high', signal: abortController.signal }
              );
              file = new File([binaryData], "carrier.png", { type: "image/png" });
           } else {

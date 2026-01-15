@@ -75,7 +75,7 @@ export class StorageService {
   private readonly DB_VERSION = 3; // Increment to trigger migration for system_settings
 
   private worker: Worker | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   private pendingRequests = new Map<string, { resolve: (value: any) => void; reject: (reason: any) => void }>();
 
   private constructor() {
@@ -270,6 +270,15 @@ export class StorageService {
   }
 
   /**
+   * Get all raw encrypted entries with prefix (No Decryption)
+   */
+  private async getAllRawWithPrefix(prefix: string): Promise<VaultEntry[]> {
+    if (!this.db) throw new Error('Database not initialized');
+    const allEntries = await this.db.getAll('secure_vault');
+    return allEntries.filter(entry => entry.id.startsWith(prefix));
+  }
+
+  /**
    * Delete entry from vault
    */
   private async deleteFromVault(id: string): Promise<void> {
@@ -290,6 +299,7 @@ export class StorageService {
       id: ID_PREFIX.IDENTITY,
       createdAt: now,
       lastUsed: now,
+      security_version: identity.security_version || 1,
     };
 
     // Delete existing identity if any (only one allowed)
@@ -799,34 +809,32 @@ export class StorageService {
        // 3. Purge Messages
        await this.clearAllMessages();
 
-       // 4. Update Data Version
+       // 4. Re-Encrypt Identity & Contacts with V2 Master Key
+       // Assumption: The global Master Key (_activeMasterKey) has been set to the NEW key before calling this.
+       // secureStorage.encryptData uses the globally set Master Key.
+
+       // Update Identity to Version 2
        identity.security_version = 2;
+       await this.storeIdentity(identity, 'IGNORED_IN_V2');
 
-       // 5. Re-Store (This will use the currently set Master Key in secureStorage)
-       // ID_PREFIX.IDENTITY
-       await this.storeInVault(ID_PREFIX.IDENTITY, identity, 'IGNORED_PIN');
-
+       // Re-store contacts
        for (const contact of contacts) {
-         await this.storeInVault(contact.id, contact, 'IGNORED_PIN');
+          await this.storeContact(contact, 'IGNORED_IN_V2');
        }
 
-       logger.log('[Storage] Migration V1->V2 Complete. Messages purged. Identity re-encrypted.');
+       logger.log('[Storage] Migration V1 -> V2 Successful');
        return true;
 
     } catch (error) {
-      logger.error('Migration failed', error);
-      return false;
+       logger.error('[Storage] Migration V1 -> V2 Failed:', error);
+       // Critical Failure: We should probably rollback or alert.
+       // For now, return false.
+       return false;
     }
   }
 
-  // Helper to get raw entries without decryption
-  private async getAllRawWithPrefix(prefix: string): Promise<VaultEntry[]> {
-    if (!this.db) return [];
 
-    // We can use a range or filter.
-    const all = await this.db.getAll('secure_vault');
-    return all.filter(e => e.id.startsWith(prefix));
-  }
+
 
 
 
