@@ -5,11 +5,16 @@ export interface AuthSlice {
   identity: Identity | null;
   isLoading: boolean;
   sessionPassphrase: string | null; // In-memory only
+  isBiometricsSupported: boolean;
+  isBiometricsEnabled: boolean;
   initializeApp: () => Promise<void>;
   addIdentity: (identity: Identity) => Promise<void>; // @deprecated Use registerAccount
   registerAccount: (name: string, email: string, pin: string) => Promise<void>;
   wipeData: () => Promise<void>;
   unlockApp: (pin: string) => Promise<boolean>;
+  unlockWithBiometrics: (options?: { signal?: AbortSignal }) => Promise<boolean>;
+  enableBiometrics: () => Promise<boolean>;
+  disableBiometrics: () => Promise<boolean>;
   lockApp: () => void;
   setSessionPassphrase: (passphrase: string) => void;
 }

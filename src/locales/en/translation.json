@@ -19,6 +19,14 @@
       "retry": "Retry"
     }
   },
+  "biometric": {
+    "prompt": {
+      "title": "Enable Biometric Unlock?",
+      "description": "Use your fingerprint or face ID to unlock Nahan securely and quickly next time."
+    },
+    "enabled": "Biometric unlock enabled",
+    "enable_failed": "Failed to enable biometrics"
+  },
   "language_selector": {
     "title": "Select Language",
     "subtitle": "Please choose your preferred language",
@@ -621,8 +629,9 @@
     "regenerate": "Regenerate / Choose Different Image",
     "cancel": "Cancel",
     "learn_more": "Learn More",
-    "download_success": "Saved to gallery",
     "copy_success": "Copied to clipboard",
-    "copy_failed": "Failed to copy"
+    "copy_failed": "Failed to copy",
+    "maybeLater": "Maybe Later",
+    "enable": "Enable"
   }
 }

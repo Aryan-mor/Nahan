@@ -1,4 +1,4 @@
-import { CornerDownLeft, Delete, Loader2 } from 'lucide-react';
+import { Delete, Fingerprint, Loader2 } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,8 @@ interface PinPadProps {
   maxLength?: number;
   isLoading?: boolean;
   'data-testid'?: string;
+  showBiometrics?: boolean;
+  onBiometricAuth?: () => void;
 }
 
 /* eslint-disable max-lines-per-function */
@@ -25,6 +27,8 @@ export const PinPad: React.FC<PinPadProps> = ({
   maxLength = 6,
   isLoading = false,
   'data-testid': testId,
+  showBiometrics,
+  onBiometricAuth,
 }) => {
   const { t } = useTranslation();
   const displayLabel = label || t('pinpad.enter_pin');
@@ -52,14 +56,7 @@ export const PinPad: React.FC<PinPadProps> = ({
     }
   };
 
-  const handleEnter = () => {
-    if (value.length > 0 && !isLoading && onComplete) {
-      if (value !== lastSubmittedRef.current) {
-        lastSubmittedRef.current = value;
-        onComplete(value);
-      }
-    }
-  };
+
 
   // Auto-submit when maxLength is reached
   useEffect(() => {
@@ -150,13 +147,12 @@ export const PinPad: React.FC<PinPadProps> = ({
         ))}
 
         <button
-          onClick={handleEnter}
+          onClick={handleDelete}
           disabled={isLoading || value.length === 0}
-          data-testid="pin-pad-enter"
           className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={t('pinpad.enter')}
+          aria-label={t('pinpad.backspace')}
         >
-          <CornerDownLeft className="w-8 h-8" />
+          <Delete className="w-8 h-8" />
         </button>
 
         <button
@@ -168,15 +164,21 @@ export const PinPad: React.FC<PinPadProps> = ({
           0
         </button>
 
-        <button
-          onClick={handleDelete}
-          disabled={isLoading || value.length === 0}
-          className="w-16 h-16 rounded-full bg-transparent hover:bg-industrial-800/50 text-industrial-400 hover:text-industrial-200 transition-all duration-150 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label={t('pinpad.backspace')}
-        >
-          <Delete className="w-8 h-8" />
-        </button>
+        {showBiometrics && onBiometricAuth ? (
+          <button
+            onClick={onBiometricAuth}
+            className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30 transition-all flex items-center justify-center border border-blue-500/20"
+            data-testid="pin-pad-biometric"
+            aria-label={t('biometric.unlock', 'Biometric Unlock')}
+          >
+            <Fingerprint className="w-8 h-8" />
+          </button>
+        ) : (
+          <div className="w-16 h-16" />
+        )}
       </div>
+
+
     </div>
   );
 };

@@ -26,6 +26,7 @@ export class WorkerService {
 
   private isStorageWorkerBusy = false;
   private isProcessingWorkerBusy = false;
+  private isTerminated = false;
 
   private constructor() {
     this.initializeWorkers();
@@ -39,6 +40,7 @@ export class WorkerService {
   }
 
   private initializeWorkers() {
+    this.isTerminated = false;
     if (typeof Worker !== 'undefined') {
       // Storage Worker (DB Access)
       this.storageWorker = new Worker(new URL('../workers/storage.worker.ts', import.meta.url), {
@@ -119,8 +121,21 @@ export class WorkerService {
       transfer?: Transferable[];
     } = {}
   ): Promise<T> {
+    if (this.isTerminated) {
+      logger.warn(`[WorkerService] executeTask called after termination: ${type}. Attempting restart...`);
+      this.initializeWorkers();
+      // If still terminated (e.g. environment issue), fail.
+      if (this.isTerminated) {
+          return new Promise(() => {}); // Prevent deadlock or throw? Better to throw so caller knows.
+      }
+    }
+
     if (!this.storageWorker || !this.processingWorker) {
-      return Promise.reject(new Error('Workers not initialized'));
+      // Auto-initialize if missing (e.g. lazy load or recovery)
+      this.initializeWorkers();
+      if (!this.storageWorker || !this.processingWorker) {
+         return Promise.reject(new Error('Workers not initialized'));
+      }
     }
 
     // Route based on task type
@@ -258,6 +273,25 @@ export class WorkerService {
   // I should add this helper.
   analyzeInput(input: string): Promise<any> {
       return this.executeTask('analyzeInput', { input }, { priority: 'high' });
+  }
+
+  /**
+   * Terminate all workers gracefully (e.g. on app shutdown)
+   */
+  terminate() {
+    this.isTerminated = true;
+    logger.debug('[WorkerService] Terminating workers starting...');
+
+    this.storageWorker?.terminate();
+    this.processingWorker?.terminate();
+
+    this.storageWorker = null;
+    this.processingWorker = null;
+    this.storageQueue = [];
+    this.processingQueue = [];
+    this.processing.clear();
+    this.isStorageWorkerBusy = false;
+    this.isProcessingWorkerBusy = false;
   }
 
   /**

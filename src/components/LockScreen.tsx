@@ -1,7 +1,6 @@
 /* eslint-disable max-lines-per-function */
-import { } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -12,7 +11,13 @@ import * as logger from '../utils/logger';
 import { PinPad } from './PinPad';
 
 export function LockScreen() {
-  const { identity, wipeData } = useAppStore();
+  const {
+    identity,
+    wipeData,
+    unlockWithBiometrics,
+    isBiometricsEnabled,
+    isBiometricsSupported
+  } = useAppStore();
 
   const { failedAttempts, incrementFailedAttempts, resetFailedAttempts } = useUIStore();
   const { t } = useTranslation();
@@ -23,6 +28,7 @@ export function LockScreen() {
   const isVerifyingRef = useRef(false);
   const isMounted = useRef(true);
   const instanceId = useRef(Math.random().toString(36).substring(7));
+  const autoPromptRef = useRef(false);
 
   useEffect(() => {
     const id = instanceId.current;
@@ -32,6 +38,79 @@ export function LockScreen() {
       isMounted.current = false;
     };
   }, []);
+
+  const handleBiometricAuth = useCallback(async (signal?: AbortSignal) => {
+    logger.debug(`[LockScreen:${instanceId.current}] handleBiometricAuth called. IsVerifying:${isVerifyingRef.current}`);
+    if (isVerifyingRef.current) {
+        logger.warn(`[LockScreen] Biometric auth blocked by verification lock`);
+        return;
+    }
+
+    // No full loading state to keep UI responsive/cancelable, but we track verification
+    setIsVerifying(true);
+    isVerifyingRef.current = true;
+
+    try {
+      const success = await unlockWithBiometrics({ signal });
+      if (success) {
+        toast.success(t('lock.welcome'));
+        resetFailedAttempts();
+
+        if (!import.meta.env.DEV) {
+          const { isStandalone, setInstallPromptVisible } = useUIStore.getState();
+          if (!isStandalone) {
+            setInstallPromptVisible(true);
+          }
+        }
+      }
+    } catch (error) {
+       if (error instanceof Error && (error.name === 'AbortError' || error.message?.includes('aborted'))) {
+           logger.debug('[LockScreen] Biometric auth aborted by user/cleanup');
+       } else {
+           logger.error('Biometric auth failed', error);
+           // Silent fail or toast? Usually silent if user cancels.
+       }
+    } finally {
+       setIsVerifying(false); // Ensure UI unlocks
+       isVerifyingRef.current = false;
+    }
+  }, [unlockWithBiometrics, t, resetFailedAttempts]);
+
+  // Auto-trigger biometrics logic (lifted from PinPad to ensure stability)
+  useEffect(() => {
+      let timer: NodeJS.Timeout;
+      const controller = new AbortController();
+
+      const conditions = {
+          enabled: isBiometricsEnabled,
+          supported: isBiometricsSupported,
+          attempts: failedAttempts === 0,
+          empty: passphrase.length === 0,
+          notPrompted: !autoPromptRef.current
+      };
+
+      logger.debug(`[LockScreen:${instanceId.current}] Auto-Auth Check:`, conditions);
+
+      if (
+          isBiometricsEnabled &&
+          isBiometricsSupported &&
+          failedAttempts === 0 &&
+          passphrase.length === 0 &&
+          !autoPromptRef.current
+      ) {
+          logger.debug(`[LockScreen:${instanceId.current}] Initiating auto-biometric prompt`);
+          autoPromptRef.current = true;
+          // Small delay to ensure UI is ready/mounted before browser prompt steals focus
+          timer = setTimeout(() => {
+              handleBiometricAuth(controller.signal);
+          }, 50);
+      }
+      return () => {
+          clearTimeout(timer);
+          controller.abort(); // Kill the WebAuthn request if unmounted
+          autoPromptRef.current = false; // Allow retry on remount (Strict Mode fix)
+      };
+  }, [isBiometricsEnabled, isBiometricsSupported, failedAttempts, passphrase.length, handleBiometricAuth]);
 
   // Set initial selected identity
   useEffect(() => {
@@ -163,6 +242,8 @@ export function LockScreen() {
           error={error}
           isLoading={isVerifying}
           data-testid="lock-screen-pinpad"
+          showBiometrics={isBiometricsEnabled && isBiometricsSupported}
+          onBiometricAuth={handleBiometricAuth}
         />
       </motion.div>
     </div>

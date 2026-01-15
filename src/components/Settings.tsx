@@ -24,6 +24,7 @@ import {
     Download,
     Eye,
     EyeOff,
+    Fingerprint,
     Globe,
     Info,
     Lock,
@@ -36,6 +37,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { useClipboardPermission } from '../hooks/useClipboardDetection';
+import { BiometricPromptModal } from './BiometricPromptModal';
 import { ClipboardPermissionPrompt } from './ClipboardPermissionPrompt';
 
 import { storageService } from '../services/storage';
@@ -44,7 +46,16 @@ import { useUIStore } from '../stores/uiStore';
 import * as logger from '../utils/logger';
 
 export function Settings() {
-  const { identity, contacts, wipeData, clearAllMessages } = useAppStore();
+  const {
+    identity,
+    contacts,
+    wipeData,
+    clearAllMessages,
+    isBiometricsSupported,
+    isBiometricsEnabled,
+    enableBiometrics,
+    disableBiometrics
+  } = useAppStore();
 
   const {
     isStandalone,
@@ -56,6 +67,7 @@ export function Settings() {
   } = useUIStore();
   const { t } = useTranslation();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const [showBiometricModal, setShowBiometricModal] = useState(false);
   const {
     isOpen: isExportOpen,
     onOpen: onExportOpen,
@@ -232,6 +244,7 @@ export function Settings() {
               {t('settings.general.language')}
             </label>
             <Select
+              aria-label={t('settings.general.language')}
               selectedKeys={[language || 'en']}
               onSelectionChange={(keys) => setLanguage(Array.from(keys)[0] as string)}
               className="w-full max-w-xs"
@@ -261,6 +274,7 @@ export function Settings() {
               {t('settings.general.camouflage')}
             </label>
             <Select
+              aria-label={t('settings.general.camouflage')}
               selectedKeys={[camouflageLanguage || 'fa']}
               onSelectionChange={(keys) =>
                 setCamouflageLanguage(Array.from(keys)[0] as 'fa' | 'en')
@@ -400,6 +414,58 @@ export function Settings() {
               <li>{t('settings.security.info.points.4')}</li>
             </ul>
           </div>
+
+          {isBiometricsSupported && (
+            <>
+              <Divider className="bg-industrial-800" />
+              <div className="flex items-center justify-between py-2">
+                <div className="flex items-center space-x-3">
+                  <Fingerprint className="w-5 h-5 text-industrial-400" />
+                  <div>
+                    <p className="font-medium text-industrial-100">
+                      {t('settings.security.biometrics.title', 'Biometric Unlock')}
+                    </p>
+                    <p className="text-sm text-industrial-400">
+                      {t('settings.security.biometrics.subtitle', 'Use fingerprint or face ID to unlock')}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  isSelected={isBiometricsEnabled}
+                  onValueChange={async (val) => {
+                      if (val) {
+                          setShowBiometricModal(true);
+                      } else {
+                          const success = await disableBiometrics();
+                          if (success) toast.success(t('biometric.disabled', 'Biometric unlock disabled'));
+                      }
+                  }}
+                  classNames={{
+                    wrapper: 'group-data-[selected=true]:bg-blue-600',
+                  }}
+                />
+              </div>
+
+              {/* Biometric Confirmation Modal inside Settings */}
+              {showBiometricModal && (
+                <BiometricPromptModal
+                    onClose={() => setShowBiometricModal(false)}
+                    onDecline={() => setShowBiometricModal(false)}
+                    onEnable={async () => {
+                        const success = await enableBiometrics();
+                        if (success) {
+                            toast.success(t('biometric.enabled', 'Biometric unlock enabled'));
+                            setShowBiometricModal(false);
+                        } else {
+                            toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
+                            setShowBiometricModal(false);
+                        }
+                    }}
+                />
+              )}
+
+            </>
+          )}
 
           <Divider className="bg-industrial-800" />
 

@@ -3,18 +3,19 @@
 import { Avatar, Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-  Download,
-  FileUser,
-  Lock,
-  MessageSquare,
-  QrCode,
-  Settings as SettingsIcon,
-  Users
+    Download,
+    FileUser,
+    Lock,
+    MessageSquare,
+    QrCode,
+    Settings as SettingsIcon,
+    Users
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast, Toaster } from 'sonner';
 
+import { BiometricPromptModal } from './components/BiometricPromptModal';
 import { ChatList } from './components/ChatList';
 import { ChatView } from './components/ChatView';
 import { ClipboardPermissionPrompt } from './components/ClipboardPermissionPrompt';
@@ -32,9 +33,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-  DetectionResult,
-  useClipboardDetection,
-  useClipboardPermission,
+    DetectionResult,
+    useClipboardDetection,
+    useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -53,6 +54,24 @@ export default function App() {
 
   useOfflineSync();
   usePWA();
+
+  // GLOBAL CLEANUP: Handle tab close events
+  useEffect(() => {
+    const handleUnload = () => {
+       import('./services/workerService').then(({ workerService }) => {
+           workerService.terminate();
+       }).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      // CRITICAL FIX: Do NOT call handleUnload() here.
+      // React StrictMode or HMR will unmount App causing the global singleton
+      // workerService to be terminated while the app is still running.
+      // We only want to terminate when the *window* unloads.
+    };
+  }, []);
 
   // ATOMIC SELECTORS: Each selector only re-renders when its specific state changes
   const initializeApp = useAppStore(state => state.initializeApp);
@@ -171,7 +190,64 @@ export default function App() {
     isBroadcast: boolean;
     senderName: string;
   } | null>(null);
+
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+
+  // Biometric Prompt State
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const isBiometricsEnabled = useAppStore(state => state.isBiometricsEnabled);
+  const isBiometricsSupported = useAppStore(state => state.isBiometricsSupported);
+  const enableBiometrics = useAppStore(state => state.enableBiometrics);
+
+  // Show biometric prompt after unlock if supported but not enabled
+  useEffect(() => {
+    logger.debug('[Biometrics] Checking prompt conditions:', {
+        isLocked,
+        hasIdentity: !!identity,
+        hasPassphrase: !!sessionPassphrase,
+        isSupported: isBiometricsSupported,
+        isEnabled: isBiometricsEnabled,
+        dismissed: localStorage.getItem('biometric_onboarding_dismissed') === 'true',
+        checkResult: (!isLocked && identity && sessionPassphrase && isBiometricsSupported && !isBiometricsEnabled && localStorage.getItem('biometric_onboarding_dismissed') !== 'true')
+    });
+
+    if (
+        !isLocked &&
+        identity &&
+        sessionPassphrase &&
+        isBiometricsSupported &&
+        !isBiometricsEnabled &&
+        localStorage.getItem('biometric_onboarding_dismissed') !== 'true'
+    ) {
+      logger.debug('[Biometrics] Scheduling prompt...');
+      const timer = setTimeout(() => {
+        logger.debug('[Biometrics] Showing ONBOARDING prompt now');
+        setShowBiometricPrompt(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLocked, identity, sessionPassphrase, isBiometricsSupported, isBiometricsEnabled]);
+
+  const handleEnableBiometrics = async () => {
+    try {
+       const success = await enableBiometrics();
+       if (success) {
+          toast.success(t('biometric.enabled', 'Biometric unlock enabled'));
+          setShowBiometricPrompt(false);
+       } else {
+          toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
+       }
+    } catch (e) {
+       console.error('Biometric enable error:', e);
+       toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
+    }
+  };
+
+  const handleDeclineBiometrics = () => {
+    localStorage.setItem('biometric_onboarding_dismissed', 'true');
+    setShowBiometricPrompt(false);
+    toast.info(t('biometric.decline_tip', 'You can always enable biometrics in Settings'));
+  };
 
   // Check if clipboard detection should be enabled
   useEffect(() => {
@@ -593,6 +669,15 @@ export default function App() {
 
         {/* My QR Modal */}
         <MyQRModal isOpen={qrModal.isOpen} onOpenChange={qrModal.onOpenChange} />
+
+        {/* Biometric Prompt Modal */}
+        {showBiometricPrompt && (
+          <BiometricPromptModal
+            onClose={() => setShowBiometricPrompt(false)}
+            onEnable={handleEnableBiometrics}
+            onDecline={handleDeclineBiometrics}
+          />
+        )}
 
         {/* Manual Paste Modal */}
         {/* Manual Paste Modal */}

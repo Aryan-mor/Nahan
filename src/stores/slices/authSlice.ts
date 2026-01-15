@@ -1,9 +1,10 @@
-/* eslint-disable max-lines-per-function */
+/* eslint-disable max-lines-per-function, max-lines */
 import { StateCreator } from 'zustand';
 
 import { CryptoService } from '../../services/crypto';
 import {
     generateMasterKey,
+    getMasterKey,
     setMasterKey,
     unwrapMasterKey,
     wrapMasterKey
@@ -45,6 +46,18 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
       // Update UI store (non-sensitive, doesn't require passphrase)
       useUIStore.getState().setStandalone(!!isStandaloneMode);
+
+      // Check Biometric Availability
+      const isBioSupported = await webAuthnService.isSupported();
+      const authId = await storageService.getSystemSetting('authenticator_id');
+      const hasBioEnabled = isBioSupported && !!authId;
+
+      logger.debug(`[Auth] Init Biometrics: Supported=${isBioSupported}, AuthID=${authId ? 'Present' : 'Missing'}, Enabled=${hasBioEnabled}`);
+
+      set({
+        isBiometricsSupported: isBioSupported,
+        isBiometricsEnabled: hasBioEnabled
+      });
 
       // Check if identity exists (without requiring passphrase for boot detection)
       const identityExists = await storageService.hasIdentity();
@@ -185,7 +198,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   unlockApp: async (pin: string) => {
     // 1. Check for V2 (Master Key) existence
     const wrappedKey = await storageService.getSystemSetting<string>('wrapped_master_key');
-    const authenticatorId = await storageService.getSystemSetting<string>('authenticator_id');
     const deviceSeed = await storageService.getSystemSetting<string>('device_seed');
 
     try {
@@ -195,13 +207,10 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         let hardwareSecret: Uint8Array | null = null;
 
-        // Try WebAuthn if ID exists
-        if (authenticatorId) {
-          hardwareSecret = await webAuthnService.getHardwareSecret(authenticatorId);
-        }
-
         // Fallback to device seed if WebAuthn failed or not set
-        if (!hardwareSecret && deviceSeed) {
+        // FIX: For PIN unlock, we should ALWAYS use the device seed (soft binding).
+        // Calling getHardwareSecret here triggers the Biometric Prompt, which is wrong for PIN unlock.
+        if (deviceSeed) {
           hardwareSecret = new TextEncoder().encode(deviceSeed);
         }
 
@@ -230,7 +239,12 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             contacts,
           });
 
+          logger.debug(`[Auth] Unlocked. Contacts: ${contacts.length}. Refreshing chats...`);
+
           await get().refreshChatSummaries();
+
+          logger.debug('[Auth] Chat summaries refreshed.');
+
           useUIStore.getState().setLocked(false);
           useUIStore.getState().resetFailedAttempts();
           return true;
@@ -324,4 +338,97 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   setSessionPassphrase: (passphrase) => set({ sessionPassphrase: passphrase }),
+
+  isBiometricsSupported: false,
+  isBiometricsEnabled: false,
+
+  enableBiometrics: async () => {
+    const { identity } = get();
+    if (!identity) return false;
+
+    try {
+      // 1. Register with WebAuthn (get Hardware Secret)
+      const credential = await webAuthnService.register(identity.fingerprint, identity.name);
+      if (!credential || !credential.hardwareSecret) {
+        logger.error('Biometrics: Failed to register or get secret');
+        return false;
+      }
+
+      // 2. Wrap Master Key with Hardware Secret (using "BIOMETRIC_AUTH" as placeholder PIN)
+      // We use a constant PIN for biometric slot because the security comes from the Hardware Secret
+      const masterKey = getMasterKey();
+      if (!masterKey) {
+        logger.error('Biometrics: Master Key not loaded');
+        return false;
+      }
+
+      const wrappedKey = await wrapMasterKey(masterKey, 'BIOMETRIC_AUTH', credential.hardwareSecret);
+
+      // 3. Store Biometric Config
+      await storageService.setSystemSetting('authenticator_id', credential.credentialId);
+      await storageService.setSystemSetting('wrapped_biometric_key', wrappedKey);
+
+      set({ isBiometricsEnabled: true });
+      return true;
+    } catch (e) {
+      logger.error('Biometrics: Enable failed', e);
+      return false;
+    }
+  },
+
+  unlockWithBiometrics: async (options?: { signal?: AbortSignal }) => {
+    try {
+      const authId = await storageService.getSystemSetting<string>('authenticator_id');
+      const wrappedKey = await storageService.getSystemSetting<string>('wrapped_biometric_key');
+
+      if (!authId || !wrappedKey) {
+        logger.error('Biometrics: No configuration found');
+        return false;
+      }
+
+      // 1. Get Hardware Secret
+      const hardwareSecret = await webAuthnService.getHardwareSecret(authId, options);
+      if (!hardwareSecret) {
+         // User cancelled or failed
+         return false;
+      }
+
+      // 2. Unwrap Master Key
+      const masterKey = await unwrapMasterKey(wrappedKey, 'BIOMETRIC_AUTH', hardwareSecret);
+      setMasterKey(masterKey);
+
+      // 3. Load Data & Unlock
+      // We don't have the text PIN, so we pass mocked PIN or rely on V2 structure ignoring it if MK is set
+      const identity = await storageService.getIdentity('BIOMETRIC_AUTH');
+      if (identity) {
+          const contacts = await storageService.getContacts('BIOMETRIC_AUTH');
+          set({
+            sessionPassphrase: 'BIOMETRIC_SESSION', // Placeholder to indicate session is active
+            identity,
+            contacts,
+          });
+
+          await get().refreshChatSummaries();
+          useUIStore.getState().setLocked(false);
+          useUIStore.getState().resetFailedAttempts();
+          return true;
+      }
+      return false;
+    } catch (e) {
+      logger.error('Biometrics: Unlock failed', e);
+      return false;
+    }
+  },
+
+  disableBiometrics: async () => {
+      try {
+          await storageService.setSystemSetting('authenticator_id', null);
+          await storageService.setSystemSetting('wrapped_biometric_key', null);
+          set({ isBiometricsEnabled: false });
+          return true;
+      } catch (e) {
+          logger.error('Biometrics: Disable failed', e);
+          return false;
+      }
+  },
 });

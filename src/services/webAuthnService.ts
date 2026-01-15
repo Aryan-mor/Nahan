@@ -108,7 +108,7 @@ export class WebAuthnService {
   /**
    * Authenticate and retrieve the PRF secret (Hardware Secret)
    */
-  async getHardwareSecret(credentialId?: string): Promise<Uint8Array | null> {
+  async getHardwareSecret(credentialId?: string, options?: { signal?: AbortSignal }): Promise<Uint8Array | null> {
     if (!await this.isSupported()) return null;
 
     try {
@@ -120,7 +120,7 @@ export class WebAuthnService {
          userVerification: 'required',
          timeout: 60000,
          allowCredentials: credentialId ? [{
-           id: Uint8Array.from(atob(credentialId), c => c.charCodeAt(0)),
+           id: this.base64UrlToUint8Array(credentialId),
            type: 'public-key',
            transports: ['internal']
          }] : [],
@@ -136,6 +136,7 @@ export class WebAuthnService {
 
        const credential = (await navigator.credentials.get({
          publicKey: getOptions,
+         signal: options?.signal
        })) as PublicKeyCredential;
 
        if (!credential) return null;
@@ -155,6 +156,16 @@ export class WebAuthnService {
        logger.error('WebAuthn Get Secret Failed:', error);
        return null;
     }
+  }
+
+  /**
+   * Helper to convert Base64URL string to Uint8Array safely
+   */
+  private base64UrlToUint8Array(base64Url: string): Uint8Array {
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
+      return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
   }
 
   /**
