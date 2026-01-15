@@ -318,6 +318,7 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
           [messageFingerprint]: newMessage
         };
 
+
         return {
           messages: { ids: newIds, entities: newEntities },
           chatCache: newCache,

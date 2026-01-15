@@ -66,6 +66,10 @@ const persistMessageAndState = async (
        return {
          messages: { ids: newIds, entities: newEntities },
          lastStorageUpdate: now,
+         chatSummaries: {
+            ...state.chatSummaries,
+            ['BROADCAST']: newMessage
+         }
        };
     });
   } else {
@@ -98,9 +102,18 @@ const persistMessageAndState = async (
        const newIds = [newMessage.id, ...ids];
        const newEntities = { ...entities, [newMessage.id]: newMessage };
 
+       // Message Slice Update
+       const messageUpdate = {
+           messages: { ids: newIds, entities: newEntities },
+           lastStorageUpdate: now
+       };
+
        return {
-         messages: { ids: newIds, entities: newEntities },
-         lastStorageUpdate: now,
+         ...messageUpdate,
+         chatSummaries: {
+            ...state.chatSummaries,
+            [activeChat.fingerprint]: newMessage
+         }
        };
     });
   }

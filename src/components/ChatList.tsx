@@ -1,27 +1,27 @@
-/* eslint-disable max-lines, no-console */
+/* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import {
-  Avatar,
-  Button,
-  Card,
-  CardBody,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
+    Avatar,
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-  ImageDown,
-  Image as ImageIcon,
-  MessageSquare,
-  Plus,
-  Search
+    ImageDown,
+    Image as ImageIcon,
+    MessageSquare,
+    Plus,
+    Search
 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -42,10 +42,7 @@ export function ChatList({
   onNewChat: () => void;
   onDetection?: (result: DetectionResult) => void;
 }) {
-  // [PERF] Re-render counter for telemetry
-  const renderCountRef = useRef(0);
-  renderCountRef.current++;
-  console.log(`[PERF][RENDER] ChatList - Render Count: ${renderCountRef.current} - Time: ${performance.now().toFixed(2)}ms`);
+
 
   const { t } = useTranslation();
 
@@ -88,7 +85,7 @@ export function ChatList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Mount only - O(1) inline updates handle subsequent changes
 
-  // [PERF] UI Rendering Audit - measures time from store update to render commit
+
 
 
   // Get contacts with broadcast at index 0
@@ -97,8 +94,6 @@ export function ChatList({
   // MEMOIZED: Expensive filtering and sorting only runs when dependencies change
   // Prevents re-sorting on every render (major performance improvement)
   const filteredContacts = useMemo(() => {
-    const sortStart = performance.now();
-
     // Helper to convert date to timestamp (handles all date formats consistently)
     const getTime = (date: Date | string | number | undefined | null): number => {
       if (!date) return 0;
@@ -136,14 +131,10 @@ export function ChatList({
         return timeB - timeA;
       });
 
-    console.log(`[PERF][UI] Contacts Sorting - Duration: ${(performance.now() - sortStart).toFixed(2)}ms - Count: ${result.length}`);
     return result;
   }, [allContacts, searchQuery, chatSummaries]);
 
-  // [PERF] DOM Commit Phase - fires after React updates DOM but before browser paint
-  useLayoutEffect(() => {
-    console.log(`[PERF][UI] DOM Commit Phase Finished at ${performance.now().toFixed(2)}ms`);
-  });
+
 
   // Log sorting result (only in dev)
   if (process.env.NODE_ENV === 'development') {

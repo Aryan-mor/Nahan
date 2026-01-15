@@ -209,18 +209,20 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
             };
           });
         } else {
-
-          // DEBOUNCE: Prevent rapid storage updates from thrashing the UI
-          // Only update if enough time has passed or use a trailing debounce
-          // For simplicity and effectiveness, we'll align to 16ms (1 frame)
-          const lastUpdate = get().lastStorageUpdate;
-          if (now - lastUpdate > 16) {
-             set({ lastStorageUpdate: now });
-          }
-          // Note: If we need strict accuracy for a "done" event, we might need a timeout,
-          // but for "repaint" capability, throttling to 16ms is usually sufficient to stop the "storm"
-          // while keeping the UI responsive.
+            // DEBOUNCE: Prevent rapid storage updates from thrashing the UI
+           const lastUpdate = get().lastStorageUpdate;
+           if (now - lastUpdate > 16) {
+              set({ lastStorageUpdate: now });
+           }
         }
+
+        // CRITICAL: Always update Broadcast Summary for ChatList
+        set((state) => ({
+            chatSummaries: {
+                ...state.chatSummaries,
+                ['BROADCAST']: newMessage
+            }
+        }));
 
         if (!skipNavigation) {
           await get().setActiveChat(sender);
@@ -549,7 +551,7 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
       if (shouldUpdateStore) {
         set((state) => {
-          const { chatCache, messages } = state;
+          const { chatCache, messages, chatSummaries } = state;
           const fingerprint = sender.fingerprint;
           const timestamp = Date.now();
 
@@ -565,7 +567,14 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
           const newCachedEntities = { ...cachedChat.entities, [newMessage.id]: newMessage };
           const newCache = { ...chatCache, [fingerprint]: { ids: newCachedIds, entities: newCachedEntities } };
 
-          // 2. Update Active Messages View if applicable
+          // 2. Update Summaries (CRITICAL for ChatList sorting)
+          const summaryKey = isBroadcast ? 'BROADCAST' : fingerprint;
+          const newSummaries = {
+             ...chatSummaries,
+             [summaryKey]: newMessage
+          };
+
+          // 3. Update Active Messages View if applicable
           // We assume 'shouldUpdateStore' implies we are in the active chat or headless
           let newMessagesState = messages;
 
@@ -582,10 +591,19 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
 
           return {
             chatCache: newCache,
+            chatSummaries: newSummaries,
             messages: newMessagesState,
             lastStorageUpdate: timestamp
           };
         });
+      } else {
+         // Even if we don't update the full message store (inactive chat), we MUST update the summary
+         set((state) => ({
+             chatSummaries: {
+                 ...state.chatSummaries,
+                 [isBroadcast ? 'BROADCAST' : sender.fingerprint]: newMessage
+             }
+         }));
       }
 
       if (!skipNavigation) {
