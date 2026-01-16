@@ -24,12 +24,34 @@ export class WebAuthnService {
   /**
    * Check if WebAuthn and PRF extension are supported
    */
+  /**
+   * Check if WebAuthn and PRF extension are supported
+   */
   async isSupported(): Promise<boolean> {
     if (!window.PublicKeyCredential) return false;
 
     // Check mainly for platform authenticators (TouchID, Windows Hello)
     const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    return isAvailable;
+    if (!isAvailable) return false;
+
+    // Check for PRF capability if supported by browser
+    if (PublicKeyCredential.getClientCapabilities) {
+       const caps = await PublicKeyCredential.getClientCapabilities();
+       // prf check - note: some browsers might support prf but not report it in capabilities yet,
+       // so strictly blocking on this might be too aggressive, but adhering to user request for check.
+       // However, the user said "If not supported, gracefully inform...".
+       // We'll trust the capability check if available.
+       // Casting to any because 'prf' might not be in the TS definition yet
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       if (!(caps as any).prf) {
+           logger.warn('WebAuthn: Start PRF capability check failed');
+           // Proceeding with caution or returning false?
+           // User Objective: "If not supported, gracefully inform the user or hide the biometric option."
+           return false;
+       }
+    }
+
+    return true;
   }
 
   /**
@@ -63,8 +85,9 @@ export class WebAuthnService {
         ],
         authenticatorSelection: {
           authenticatorAttachment: 'platform', // Prefer internal (TouchID/Hello)
-          userVerification: 'required',
-          residentKey: 'required', // Discoverable credential
+          userVerification: 'required', // Mobile Requirement
+          residentKey: 'required', // Mobile Requirement
+          requireResidentKey: true, // Mobile Requirement (legacy compat)
         },
         timeout: 60000,
         attestation: 'none',
@@ -100,7 +123,15 @@ export class WebAuthnService {
       };
 
     } catch (error) {
-      logger.error('WebAuthn Registration Failed:', error);
+      if (error instanceof Error) {
+          if (error.name === 'NotAllowedError') {
+              logger.warn('WebAuthn Registration Cancelled by User');
+          } else if (error.name === 'SecurityError') {
+              logger.error('WebAuthn Security Error (Origin/Context):', error);
+          } else {
+              logger.error('WebAuthn Registration Failed:', error);
+          }
+      }
       return null;
     }
   }
@@ -117,7 +148,7 @@ export class WebAuthnService {
        const getOptions: PublicKeyCredentialRequestOptions = {
          challenge,
          rpId: window.location.hostname,
-         userVerification: 'required',
+         userVerification: 'required', // Mobile Requirement
          timeout: 60000,
          allowCredentials: credentialId ? [{
            id: this.base64UrlToUint8Array(credentialId),
@@ -153,7 +184,15 @@ export class WebAuthnService {
        return null;
 
     } catch (error) {
-       logger.error('WebAuthn Get Secret Failed:', error);
+        if (error instanceof Error) {
+            if (error.name === 'NotAllowedError') {
+                logger.warn('WebAuthn Authentication Cancelled by User');
+            } else if (error.name === 'SecurityError') {
+                logger.error('WebAuthn Security Error:', error);
+            } else {
+                logger.error('WebAuthn Get Secret Failed:', error);
+            }
+        }
        return null;
     }
   }
