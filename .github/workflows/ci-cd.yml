@@ -66,15 +66,19 @@ jobs:
     name: 🚀 Deploy
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for pushing to gh-pages branch
     steps:
+    - uses: actions/checkout@v4
+
     - name: Download Build Artifact
       uses: actions/download-artifact@v4
       with:
         name: dist
         path: dist
 
-    - name: Simulate Deployment
-      run: |
-        echo "Ready to deploy!"
-        ls -R dist/
-        echo "⚠️ Deployment target not configured. Add deployment steps here."
+    - name: Deploy to GitHub Pages
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: dist # The folder the action should deploy.
+        branch: gh-pages # The branch the action should deploy to.
