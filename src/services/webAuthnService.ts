@@ -125,6 +125,9 @@ export class WebAuthnService {
       if (error instanceof Error) {
           if (error.name === 'NotAllowedError') {
               logger.warn('WebAuthn Registration Cancelled by User');
+          } else if (error.name === 'NotReadableError') {
+              // Android Conflict: Credential Manager API vs Chrome
+              logger.error('[WebAuthn] Android Credential Manager Conflict detected.');
           } else if (error.name === 'SecurityError') {
               logger.error('WebAuthn Security Error (Origin/Context):', error);
           } else {
@@ -186,6 +189,9 @@ export class WebAuthnService {
         if (error instanceof Error) {
             if (error.name === 'NotAllowedError') {
                 logger.warn('WebAuthn Authentication Cancelled by User');
+            } else if (error.name === 'NotReadableError') {
+                 // Android Conflict: Credential Manager API vs Chrome
+                 logger.error('[WebAuthn] Android Credential Manager Conflict detected.');
             } else if (error.name === 'SecurityError') {
                 logger.error('WebAuthn Security Error:', error);
             } else {
