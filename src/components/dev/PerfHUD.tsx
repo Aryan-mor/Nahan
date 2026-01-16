@@ -1,7 +1,8 @@
 /* eslint-disable i18next/no-literal-string */
 /* eslint-disable no-console */
 /* eslint-disable max-lines-per-function */
-import { Activity, Maximize2, Minimize2, X } from 'lucide-react';
+/* eslint-disable max-lines */
+import { Activity, GripVertical, Maximize2, Minimize2, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { workerService } from '../../services/workerService';
@@ -19,9 +20,24 @@ export const PerfHUD: React.FC = () => {
     });
     const [mode, setMode] = useState<HudMode>(() => {
         const stored = localStorage.getItem('nahan_perf_hud_mode');
-        // Fallback to full if stored was 'minimized' or invalid
         return (stored === 'compact' ? 'compact' : 'full');
     });
+
+    // Position State (y only, x is determined by snap)
+    const [position, setPosition] = useState(() => {
+        const stored = localStorage.getItem('nahan_perf_hud_pos');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch { /* ignore */ }
+        }
+        return { y: 100, side: 'right' }; // Default
+    });
+
+    // Dragging State
+    const [isDragging, setIsDragging] = useState(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
+    const dragRef = useRef<HTMLDivElement>(null);
 
     // 1. Event Loop Lag
     const [lag, setLag] = useState(0);
@@ -42,33 +58,33 @@ export const PerfHUD: React.FC = () => {
     // 4. Memory (Chrome only)
     const [memory, setMemory] = useState(0);
 
-    // Persist Mode
+    // Persist Mode & Position
     useEffect(() => {
         localStorage.setItem('nahan_perf_hud_mode', mode);
     }, [mode]);
 
-    // Event Loop Monitor
+    useEffect(() => {
+        localStorage.setItem('nahan_perf_hud_pos', JSON.stringify(position));
+    }, [position]);
+
+    // --- Data Polling Effects (unchanged) ---
     useEffect(() => {
         if (!isVisible) return;
         const interval = setInterval(() => {
             const now = Date.now();
             const delta = now - lastLoopTime.current;
-            const currentLag = Math.max(0, delta - 500); // Expecting 500ms interval
+            const currentLag = Math.max(0, delta - 500);
             setLag(currentLag);
             lastLoopTime.current = now;
         }, 500);
         return () => clearInterval(interval);
     }, [isVisible]);
 
-    // Worker & Memory Polling
     useEffect(() => {
         if (!isVisible) return;
         const pollInterval = setInterval(() => {
             try {
-                // Worker Stats
                 setWorkerStats(workerService.getQueueStats());
-
-                // Memory
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const perf = performance as any;
                 if (perf.memory) {
@@ -82,7 +98,6 @@ export const PerfHUD: React.FC = () => {
         return () => clearInterval(pollInterval);
     }, [isVisible]);
 
-    // FPS Counter
     useEffect(() => {
         if (!isVisible) return;
         let frameId: number;
@@ -100,6 +115,90 @@ export const PerfHUD: React.FC = () => {
         return () => cancelAnimationFrame(frameId);
     }, [isVisible]);
 
+    // --- Drag Logic ---
+    const handleStart = (clientX: number, clientY: number) => {
+        if (!dragRef.current) return;
+        const rect = dragRef.current.getBoundingClientRect();
+        dragOffset.current = {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+        setIsDragging(true);
+    };
+
+    const handleMove = (clientX: number, clientY: number) => {
+        if (!isDragging || !dragRef.current) return;
+
+        // Update position visually during drag (without snapping yet)
+        const x = clientX - dragOffset.current.x;
+        const y = clientY - dragOffset.current.y;
+
+        dragRef.current.style.left = `${x}px`;
+        dragRef.current.style.top = `${y}px`;
+        dragRef.current.style.right = 'auto'; // Disable right while dragging
+        dragRef.current.style.transform = 'none';
+
+        // Prevent default to stop scrolling on mobile
+        // e.preventDefault(); // Note: handled in listener options usually
+    };
+
+    const handleEnd = () => {
+        if (!isDragging || !dragRef.current) return;
+        setIsDragging(false);
+
+        const rect = dragRef.current.getBoundingClientRect();
+        const screenWidth = window.innerWidth;
+        const centerX = rect.left + rect.width / 2;
+
+        // Snap Logic
+        const newSide = centerX < screenWidth / 2 ? 'left' : 'right';
+
+        // Reset styles for React state to take over
+        dragRef.current.style.left = '';
+        dragRef.current.style.top = '';
+        dragRef.current.style.right = '';
+
+        setPosition({ y: rect.top, side: newSide });
+    };
+
+    // Mouse Handlers
+    const onMouseDown = (e: React.MouseEvent) => {
+        handleStart(e.clientX, e.clientY);
+    };
+
+    // Touch Handlers
+    const onTouchStart = (e: React.TouchEvent) => {
+        handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    };
+
+    // Global Listeners for Move/End (to catch release outside element)
+    useEffect(() => {
+        const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+        const onMouseUp = () => isDragging && handleEnd();
+
+        const onTouchMove = (e: TouchEvent) => {
+            if(isDragging) e.preventDefault();
+            handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        };
+        const onTouchEnd = () => isDragging && handleEnd();
+
+        if (isDragging) {
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            window.addEventListener('touchmove', onTouchMove, { passive: false });
+            window.addEventListener('touchend', onTouchEnd);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            window.removeEventListener('touchmove', onTouchMove);
+            window.removeEventListener('touchend', onTouchEnd);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDragging]);
+
+
     const handleClose = () => {
         localStorage.removeItem('nahan_force_perf_hud');
         setIsVisible(false);
@@ -111,18 +210,19 @@ export const PerfHUD: React.FC = () => {
     const isLagHigh = lag > 50;
     const isMemoryHigh = memory > 250;
     const isWorkerBusy = workerStats.activeTasks > 0 || workerStats.processingQueueLength > 0 || workerStats.storageQueueLength > 0;
-
-    // Overall Health check (kept for potential health indicator use, though minimized mode is gone)
     const isHealthy = !isLagHigh && !isMemoryHigh;
 
     const containerStyle: React.CSSProperties = {
         position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        backgroundColor: isLagHigh ? 'rgba(80, 0, 0, 0.95)' : 'rgba(10, 10, 10, 0.85)',
+        top: `${position.y}px`,
+        // Snap to side
+        left: position.side === 'left' ? '0' : 'auto',
+        right: position.side === 'right' ? '0' : 'auto',
+
+        // Visuals
+        backgroundColor: isLagHigh ? 'rgba(80, 0, 0, 0.95)' : 'rgba(10, 10, 10, 0.90)',
         color: '#e5e5e5',
         padding: '12px',
-        borderRadius: '12px',
         fontSize: '11px',
         fontFamily: 'Menlo, Monaco, Consolas, monospace',
         zIndex: 9999,
@@ -133,7 +233,13 @@ export const PerfHUD: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        transition: 'all 0.3s ease'
+        transition: isDragging ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth snap
+
+        // Rounding logic for sides
+        borderTopRightRadius: position.side === 'left' ? '12px' : '0',
+        borderBottomRightRadius: position.side === 'left' ? '12px' : '0',
+        borderTopLeftRadius: position.side === 'right' ? '12px' : '0',
+        borderBottomLeftRadius: position.side === 'right' ? '12px' : '0',
     };
 
     const headerStyle: React.CSSProperties = {
@@ -146,13 +252,32 @@ export const PerfHUD: React.FC = () => {
     };
 
     return (
-        <div data-testid={`perf-hud-${mode}`} style={containerStyle}>
+        <div
+            ref={dragRef}
+            data-testid={`perf-hud-${mode}`}
+            style={containerStyle}
+        >
             {/* Header / Controls */}
             <div style={headerStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', color: '#fff' }}>
-                    <Activity size={14} className={isHealthy ? 'text-green-400' : 'text-red-400'} />
-                    <span>PERF HUD</span>
+                {/* Drag Handle */}
+                <div
+                    onMouseDown={onMouseDown}
+                    onTouchStart={onTouchStart}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: isDragging ? 'grabbing' : 'grab',
+                        padding: '4px'
+                    }}
+                >
+                    <GripVertical size={14} color="#666" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', color: '#fff' }}>
+                        <Activity size={14} className={isHealthy ? 'text-green-400' : 'text-red-400'} />
+                        {mode === 'full' && <span>PERF HUD</span>}
+                    </div>
                 </div>
+
                 <div style={{ display: 'flex', gap: '4px' }}>
                     <button
                         onClick={() => setMode(mode === 'full' ? 'compact' : 'full')}
@@ -174,7 +299,7 @@ export const PerfHUD: React.FC = () => {
 
             {/* Compact Mode Content */}
             {mode === 'compact' && (
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '12px', paddingLeft: '8px' }}>
                     <div style={{ color: fps < 30 ? '#ef4444' : '#22c55e', fontWeight: 'bold' }}>
                         {fps} FPS
                     </div>
