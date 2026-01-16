@@ -44,10 +44,9 @@ export class WebAuthnService {
        // Casting to any because 'prf' might not be in the TS definition yet
        // eslint-disable-next-line @typescript-eslint/no-explicit-any
        if (!(caps as any).prf) {
-           logger.warn('WebAuthn: Start PRF capability check failed');
-           // Proceeding with caution or returning false?
-           // User Objective: "If not supported, gracefully inform the user or hide the biometric option."
-           return false;
+           logger.warn('WebAuthn: PRF capability not reported (continuing for Windows compatibility)');
+           // Allow proceeding even if PRF isn't explicitly reported in capabilities
+           // because Windows Hello often supports it without reporting it here.
        }
     }
 

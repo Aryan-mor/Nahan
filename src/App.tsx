@@ -826,7 +826,7 @@ export default function App() {
           </nav>
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col h-[calc(100vh-64px-64px)] md:h-[calc(100vh-64px)] pb-16 w-full relative">
+          <main className="flex-1 flex flex-col h-[calc(100vh-64px-64px)] md:h-[calc(100vh-64px)] pb-16 lg:pb-0 w-full relative">
             {activeTab === 'chats' && (
               <ChatList onNewChat={() => setActiveTab('keys')} onDetection={handleDetection} />
             )}
