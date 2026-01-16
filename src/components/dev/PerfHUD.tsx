@@ -12,18 +12,32 @@ type HudMode = 'full' | 'compact';
 export const PerfHUD: React.FC = () => {
     // UI State
     const [isVisible, setIsVisible] = useState(() => {
-        // Hide by default in automated test environments to prevent interference
-        if (typeof navigator !== 'undefined' && navigator.webdriver) {
-            return false;
-        }
-        return true;
+        // Hide by default in automated test environments
+        if (typeof navigator !== 'undefined' && navigator.webdriver) return false;
+
+        // Check persistence and force flag
+        const storedVisible = localStorage.getItem('nahan_perf_hud_visible');
+        const forced = localStorage.getItem('nahan_force_perf_hud') === 'true';
+
+        // Show if forced or previously visible
+        if (forced) return true;
+        if (storedVisible !== null) return storedVisible === 'true';
+
+        return false; // Default hide as requested
     });
+
+    // Persist Visibility
+    useEffect(() => {
+        localStorage.setItem('nahan_perf_hud_visible', String(isVisible));
+    }, [isVisible]);
+
     const [mode, setMode] = useState<HudMode>(() => {
         const stored = localStorage.getItem('nahan_perf_hud_mode');
         return (stored === 'compact' ? 'compact' : 'full');
     });
 
-    // Position State (y only, x is determined by snap)
+    // Position State
+    // We store the snapped side and the vertical Y position.
     const [position, setPosition] = useState(() => {
         const stored = localStorage.getItem('nahan_perf_hud_pos');
         if (stored) {
@@ -36,7 +50,10 @@ export const PerfHUD: React.FC = () => {
 
     // Dragging State
     const [isDragging, setIsDragging] = useState(false);
-    const dragOffset = useRef({ x: 0, y: 0 });
+
+    // Checkpoints for drag calculations
+    const dragStart = useRef({ x: 0, y: 0 }); // Mouse/Touch start position
+    const initialRect = useRef<DOMRect | null>(null); // Element rect at start
     const dragRef = useRef<HTMLDivElement>(null);
 
     // 1. Event Loop Lag
@@ -115,50 +132,67 @@ export const PerfHUD: React.FC = () => {
         return () => cancelAnimationFrame(frameId);
     }, [isVisible]);
 
-    // --- Drag Logic ---
+    // --- Drag Logic with Clamping & Transform ---
     const handleStart = (clientX: number, clientY: number) => {
         if (!dragRef.current) return;
-        const rect = dragRef.current.getBoundingClientRect();
-        dragOffset.current = {
-            x: clientX - rect.left,
-            y: clientY - rect.top
-        };
+
+        // Capture initial state
+        dragStart.current = { x: clientX, y: clientY };
+        initialRect.current = dragRef.current.getBoundingClientRect();
+
         setIsDragging(true);
     };
 
     const handleMove = (clientX: number, clientY: number) => {
-        if (!isDragging || !dragRef.current) return;
+        if (!isDragging || !dragRef.current || !initialRect.current) return;
 
-        // Update position visually during drag (without snapping yet)
-        const x = clientX - dragOffset.current.x;
-        const y = clientY - dragOffset.current.y;
+        const deltaX = clientX - dragStart.current.x;
+        const deltaY = clientY - dragStart.current.y;
 
-        dragRef.current.style.left = `${x}px`;
-        dragRef.current.style.top = `${y}px`;
-        dragRef.current.style.right = 'auto'; // Disable right while dragging
-        dragRef.current.style.transform = 'none';
+        // Visual feedback using Transform (avoids layout thrashing)
+        // We clamp the delta so the element doesn't leave the viewport
+        const rect = initialRect.current;
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
 
-        // Prevent default to stop scrolling on mobile
-        // e.preventDefault(); // Note: handled in listener options usually
+        // Calculate allowed movement range relative to start position
+        const minX = -rect.left + 5; // allow 5px margin
+        const maxX = windowWidth - rect.right - 5;
+        const minY = -rect.top + 5;
+        const maxY = windowHeight - rect.bottom - 5;
+
+        const clampedDeltaX = Math.max(minX, Math.min(maxX, deltaX));
+        const clampedDeltaY = Math.max(minY, Math.min(maxY, deltaY));
+
+        dragRef.current.style.transform = `translate3d(${clampedDeltaX}px, ${clampedDeltaY}px, 0)`;
+        // NOTE: We do NOT touch top/left/right styles here. React owns those.
+        // Transform sits on top visually.
     };
 
     const handleEnd = () => {
-        if (!isDragging || !dragRef.current) return;
+        if (!isDragging || !dragRef.current || !initialRect.current) return;
         setIsDragging(false);
 
-        const rect = dragRef.current.getBoundingClientRect();
+        // Get final visual position
+        // Since we used transform, we need to calculate where we ended up.
+        // We can use getBoundingClientRect() which accounts for the transform.
+        const finalRect = dragRef.current.getBoundingClientRect();
         const screenWidth = window.innerWidth;
-        const centerX = rect.left + rect.width / 2;
+        const screenHeight = window.innerHeight;
+        const centerX = finalRect.left + finalRect.width / 2;
 
-        // Snap Logic
+        // Reset Transform (so state updates can take over cleanly)
+        dragRef.current.style.transform = '';
+
+        // Determine Snap Side
         const newSide = centerX < screenWidth / 2 ? 'left' : 'right';
 
-        // Reset styles for React state to take over
-        dragRef.current.style.left = '';
-        dragRef.current.style.top = '';
-        dragRef.current.style.right = '';
+        // Determine Y position (clamped)
+        // Ensure it doesn't stick off top/bottom
+        let newY = finalRect.top;
+        newY = Math.max(10, Math.min(screenHeight - finalRect.height - 10, newY));
 
-        setPosition({ y: rect.top, side: newSide });
+        setPosition({ y: newY, side: newSide });
     };
 
     // Mouse Handlers
@@ -171,7 +205,7 @@ export const PerfHUD: React.FC = () => {
         handleStart(e.touches[0].clientX, e.touches[0].clientY);
     };
 
-    // Global Listeners for Move/End (to catch release outside element)
+    // Global Listeners
     useEffect(() => {
         const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
         const onMouseUp = () => isDragging && handleEnd();
@@ -214,8 +248,9 @@ export const PerfHUD: React.FC = () => {
 
     const containerStyle: React.CSSProperties = {
         position: 'fixed',
+         // When NOT dragging, we use the state position.
+         // When dragging, strict position remains, and transform moves it visually.
         top: `${position.y}px`,
-        // Snap to side
         left: position.side === 'left' ? '0' : 'auto',
         right: position.side === 'right' ? '0' : 'auto',
 
@@ -233,13 +268,19 @@ export const PerfHUD: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        transition: isDragging ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth snap
+        // Important: During dragging, we disable transition so it follows mouse perfectly.
+        // After drag, we enable it for the snap effect.
+        transition: isDragging ? 'none' : 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
 
         // Rounding logic for sides
         borderTopRightRadius: position.side === 'left' ? '12px' : '0',
         borderBottomRightRadius: position.side === 'left' ? '12px' : '0',
         borderTopLeftRadius: position.side === 'right' ? '12px' : '0',
         borderBottomLeftRadius: position.side === 'right' ? '12px' : '0',
+
+        // Prevent selection during drag
+        userSelect: 'none',
+        touchAction: 'none'
     };
 
     const headerStyle: React.CSSProperties = {
@@ -268,7 +309,8 @@ export const PerfHUD: React.FC = () => {
                         alignItems: 'center',
                         gap: '6px',
                         cursor: isDragging ? 'grabbing' : 'grab',
-                        padding: '4px'
+                        padding: '4px',
+                        flex: 1 // make header handle drag target
                     }}
                 >
                     <GripVertical size={14} color="#666" />
