@@ -1,15 +1,15 @@
 /* eslint-disable max-lines-per-function, no-console */
 import {
-    Avatar,
-    Button,
-    Dropdown,
-    DropdownItem,
-    DropdownMenu,
-    DropdownTrigger,
+  Avatar,
+  Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
 } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ChevronDown, MoreVertical, Shield } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -23,7 +23,14 @@ import { ChatSkeleton } from './ChatSkeleton';
 import { MessageBubble } from './MessageBubble';
 import { TemporarySteganographyMessage } from './steganography/TemporarySteganographyMessage';
 
-export function ChatView() {
+export const ChatView = React.memo(ChatViewComponent);
+
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ChatView as any).whyDidYouRender = true;
+}
+
+function ChatViewComponent() {
   // [PERF] Re-render counter for telemetry
   const renderCountRef = useRef(0);
   renderCountRef.current++;

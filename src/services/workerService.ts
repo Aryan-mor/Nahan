@@ -309,6 +309,18 @@ export class WorkerService {
     this.isProcessingWorkerBusy = false;
     this.initializeWorkers();
   }
+
+  /**
+   * Get current queue statistics for performance monitoring
+   */
+  getQueueStats() {
+    return {
+      storageQueueLength: this.storageQueue.length,
+      processingQueueLength: this.processingQueue.length,
+      activeTasks: this.processing.size
+    };
+  }
+
 }
 
 export const workerService = WorkerService.getInstance();

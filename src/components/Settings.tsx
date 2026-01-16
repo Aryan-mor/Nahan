@@ -19,7 +19,9 @@ import {
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
+    Activity,
     AlertTriangle,
+    ChevronDown,
     Clock,
     Download,
     Eye,
@@ -469,73 +471,119 @@ export function Settings() {
 
           <Divider className="bg-industrial-800" />
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-400" />
-              <div>
-                <p className="font-medium text-industrial-100">
-                  {t('settings.security.advanced.title')}
-                </p>
-                <p className="text-sm text-industrial-400">
-                  {t('settings.security.advanced.subtitle')}
-                </p>
-              </div>
-            </div>
-            <Switch
-              isSelected={showAdvanced}
-              onValueChange={setShowAdvanced}
-              classNames={{
-                wrapper: 'group-data-[selected=true]:bg-industrial-600',
-              }}
-            />
-          </div>
+          <Divider className="bg-industrial-800" />
 
-          {showAdvanced && (
-            <div className="ml-8 space-y-4">
-              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="font-medium text-yellow-400">
-                    {t('settings.security.advanced.warning')}
-                  </span>
+          {/* Advanced Options Accordion */}
+          <div className="border border-industrial-800 rounded-lg overflow-hidden transition-all duration-300">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between p-4 bg-industrial-900 hover:bg-industrial-800 transition-colors"
+              aria-expanded={showAdvanced}
+            >
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                <div className="text-left">
+                  <p className="font-medium text-industrial-100">
+                    {t('settings.security.advanced.title')}
+                  </p>
+                  <p className="text-sm text-industrial-400">
+                    {t('settings.security.advanced.subtitle')}
+                  </p>
                 </div>
-                <p className="text-sm text-yellow-300">{t('settings.security.advanced.warning')}</p>
               </div>
+              <ChevronDown
+                className={`w-5 h-5 text-industrial-400 transition-transform duration-300 ${
+                  showAdvanced ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="warning"
-                  startContent={<Download className="w-4 h-4" />}
-                  onPress={onExportOpen}
-                  className="flex-1"
-                >
-                  {t('settings.security.advanced.export')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="danger"
-                  startContent={<Lock className="w-4 h-4" />}
-                  onPress={handleLogout}
-                  className="flex-1"
-                >
-                  {t('settings.security.advanced.logout', 'Logout')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="danger"
-                  startContent={<Trash2 className="w-4 h-4" />}
-                  onPress={onOpen}
-                  className="flex-1"
-                >
-                  {t('settings.security.advanced.clear')}
-                </Button>
+            {/* Collapsible Content */}
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                showAdvanced ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="p-4 bg-industrial-900.5 space-y-4 border-t border-industrial-800">
+
+                {/* Warning Banner */}
+                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                    <span className="font-medium text-yellow-400">
+                      {t('settings.security.advanced.warning')}
+                    </span>
+                  </div>
+                  <p className="text-sm text-yellow-300">{t('settings.security.advanced.warning_text', 'These actions are destructive or for debugging only.')}</p>
+                </div>
+
+                {/* Debug Mode Toggle */}
+                <div className="flex items-center justify-between py-2">
+                    <div className="flex items-center space-x-3">
+                        <Activity className="w-5 h-5 text-industrial-400" />
+                        <div>
+                            <p className="font-medium text-industrial-100">
+                                {t('settings.debug.hud.title', 'Enable Performance HUD')}
+                            </p>
+                            <p className="text-sm text-industrial-400">
+                                {t('settings.debug.hud.subtitle', 'Show debug metrics overlay (Requires Reload)')}
+                            </p>
+                        </div>
+                    </div>
+                    <Switch
+                        isSelected={localStorage.getItem('nahan_force_perf_hud') === 'true'}
+                        onValueChange={(val) => {
+                            if (val) {
+                                localStorage.setItem('nahan_force_perf_hud', 'true');
+                            } else {
+                                localStorage.removeItem('nahan_force_perf_hud');
+                            }
+                            // Force reload to apply clean state
+                            window.location.reload();
+                        }}
+                        classNames={{
+                            wrapper: 'group-data-[selected=true]:bg-blue-600',
+                        }}
+                        data-testid="perf-hud-toggle"
+                    />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="warning"
+                    startContent={<Download className="w-4 h-4" />}
+                    onPress={onExportOpen}
+                    className="flex-1"
+                  >
+                    {t('settings.security.advanced.export')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="danger"
+                    startContent={<Lock className="w-4 h-4" />}
+                    onPress={handleLogout}
+                    className="flex-1"
+                  >
+                    {t('settings.security.advanced.logout', 'Logout')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="danger"
+                    startContent={<Trash2 className="w-4 h-4" />}
+                    onPress={onOpen}
+                    className="flex-1"
+                  >
+                    {t('settings.security.advanced.clear')}
+                  </Button>
+                </div>
               </div>
             </div>
-          )}
+          </div>
         </CardBody>
       </Card>
 

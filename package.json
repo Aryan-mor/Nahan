@@ -61,6 +61,7 @@
     "@typescript-eslint/parser": "^8.51.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitest/ui": "^4.0.16",
+    "@welldone-software/why-did-you-render": "^10.0.1",
     "autoprefixer": "^10.4.21",
     "babel-plugin-react-dev-locator": "^1.0.0",
     "cross-env": "^10.1.0",

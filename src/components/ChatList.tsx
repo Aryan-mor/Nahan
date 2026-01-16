@@ -21,7 +21,7 @@ import {
     Plus,
     Search
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -35,7 +35,14 @@ import { ManualPasteButton } from './ManualPasteButton';
 
 import { MyQRModal } from './MyQRModal';
 
-export function ChatList({
+export const ChatList = React.memo(ChatListComponent);
+
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ChatList as any).whyDidYouRender = true;
+}
+
+function ChatListComponent({
   onNewChat,
   onDetection,
 }: {

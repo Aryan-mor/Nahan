@@ -11,7 +11,7 @@ import {
     Settings as SettingsIcon,
     Users
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast, Toaster } from 'sonner';
 
@@ -43,6 +43,8 @@ import { formatNahanIdentity } from './services/stealthId';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
 import * as logger from './utils/logger';
+
+const PerfHUD = lazy(() => import('./components/dev/PerfHUD').then(module => ({ default: module.PerfHUD })));
 
 type TabType = 'chats' | 'keys' | 'settings';
 
@@ -621,6 +623,11 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-industrial-950 text-industrial-100 flex flex-col relative overflow-hidden">
+        {(import.meta.env.DEV || localStorage.getItem('nahan_force_perf_hud') === 'true') && (
+          <Suspense fallback={null}>
+             <PerfHUD />
+          </Suspense>
+        )}
         <PWAInstallPrompt />
         <PWAUpdateNotification />
 
