@@ -880,4 +880,12 @@ export class StorageService {
   }
 }
 
+import * as secureStorageExports from './secureStorage';
+
 export const storageService = StorageService.getInstance();
+
+// Expose storageService to window for E2E testing
+if (typeof window !== 'undefined') {
+  (window as any).nahanStorage = storageService;
+  (window as any).nahanSecureStorage = secureStorageExports;
+}

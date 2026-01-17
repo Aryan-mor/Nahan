@@ -1,203 +1,212 @@
-/* eslint-disable max-lines-per-function */
 import { expect, test } from '@playwright/test';
-
 import { AuthPage } from '../pages/AuthPage';
+import { ChatListPage } from '../pages/ChatListPage';
 
-test.describe('Chat List Actions', () => {
-    test.setTimeout(120000); // 2 minutes timeout for slow environments
-    test.use({ actionTimeout: 45000 }); // Increase action timeout for slow UI
+/* eslint-disable max-lines-per-function */
+test.describe('Chat List Actions (Contact Management)', () => {
+  test.setTimeout(120000); // 2 minutes timeout for slow environments
 
-    let authPage: AuthPage;
-    const testUser = {
-        name: 'Action Tester',
-        passphrase: '123456'
-    };
+  let authPage: AuthPage;
+  let chatListPage: ChatListPage;
 
+  test.beforeEach(async ({ page }) => {
+    authPage = new AuthPage(page);
+    chatListPage = new ChatListPage(page);
 
+    await page.goto('/');
 
-    async function addContact(page, name) {
+    // Reset DB to ensure clean state
+    await page.evaluate(async () => {
+      // 1. Close active connection if exposed
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((window as any).nahanStorage) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (window as any).nahanStorage.close();
+      }
 
-
-        // Generate unique fingerprint
-        const fingerprint = `TESTFP_${Date.now()}_${name.replace(/\s/g, '_')}`;
-
-        // Ensure page is stable before injecting into IndexedDB
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(500); // Extra buffer for any React state transitions
-
-        // Inject contact directly into IndexedDB
-        await page.evaluate(async ({ contactName, contactFingerprint }) => {
-            const dbName = 'nahan-db';
-
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(dbName);
-                request.onerror = () => reject(request.error);
-                request.onsuccess = () => {
-                    const db = request.result;
-                    const tx = db.transaction('contacts', 'readwrite');
-                    const store = tx.objectStore('contacts');
-
-                    const contact = {
-                        name: contactName,
-                        fingerprint: contactFingerprint,
-                        publicKey: 'MOCK_PUBLIC_KEY_FOR_TESTING_' + contactFingerprint,
-                        createdAt: new Date().toISOString(),
-                    };
-
-                    store.add(contact);
-                    tx.oncomplete = () => resolve(true);
-                    tx.onerror = () => reject(tx.error);
-                };
-            });
-        }, { contactName: name, contactFingerprint: fingerprint });
-
-        // Reload to pick up the new contact
-        await page.reload();
-
-        // Dismiss clipboard dialog if it appears
-        const clipboardDismiss = page.getByTestId('clipboard-permission-dismiss');
-        if (await clipboardDismiss.isVisible({ timeout: 2000 })) {
-            await clipboardDismiss.click();
+      // 2. Delete databases
+      const dbs = await window.indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name) {
+          await new Promise((resolve) => {
+            const req = window.indexedDB.deleteDatabase(db.name);
+            req.onsuccess = resolve;
+            req.onerror = resolve;
+            req.onblocked = resolve;
+          });
         }
+      }
+    });
 
-        // Verify contact appears
-        await expect(page.getByText(name)).toBeVisible({ timeout: 10000 });
+    await page.reload();
 
+    // Signup with standard test credentials
+    await authPage.performSignup('Tester', '123456');
+
+    // Handle potential clipboard permission dialog
+    const clipboardDismiss = page.getByTestId('clipboard-permission-dismiss');
+    if (await clipboardDismiss.isVisible({ timeout: 3000 })) {
+      await clipboardDismiss.click();
     }
 
-    test.beforeEach(async ({ page }) => {
-        authPage = new AuthPage(page);
-        await page.goto('/');
+    await expect(chatListPage.chatListTitle).toBeVisible({ timeout: 15000 });
+  });
 
-        // Reset DB
-        await page.evaluate(async () => {
-            const dbs = await window.indexedDB.databases();
-            for (const db of dbs) {
-                if (db.name) window.indexedDB.deleteDatabase(db.name);
-            }
-        });
-        await page.reload();
+  // -------------------------------------------------------------------------
+  // 1. Single Contact Operations
+  // -------------------------------------------------------------------------
 
-         // Signup
-         await authPage.performSignup(testUser.name, testUser.passphrase);
+  test('should delete chat history for a specific contact', async ({ page }) => {
+    const contactName = 'History User';
+    const messageContent = 'Secret Message to Delete';
 
-         // Dismiss clipboard permission dialog if it appears
-         const clipboardDismiss = page.getByTestId('clipboard-permission-dismiss');
-         if (await clipboardDismiss.isVisible({ timeout: 2000 })) {
-             await clipboardDismiss.click();
-         }
+    // 1. Setup: Create contact and message
+    await chatListPage.createMockContact(contactName);
+    await chatListPage.createMockMessage(contactName, messageContent);
 
-         await expect(page.getByTestId('chat-list-title')).toBeVisible();
+    // Verify message preview shows in list
+    await expect(page.getByText(messageContent)).toBeVisible();
 
-         // Wait for page to be fully stable (no pending network requests)
-         await page.waitForLoadState('networkidle');
+    // 2. Open Context Menu -> Delete History
+    await chatListPage.openContextMenu(contactName);
+    await page.getByText('Delete History').click();
 
-         // Extra stability wait for any async React state transitions
-         await page.waitForTimeout(2000);
-    });
+    // Confirm
+    await page.getByTestId('confirm-delete-history').click();
 
-    // NOTE: Removed 'should rename a contact' because now we only have selection mode 3-dot for bulk actions,
-    // and individual item actions are back to long-press which is tricky to test reliably on desktop web without mobile emulation.
-    // Focusing on the Selection Mode Header functionality requested by the user.
+    // 3. Verify
+    // Message should be gone, replaced by "No messages yet"
+    await expect(page.getByText(messageContent)).not.toBeVisible();
 
-    // SKIP: Broadcast channel is excluded from long-press menu (line 117 in ChatList.tsx: if fingerprint === 'BROADCAST' return)
-    // This test would need to use addContact which fails with "Execution context was destroyed" issue.
-    // Fix: Refactor to use multi-context setup with real key exchange.
-    test.skip('should delete chat history via selection mode', async ({ page }) => {
-        // Use Broadcast channel which is always present (no need for addContact)
-        const contactName = 'Broadcast';
+    // Verify specific contact item shows "No messages yet"
+    const contactItem = await chatListPage.getContactItem(contactName);
+    await expect(contactItem.getByText('No messages yet')).toBeVisible();
 
-        // Open Broadcast chat
-        await page.getByText(contactName).click();
-        await expect(page.getByTestId('chat-view-container')).toBeVisible();
+    // Contact should still exist
+    await expect(contactItem).toBeVisible();
+  });
 
-        // Send a message
-        await page.getByTestId('chat-input').fill('Test Message for History');
-        await page.getByTestId('chat-send-btn').click();
-        await expect(page.getByTestId('message-content').last()).toHaveText('Test Message for History');
+  test('should delete a specific contact from the list', async ({ page }) => {
+    const contactName = 'Delete User';
 
-        // Go back to list
-        await page.getByTestId('back-to-list-btn').click();
+    // 1. Setup
+    await chatListPage.createMockContact(contactName);
 
-        // 1. Enter Selection Mode via long press simulation
-        // The useLongPress hook has a 500ms threshold
-        const broadcastItem = page.locator(`[data-testid="chat-list-item-BROADCAST"]`);
-        const box = await broadcastItem.boundingBox();
-        if (!box) throw new Error('Broadcast item not found');
+    // 2. Open Context Menu -> Delete Contact
+    await chatListPage.openContextMenu(contactName);
+    await page.getByText('Delete Contact').click();
 
-        // Click in the center of the element
-        const x = box.x + box.width / 2;
-        const y = box.y + box.height / 2;
+    // Confirm
+    await page.getByTestId('confirm-delete-contact').click();
 
-        await page.mouse.move(x, y);
-        await page.mouse.down();
-        await page.waitForTimeout(600); // Wait longer than the 500ms threshold
-        await page.mouse.up();
+    // 3. Verify
+    await expect(page.getByText(contactName)).not.toBeVisible();
+  });
 
-        // Check context menu appears
-        await expect(page.getByText('Choose an action')).toBeVisible({ timeout: 5000 });
+  test('should rename a specific contact', async ({ page }) => {
+    const oldName = 'Rename User';
+    const newName = 'Renamed Successfully';
 
-        // Select "Select" to enter selection mode
-        await page.getByRole('button', { name: 'Select' }).click();
+    // 1. Setup
+    await chatListPage.createMockContact(oldName);
 
-        // Verify Selection Mode Header
-        await expect(page.getByText('1 selected')).toBeVisible();
+    // 2. Open Context Menu -> Rename
+    await chatListPage.openContextMenu(oldName);
+    await page.getByRole('button', { name: 'Rename', exact: true }).click();
 
-        // 2. Open Bulk Actions Menu (The new 3-dot in header)
-        await page.getByTestId('selection-menu-trigger').click();
+    // 3. Fill Rename Modal
+    await expect(page.getByTestId('rename-modal-header')).toBeVisible();
+    await page.getByTestId('rename-input').fill(newName);
+    await page.getByTestId('rename-save-button').click();
 
-        // 3. Select Delete History
-        await page.getByText('Delete History').click();
+    // 4. Verify
+    await expect(await chatListPage.getContactItem(newName)).toBeVisible();
+    await expect(page.getByText(oldName)).not.toBeVisible();
+  });
 
-        // Confirm
-        await page.getByTestId('confirm-delete-history').click();
+  test('should share a specific contact', async ({ page }) => {
+    const contactName = 'Share User';
 
-        // 4. Verify
-        await expect(page.getByText('No messages yet')).toBeVisible();
-    });
+    // 1. Setup
+    await chatListPage.createMockContact(contactName);
 
-    // SKIP: This test requires addContact which fails due to "Execution context was destroyed" during IndexedDB injection.
-    // Root cause: App performs late async initialization/navigation after signup that destroys page.evaluate context.
-    // Fix: Refactor to use multi-context setup like p2p-setup.ts with real key exchange between users.
-    test.skip('should rename a contact via context menu', async ({ page }) => {
-        await addContact(page, 'User To Rename');
+    // 2. Open Context Menu -> Share
+    await chatListPage.openContextMenu(contactName);
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
 
-        // 1. Open Context Menu
-        await page.locator(`[data-testid="chat-item-User To Rename"]`).dispatchEvent('contextmenu');
+    // 3. Verify QR Code Modal
+    // The modal usually has a header or QR code element
+    await expect(page.getByText('Contact Identity')).toBeVisible(); // Adjust text if needed
+    // Or check for QR canvas/svg
+    await expect(page.locator('canvas, svg').first()).toBeVisible();
 
-        // 2. Click Rename
-        await page.getByText('Rename').click();
+    // Close modal
+    await page.getByRole('button', { name: 'Close' }).click();
+  });
 
-        // 3. Wait for modal via testid
-        await expect(page.getByTestId('rename-modal-header')).toBeVisible();
+  // -------------------------------------------------------------------------
+  // 2. Multiple Contact Operations
+  // -------------------------------------------------------------------------
 
-        // 4. Fill new name
-        await page.getByTestId('rename-input').fill('Renamed User');
-        await page.getByTestId('rename-save-button').click();
+  test('should delete chat histories for multiple contacts', async ({ page }) => {
+    const userA = 'User A';
+    const userB = 'User B';
 
-        // 5. Verify change in list
-        await expect(page.getByText('Renamed User')).toBeVisible();
-        await expect(page.getByText('User To Rename')).not.toBeVisible();
-    });
+    // 1. Setup
+    await chatListPage.createMockContact(userA);
+    await chatListPage.createMockMessage(userA, 'Msg A');
 
-    // SKIP: Same issue as rename test - addContact fails with "Execution context was destroyed"
-    test.skip('should delete contact via selection mode', async ({ page }) => {
-        await addContact(page, 'User To Delete');
+    await chatListPage.createMockContact(userB);
+    await chatListPage.createMockMessage(userB, 'Msg B');
 
-        // 1. Enter Selection Mode
-        await page.locator(`[data-testid="chat-item-User To Delete"]`).dispatchEvent('contextmenu');
-        await page.getByRole('button', { name: 'Select' }).click();
+    // 2. Enter Selection Mode on User A
+    await chatListPage.enterSelectionMode(userA);
 
-        // 2. Open Bulk Actions Menu
-        await page.getByTestId('selection-menu-trigger').click();
+    // 3. Select User B
+    await chatListPage.selectContactInMode(userB);
+    await expect(page.getByText('2 selected')).toBeVisible();
 
-        // 3. Delete Contact
-        await page.getByText('Delete Contact').click();
+    // 4. Bulk Menu -> Delete History
+    await chatListPage.selectionMenuTrigger.click();
+    await page.getByText('Delete History').click();
 
-        // Confirm
-        await page.getByTestId('confirm-delete-contact').click();
+    // Confirm
+    await page.getByTestId('confirm-delete-history').click();
 
-        // 4. Verify
-        await expect(page.getByText('User To Delete')).not.toBeVisible();
-    });
+    // 5. Verify
+    // Wait for UI to settle (selection mode might exit or list refreshes)
+    await expect(page.getByText('Msg A')).not.toBeVisible();
+    await expect(page.getByText('Msg B')).not.toBeVisible();
+
+    // Both contacts should still be there
+    await expect(page.getByText(userA)).toBeVisible();
+    await expect(page.getByText(userB)).toBeVisible();
+  });
+
+  test('should delete multiple contacts from the list', async ({ page }) => {
+    const userC = 'User C';
+    const userD = 'User D';
+    const userKeep = 'User Keep';
+
+    // 1. Setup
+    await chatListPage.createMockContact(userC);
+    await chatListPage.createMockContact(userD);
+    await chatListPage.createMockContact(userKeep);
+
+    // 2. Enter Selection Mode
+    await chatListPage.enterSelectionMode(userC);
+    await chatListPage.selectContactInMode(userD);
+
+    // 3. Bulk Menu -> Delete Contact
+    await chatListPage.selectionMenuTrigger.click();
+    await page.getByText('Delete Contact').click();
+
+    // Confirm
+    await page.getByTestId('confirm-delete-contact').click();
+
+    // 4. Verify
+    await expect(page.getByText(userC)).not.toBeVisible();
+    await expect(page.getByText(userD)).not.toBeVisible();
+    await expect(page.getByText(userKeep)).toBeVisible();
+  });
 });

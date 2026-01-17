@@ -23,12 +23,7 @@ export class AuthPage {
     const engBtn = this.page.getByTestId('lang-en-btn');
     if (await engBtn.isVisible({ timeout: 2000 })) await engBtn.click();
 
-    // 2. Welcome "Start Now" (or Continue in Browser)
-    const startBtn = this.page.getByTestId('welcome-start-button');
-    if (await startBtn.isVisible({ timeout: 5000 })) {
-    await startBtn.click();
-    await expect(startBtn).toBeHidden();
-    }
+    await this.handleWelcomeScreen();
 
     // 3. Create PIN
     const createPinStep = this.page.getByTestId('onboarding-create-pin');
@@ -38,7 +33,6 @@ export class AuthPage {
     // 4. Confirm PIN
     const confirmPinStep = this.page.getByTestId('onboarding-confirm-pin');
     await expect(confirmPinStep).toBeVisible();
-    await this.page.waitForTimeout(500); // Allow animation/state to settle
     await this.enterPin(pin, confirmPinStep);
 
     // 5. Warning Step
@@ -65,6 +59,25 @@ export class AuthPage {
     await this.verifyDashboard();
   }
 
+  private async handleWelcomeScreen() {
+    // 2. Intelligent Wait for Welcome OR Create PIN
+    try {
+      await this.page.waitForLoadState('domcontentloaded');
+      const welcomeOrPin = await this.page.waitForSelector(
+        '[data-testid="welcome-start-button"], [data-testid="onboarding-create-pin"]',
+        { timeout: 30000 },
+      );
+
+      const testId = await welcomeOrPin.getAttribute('data-testid');
+      if (testId === 'welcome-start-button') {
+        await welcomeOrPin.click();
+        await expect(this.page.getByTestId('welcome-start-button')).toBeHidden();
+      }
+    } catch (_e) {
+      // console.log('Timeout waiting for Welcome or Create PIN');
+    }
+  }
+
   /**
    * Perform Login (Unlock)
    */
@@ -82,7 +95,7 @@ export class AuthPage {
   async enterPin(pin: string, context?: Locator) {
     // Wait for the specific container to be visible if provided
     if (context) {
-       await expect(context).toBeVisible();
+      await expect(context).toBeVisible();
     }
 
     // Ensure the keypad UI is generally ready (checking first button existence/visibility)
@@ -92,8 +105,8 @@ export class AuthPage {
     // Use keyboard input which is handled by window listener in PinPad.tsx
     // varying delay to ensure state updates propagate
     for (const char of pin) {
-        await this.page.keyboard.press(char);
-        await this.page.waitForTimeout(100);
+      await this.page.keyboard.press(char);
+      await this.page.waitForTimeout(100);
     }
   }
 

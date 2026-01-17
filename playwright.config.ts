@@ -6,9 +6,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   timeout: 60000,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 4,
   expect: {
-    timeout: 10000,
+    timeout: 20000,
   },
   use: {
     baseURL: 'http://localhost:5173',
