@@ -166,7 +166,7 @@ export const PinPad: React.FC<PinPadProps> = ({
 
         {showBiometrics && onBiometricAuth ? (
           <button
-            onClick={onBiometricAuth}
+            onClick={() => onBiometricAuth()}
             className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30 transition-all flex items-center justify-center border border-blue-500/20"
             data-testid="pin-pad-biometric"
             aria-label={t('biometric.unlock', 'Biometric Unlock')}

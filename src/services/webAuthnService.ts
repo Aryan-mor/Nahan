@@ -169,7 +169,7 @@ export class WebAuthnService {
 
        const credential = (await navigator.credentials.get({
          publicKey: getOptions,
-         signal: options?.signal
+         signal: (options?.signal instanceof AbortSignal) ? options.signal : undefined
        })) as PublicKeyCredential;
 
        if (!credential) return null;
