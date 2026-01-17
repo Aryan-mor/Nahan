@@ -142,6 +142,7 @@ export function MyQRModal({ isOpen, onOpenChange, contact }: MyQRModalProps) {
                     src={qrCodeDataUrl}
                     alt={t('my_qr.title')}
                     className="w-64 h-64 object-contain"
+                    data-testid="qr-code-img"
                   />
                 </div>
               ) : (

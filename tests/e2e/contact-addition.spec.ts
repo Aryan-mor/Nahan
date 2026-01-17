@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
+import { fileURLToPath } from 'url';
 
 import { AuthPage } from '../pages/AuthPage';
 import { ContactPage } from '../pages/ContactPage';
@@ -14,7 +15,9 @@ test.describe('Contact Addition E2E', () => {
   const pin = '123456';
   const senderName = 'SenderUser';
   const receiverName = 'ReceiverUser';
-  const fixturesDir = path.resolve(process.cwd(), 'tests', 'fixtures');
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const fixturesDir = path.resolve(__dirname, '..', 'fixtures');
 
   test.setTimeout(120000); // Increase timeout for slow environments
 
@@ -58,9 +61,22 @@ test.describe('Contact Addition E2E', () => {
 
     // Wait for QR to generate
     await expect(senderPage.locator('.animate-spin')).not.toBeVisible();
-    const qrImage = senderPage.getByRole('dialog').getByRole('img');
+    const qrImage = senderPage.getByTestId('qr-code-img');
     await expect(qrImage).toBeVisible();
+
+    // Ensure directory exists (fallback)
+    if (!fs.existsSync(fixturesDir)) {
+      fs.mkdirSync(fixturesDir, { recursive: true });
+    }
+
     await qrImage.screenshot({ path: qrFilePath });
+
+    // VERIFY: Wait for file to be written to disk before closing page
+    // This prevents race conditions where the page closes before screenshot flushes
+    await expect.poll(() => fs.existsSync(qrFilePath), {
+      message: 'Screenshot file should be created',
+      timeout: 10000,
+    }).toBeTruthy();
 
     await senderPage.close();
 
