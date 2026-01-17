@@ -1,7 +1,9 @@
-/* eslint-disable max-lines-per-function */
+ 
 import { expect, test } from '@playwright/test';
 
 import { AuthPage } from '../pages/AuthPage';
+
+import { ContactPage } from '../pages/ContactPage';
 
 test.describe('Identity Verification & Sharing', () => {
   let authPage: AuthPage;
@@ -21,9 +23,9 @@ test.describe('Identity Verification & Sharing', () => {
     // strict check for lock screen visibility without try-catch
     const lockScreen = page.getByTestId('lock-screen-wrapper');
     if (await lockScreen.isVisible()) {
-        await authPage.performLogin(pin);
+      await authPage.performLogin(pin);
     } else {
-        await authPage.performSignup(name, pin);
+      await authPage.performSignup(name, pin);
     }
   });
 
@@ -48,57 +50,53 @@ test.describe('Identity Verification & Sharing', () => {
 
     // 2. QR Modal via Header
     await test.step('QR Modal via Header', async () => {
-        const qrBtn = page.getByTestId('view-qr-header');
-        await qrBtn.click();
+      const qrBtn = page.getByTestId('view-qr-header');
+      await qrBtn.click();
 
-        // Wait for modal
-        const modalCopyBtn = page.getByTestId('copy-identity-modal');
-        await expect(modalCopyBtn).toBeVisible();
+      // Wait for modal
+      const modalCopyBtn = page.getByTestId('copy-identity-modal');
+      await expect(modalCopyBtn).toBeVisible();
 
-        // Verify QR Code Canvas/Image existence
-        // Wait for spinner to go away (implies QRCode generated)
-        await expect(page.locator('.animate-spin')).not.toBeVisible({ timeout: 10000 });
-        const qrImage = page.getByRole('dialog').getByRole('img');
-        await expect(qrImage).toBeVisible();
+      // Verify QR Code Canvas/Image existence
+      // Wait for spinner to go away (implies QRCode generated)
+      await expect(page.locator('.animate-spin')).not.toBeVisible({ timeout: 10000 });
+      const qrImage = page.getByRole('dialog').getByRole('img');
+      await expect(qrImage).toBeVisible();
 
-        await modalCopyBtn.click();
-        const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-        // Stealth ID check
-        expect(clipboardText).toMatch(/[\u0600-\u06FF]/);
-        expect(clipboardText).toMatch(/[\u{E0020}-\u{E007F}]/u);
+      await modalCopyBtn.click();
+      const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+      // Stealth ID check
+      expect(clipboardText).toMatch(/[\u0600-\u06FF]/);
+      expect(clipboardText).toMatch(/[\u{E0020}-\u{E007F}]/u);
 
-        // Close modal (Click outside or use close button if available, or just press Escape)
-        await page.keyboard.press('Escape');
-        await expect(modalCopyBtn).toBeHidden();
+      // Close modal (Click outside or use close button if available, or just press Escape)
+      await page.keyboard.press('Escape');
+      await expect(modalCopyBtn).toBeHidden();
     });
 
     // 3. Navigate to Keys Page
     await test.step('Navigate to Keys Page', async () => {
-        const keysTab = page.getByTestId('nav-keys-tab');
-        await expect(keysTab).toBeVisible();
-        await keysTab.click();
+      const contactPage = new ContactPage(page);
+      await contactPage.navigateToContacts();
 
-        // Wait for Keys page content
-        await expect(page.getByTestId('copy-identity-keys')).toBeVisible();
+      // 3a. Keys Page Copy
+      const keysCopyBtn = page.getByTestId('copy-identity-keys');
+      await keysCopyBtn.click();
+      // Short wait to ensure clipboard write
+      await page.waitForTimeout(100);
+      const clipboardKeys = await page.evaluate(() => navigator.clipboard.readText());
+      // Stealth ID check
+      expect(clipboardKeys).toMatch(/[\u0600-\u06FF]/);
+      expect(clipboardKeys).toMatch(/[\u{E0020}-\u{E007F}]/u);
 
-        // 3a. Keys Page Copy
-        const keysCopyBtn = page.getByTestId('copy-identity-keys');
-        await keysCopyBtn.click();
-        // Short wait to ensure clipboard write
-        await page.waitForTimeout(100);
-        const clipboardKeys = await page.evaluate(() => navigator.clipboard.readText());
-        // Stealth ID check
-        expect(clipboardKeys).toMatch(/[\u0600-\u06FF]/);
-        expect(clipboardKeys).toMatch(/[\u{E0020}-\u{E007F}]/u);
+      // 3b. QR Modal via Keys Page
+      const keysQrBtn = page.getByTestId('view-qr-keys');
+      await keysQrBtn.click();
 
-        // 3b. QR Modal via Keys Page
-        const keysQrBtn = page.getByTestId('view-qr-keys');
-        await keysQrBtn.click();
-
-        // Verify Modal again
-        const modalCopyBtn = page.getByTestId('copy-identity-modal');
-        await expect(modalCopyBtn).toBeVisible();
-        await page.keyboard.press('Escape');
+      // Verify Modal again
+      const modalCopyBtn = page.getByTestId('copy-identity-modal');
+      await expect(modalCopyBtn).toBeVisible();
+      await page.keyboard.press('Escape');
     });
   });
 });

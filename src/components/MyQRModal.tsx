@@ -53,8 +53,8 @@ export function MyQRModal({ isOpen, onOpenChange, contact }: MyQRModalProps) {
           width: 300,
           margin: 2,
           color: {
-            dark: '#e2e8f0', // industrial-200
-            light: '#020617', // industrial-950
+            dark: '#000000',
+            light: '#ffffff',
           },
         });
         setQrCodeDataUrl(dataUrl);

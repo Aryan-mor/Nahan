@@ -47,3 +47,4 @@ local.properties
 build/
 test-results/
 playwright-report/
+tests/fixtures/*.png

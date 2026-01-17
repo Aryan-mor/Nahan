@@ -1,5 +1,6 @@
 /* eslint-disable max-lines-per-function, no-constant-condition, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import i18next from 'i18next';
+import jsQR from 'jsqr';
 import * as naclUtil from 'tweetnacl-util';
 
 import * as logger from '../../utils/logger';
@@ -196,6 +197,27 @@ export class ImageSteganographyService {
   ): Promise<{ url?: string; text?: string; senderPublicKey?: string }> {
     try {
       const canvas = await this.loadCarrierCanvas(carrierFile);
+
+      // 1. Try QR Code Detection First
+      try {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth',
+          });
+          if (code && code.data) {
+             logger.info('Steganography Decode: QR Code detected', { length: code.data.length });
+             // Clean up canvas
+             canvas.width = 0;
+             canvas.height = 0;
+             return { text: code.data };
+          }
+        }
+      } catch (e) {
+        logger.warn('Steganography Decode: QR detection failed, continuing to stego', e);
+      }
+
       const base122Payload = extractPayload(canvas);
 
       // MEMORY OPTIMIZATION: Dispose canvas immediately

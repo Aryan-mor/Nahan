@@ -1,13 +1,17 @@
 /* eslint-disable max-lines-per-function */
 import { Button, useDisclosure } from '@heroui/react';
-import jsQR from 'jsqr';
 import { Camera, Upload, User } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { DetectionResult } from '../../hooks/useClipboardDetection';
+import { camouflageService } from '../../services/camouflage';
 import { cryptoService } from '../../services/crypto';
+import { parseStealthID } from '../../services/stealthId';
+import { ImageSteganographyService } from '../../services/steganography';
+import { useAppStore } from '../../stores/appStore';
+import * as logger from '../../utils/logger';
 
 import { ContactImportModal } from './ContactImportModal';
 import { QRScannerModal } from './QRScannerModal';
@@ -24,6 +28,8 @@ interface AddContactProps {
 
 export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
   const { t } = useTranslation();
+  const { identity, sessionPassphrase } = useAppStore();
+  const stegoService = ImageSteganographyService.getInstance();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -46,25 +52,46 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
     onScanOpenChange(); // Close scan modal if open
 
     try {
-      // Try parsing as JSON (Nahan QR format)
       let publicKey = '';
       let name = '';
 
-      try {
-        const parsedData = JSON.parse(data);
-        if (parsedData.type === 'nahan-public-key') {
-          publicKey = parsedData.publicKey || '';
-          name = parsedData.name || '';
+      // 1. Check for Stealth ID (Poem with hidden data)
+      if (camouflageService.hasZWC(data)) {
+        try {
+          const binary = camouflageService.decodeFromZWC(data, true); // lenient=true
+          const idData = parseStealthID(binary);
+          if (idData) {
+            publicKey = idData.publicKey;
+            name = idData.name;
+            logger.info('Detected Stealth ID in QR scan', { name });
+          }
+        } catch (e) {
+          logger.warn('Failed to decode potential Stealth ID', e);
         }
-      } catch {
-        // Not JSON, check if it's a raw key OR USERNAME+KEY
+      }
+
+      // 2. Try parsing as JSON (Nahan QR format) if not found yet
+      if (!publicKey) {
+        try {
+          const parsedData = JSON.parse(data);
+          if (parsedData.type === 'nahan-public-key') {
+            publicKey = parsedData.publicKey || '';
+            name = parsedData.name || '';
+          }
+        } catch {
+          // Not JSON
+        }
+      }
+
+      // 3. Fallback: Check if it's a raw key OR USERNAME+KEY
+      if (!publicKey) {
         const { username: parsedName, key: parsedKey, isValid } = cryptoService.parseKeyInput(data);
         if (isValid) {
           publicKey = parsedKey;
           // Prefer extracted name from prefix if available
           name = parsedName || '';
 
-          // If no name from prefix, try to get from key
+          // If no name from prefix, try to get from key lookup
           if (!name) {
             name = (await cryptoService.getNameFromKey()) || '';
           }
@@ -72,45 +99,57 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
       }
 
       if (publicKey && cryptoService.isValidKeyFormat(publicKey)) {
-        setScannedData({ name, publicKey });
         toast.success(t('add_contact.toast.scan_success'));
-        onManualOpen();
+
+        // Direct detection handling - skips the manual import modal
+        if (onDetection) {
+          onDetection({
+            type: 'id',
+            contactName: name || 'Unknown',
+            contactPublicKey: publicKey,
+          });
+        } else {
+          // Fallback if no detection handler (should not happen in main flow)
+          setScannedData({ name, publicKey });
+          onManualOpen();
+        }
       } else {
         toast.error(t('add_contact.toast.invalid_format'));
       }
-    } catch {
+    } catch (error) {
+      logger.error('Scan processing error', error);
       toast.error(t('add_contact.toast.process_fail'));
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) return;
+    if (!identity || !sessionPassphrase) {
+      toast.error(t('chat.input.error.missing_context'));
+      return;
+    }
 
-        canvas.width = img.width;
-        canvas.height = img.height;
-        context.drawImage(img, 0, 0);
+    try {
+      const { text, url } = await stegoService.decode(file, identity.privateKey, sessionPassphrase);
 
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (text) {
+        // Handle as QR code or text payload (Stealth ID or Key)
+        handleScannedData(text);
+      } else if (url) {
+        // If it's an image, maybe it's just a raw image or stego image without text
+        // For AddContact, we primarily care about text/keys.
+        // But if it decoded successfully, we should maybe inform the user.
+        toast.info(t('add_contact.toast.image_decoded_no_text'));
+      } else {
+        toast.error(t('add_contact.toast.no_qr_found'));
+      }
+    } catch (error) {
+      logger.error('File processing error', error);
+      toast.error(t('add_contact.toast.process_fail'));
+    }
 
-        if (code) {
-          handleScannedData(code.data);
-        } else {
-          toast.error(t('add_contact.toast.no_qr_found'));
-        }
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
     event.target.value = '';
   };
 

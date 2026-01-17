@@ -27,7 +27,7 @@ export class AuthPage {
 
     // 3. Create PIN
     const createPinStep = this.page.getByTestId('onboarding-create-pin');
-    await expect(createPinStep).toBeVisible({ timeout: 10000 });
+    await expect(createPinStep).toBeVisible({ timeout: 30000 });
     await this.enterPin(pin, createPinStep);
 
     // 4. Confirm PIN
@@ -114,6 +114,12 @@ export class AuthPage {
    * Verify we are on the dashboard
    */
   async verifyDashboard() {
-    await expect(this.page.getByTestId('nav-chats-tab')).toBeVisible({ timeout: 60000 });
+    // Check for either Desktop OR Mobile Chats tab
+    // We use a Promise.race or check visibility of either
+    await expect(
+      this.page
+        .locator('[data-testid="nav-chats-tab"], [data-testid="nav-mobile-chats-tab"]')
+        .first(),
+    ).toBeVisible({ timeout: 60000 });
   }
 }

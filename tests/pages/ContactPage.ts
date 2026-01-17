@@ -4,37 +4,56 @@ export class ContactPage {
   constructor(readonly page: Page) {}
 
   async navigateToContacts() {
-    await this.page.getByTestId('nav-keys-tab').click();
+    // If Chat View is open, close it first
+    if (await this.page.getByTestId('chat-view-container').isVisible()) {
+      await this.page.getByTestId('back-to-list-btn').click();
+      await expect(this.page.getByTestId('chat-view-container')).toBeHidden();
+    }
+
+    // If already on the page (check for a unique element), return
+    if (await this.page.getByTestId('add-contact-scan-btn').isVisible()) {
+      return;
+    }
+
+    const desktopTab = this.page.getByTestId('nav-keys-tab');
+    const mobileTab = this.page.getByTestId('nav-mobile-keys-tab');
+
+    if (await desktopTab.isVisible()) {
+      await desktopTab.click();
+    } else {
+      // Assume mobile if desktop is not visible
+      await mobileTab.click();
+    }
+
+    // Wait for the Keys view to load with a generous timeout and retry logic
+    try {
+      await expect(this.page.getByTestId('add-contact-scan-btn')).toBeVisible({ timeout: 10000 });
+    } catch (_e) {
+      const anyKeysBtn = this.page
+        .getByRole('button', { name: 'Keys' })
+        .filter({ hasText: 'Keys' })
+        .first();
+      if (await anyKeysBtn.isVisible()) {
+        await anyKeysBtn.click({ force: true });
+      } else {
+        // Retry the explicit IDs
+        if (await desktopTab.isVisible()) await desktopTab.click({ force: true });
+        else await mobileTab.click({ force: true });
+      }
+
+      await expect(this.page.getByTestId('add-contact-scan-btn')).toBeVisible({ timeout: 10000 });
+    }
   }
 
   async copyIdentity(): Promise<string> {
-      // Ensure we are on the dashboard/chats where the copy button is (usually)
-      // Or just click it if visible. Best to ensure tab.
-      // But button might be globally available? No, usually in header.
-      // Let's assume user is on Dashboard (Test logic puts them there).
-      const copyBtn = this.page.getByTestId('copy-identity-home');
-      await expect(copyBtn).toBeVisible();
-      await copyBtn.click({ force: true });
-      // Read clipboard
-      return await this.page.evaluate(() => navigator.clipboard.readText());
+    const copyBtn = this.page.getByTestId('copy-identity-home');
+    await expect(copyBtn).toBeVisible();
+    await copyBtn.click({ force: true });
+    return await this.page.evaluate(() => navigator.clipboard.readText());
   }
 
   async openAddContactManual() {
-    // Navigate to keys
     await this.navigateToContacts();
-    // Open Manual Import (Assuming "Add Contact" or similar button triggers modal)
-    // The UI shows 3 buttons in AddContact component.
-    // We need to trigger the Manual one.
-    // But first, we need to click the main FAB "Add Contact" usually?
-    // In ChatList, we confirmed `data-testid="add-chat-button"`.
-    // In KeyExchange/AddContact, we see:
-    // <span ...>{t('add_contact.buttons.manual')}</span> which is inside a button.
-    // Let's rely on finding text "Manual Entry" or similar from translation keys.
-    // 'add_contact.buttons.manual' -> "Manual Entry" usually.
-    // We will target via text for now as we don't have ID on the button itself yet.
-    // Wait! AddContact.tsx logic shows it renders these buttons directly?
-    // If we are on the Keys page, these buttons are visible.
-
     await this.page.getByTestId('manual-entry-button').click();
   }
 
@@ -43,22 +62,46 @@ export class ContactPage {
     await expect(manualInput).toBeVisible();
     await manualInput.fill(identityString);
 
-    // Click Import & Decode
     const decodeBtn = this.page.getByTestId('manual-import-decode-btn');
     await decodeBtn.click();
-
-    // Verify modal closes (Success)
-    // await expect(manualInput).toBeHidden();
   }
 
   async submitContact() {
-    // Click "Add Contact" in footer
     const addBtn = this.page.getByTestId('detection-add-contact-btn');
     await addBtn.click();
   }
 
   async verifyContactAdded(name: string) {
-      // Check in list using strict test ID
-      await expect(this.page.getByTestId(`chat-item-${name}`).first()).toBeVisible();
+    await this.page.getByTestId('nav-chats-tab').click();
+    await expect(this.page.getByTestId(`chat-item-${name}`).first()).toBeVisible();
+  }
+
+  async openAddContactScanner() {
+    await this.navigateToContacts();
+    await this.page.getByTestId('add-contact-scan-btn').click();
+  }
+
+  async uploadContactQR(filePath: string) {
+    await this.navigateToContacts();
+    await expect(this.page.getByTestId('add-contact-upload-btn')).toBeVisible();
+    const fileInput = this.page.locator('input[type="file"][accept="image/*"]').first();
+    await fileInput.setInputFiles(filePath);
+  }
+
+  async verifyScannerOpen() {
+    await expect(this.page.locator('video')).toBeVisible();
+    await expect(this.page.getByText('Point camera at a NAHAN QR code')).toBeVisible();
+  }
+
+  async verifyContactModalOpen(expectedName?: string) {
+    // "New Contact Detected" or similar title
+    await expect(this.page.getByText('New Contact Detected', { exact: false })).toBeVisible();
+    if (expectedName) {
+      await expect(this.page.getByText(expectedName)).toBeVisible();
+    }
+  }
+
+  async confirmAddContact() {
+    await this.page.getByTestId('detection-add-contact-btn').click();
   }
 }

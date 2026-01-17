@@ -28,22 +28,19 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       
-      // 1. Unused Variables (Error)
       '@typescript-eslint/no-unused-vars': ['error', { 
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_'
       }],
 
-      // 2. File Size Limits (Keep it modular)
       'max-lines': ['error', { max: 250, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['error', { max: 50 }],
 
-      // 3. Translation Enforcement (i18next)
       'i18next/no-literal-string': [
         'error',
         {
-          markupOnly: true, // Only check strings inside JSX
+          markupOnly: true,
           ignoreAttribute: [
             'style', 'className', 'path', 'type', 'key', 'id', 'width', 'height', 
             'viewBox', 'd', 'fill', 'stroke', 'strokeWidth', 'strokeLinecap', 
@@ -53,21 +50,15 @@ export default tseslint.config(
         },
       ],
 
-      // 4. Code Organization
-      // Note: eslint-plugin-import is temporarily disabled during migration to Flat Config (ESLint v9)
-      // due to compatibility issues. It will be re-enabled once a compatible version is available.
-      // 'import/order': [
-      //   'error',
-      //   {
-      //     groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-      //     'newlines-between': 'always',
-      //     alphabetize: { order: 'asc', caseInsensitive: true },
-      //   },
-      // ],
-
-      // 5. General Cleanliness
-      'no-console': 'error', // Don't leave debug logs in production
-      '@typescript-eslint/no-explicit-any': 'error', // No 'any' cheating in TS
+      'no-console': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
+  {
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: {
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
     },
   },
 );
