@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';

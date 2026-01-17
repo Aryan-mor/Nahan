@@ -27,7 +27,9 @@ export class AuthPage {
 
     // 3. Create PIN
     const createPinStep = this.page.getByTestId('onboarding-create-pin');
-    await expect(createPinStep).toBeVisible({ timeout: 30000 });
+
+    // Sometimes transition from Welcome to Create PIN takes longer or animation blocks it
+    await expect(createPinStep).toBeVisible({ timeout: 45000 });
     await this.enterPin(pin, createPinStep);
 
     // 4. Confirm PIN

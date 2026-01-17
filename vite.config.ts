@@ -15,11 +15,7 @@ export default defineConfig(({ command }) => {
       sourcemap: 'hidden',
     },
     plugins: [
-      react({
-        babel: {
-          plugins: ['react-dev-locator'],
-        },
-      }),
+      react(),
       tsconfigPaths(),
       VitePWA({
         devOptions: {

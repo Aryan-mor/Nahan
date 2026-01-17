@@ -133,6 +133,9 @@ pnpm build
 - `pnpm test:ui` - Run tests with UI
 - `pnpm lint` - Run ESLint
 
+### Automated PR Previews
+Every Pull Request is automatically deployed to valid, isolated limits. Look for the "Deploy Preview" comment from the github-actions bot in your PR timeline to access the live preview URL.
+
 ## Project Structure
 
 ```

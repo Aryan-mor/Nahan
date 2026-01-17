@@ -179,20 +179,33 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   wipeData: async () => {
-    await storageService.clearAllData();
-    // Reset UI state (non-sensitive)
-    useUIStore.getState().setLocked(false);
-    useUIStore.getState().resetFailedAttempts();
-    // Reset sensitive state
-    set({
-      identity: null,
-      contacts: [],
-      sessionPassphrase: null,
-      activeChat: null,
-      messages: { ids: [], entities: {} },
-    });
-    // Reload to ensure clean slate
-    window.location.reload();
+    try {
+      await storageService.clearAllData();
+      // Critical: Clear all local storage to ensure fresh slate (including welcome screen state)
+      localStorage.clear();
+
+      // Reset UI state (non-sensitive)
+      useUIStore.getState().setLocked(false);
+      useUIStore.getState().resetFailedAttempts();
+      // Reset sensitive state
+      set({
+        identity: null,
+        contacts: [],
+        sessionPassphrase: null,
+        activeChat: null,
+        messages: { ids: [], entities: {} },
+      });
+
+      // Close DB to ensure all transactions flush
+      await storageService.close();
+
+      // Reload to ensure clean slate
+      window.location.reload();
+    } catch (e) {
+      logger.error('[Auth] wipeData Failed:', e);
+      // Fallback reload if wipe failed?
+      window.location.reload();
+    }
   },
 
   unlockApp: async (pin: string) => {

@@ -11,10 +11,11 @@ import * as logger from '../../utils/logger';
 interface QRScannerModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  onClose: () => void;
   onScan: (data: string) => void;
 }
 
-export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalProps) {
+export function QRScannerModal({ isOpen, onOpenChange, onClose, onScan }: QRScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -61,7 +62,7 @@ export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalP
   const startScanning = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast.error('Camera not supported');
-      onOpenChange(false);
+      onClose();
       return;
     }
 
@@ -82,9 +83,9 @@ export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalP
     } catch (error) {
       logger.error('Camera error:', error);
       toast.error('Failed to access camera');
-      onOpenChange(false);
+      onClose();
     }
-  }, [onOpenChange, scanFrame]);
+  }, [onClose, scanFrame]);
 
   useEffect(() => {
     if (isOpen) {
@@ -120,6 +121,7 @@ export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalP
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 muted
                 playsInline
+                data-testid="contact-scan-video"
               />
               <div className="z-10 w-64 h-64 border-2 border-primary/50 border-dashed rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] pointer-events-none relative">
                 <div className="absolute inset-0 flex items-center justify-center">
