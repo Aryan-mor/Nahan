@@ -438,6 +438,18 @@
       "process_error": "Failed to process input",
       "import_error": "Failed to import message",
       "unknown_sender": "Unknown sender. Please select the sender manually.",
+      "actions_prompt": "Choose an action",
+      "delete_contact": "Delete Contact",
+      "delete_history": "Delete History",
+      "renamed": "Contact renamed successfully",
+      "history_cleared": "History cleared successfully",
+      "contact_deleted": "Contact deleted successfully",
+      "enter_new_name": "Enter new name",
+      "confirm_bulk_history": "Are you sure you want to delete history for selected contacts? This cannot be undone.",
+      "confirm_history": "Are you sure you want to delete message history for this contact? This cannot be undone.",
+      "delete_history_note": "Start fresh. Contact will remain in your list.",
+      "confirm_bulk_contact": "Are you sure you want to delete selected contacts? This will also delete their message history.",
+      "confirm_contact": "Are you sure you want to delete this contact? This will also delete all message history.",
       "select_sender": {
         "title": "Select Sender",
         "desc": "This message is unsigned or from an unknown key. Who sent it?"
@@ -632,6 +644,8 @@
     "copy_success": "Copied to clipboard",
     "copy_failed": "Failed to copy",
     "maybeLater": "Maybe Later",
-    "enable": "Enable"
+    "enable": "Enable",
+    "save": "Save",
+    "delete": "Delete"
   }
 }

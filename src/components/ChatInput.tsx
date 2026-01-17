@@ -309,7 +309,7 @@ export function ChatInput() {
     onLongPress: handleLongPress,
     onClick: handleSingleClick,
     threshold: 500,
-    preventDefault: true,
+    shouldPreventDefault: true,
   });
 
   /**

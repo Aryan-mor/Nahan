@@ -2,51 +2,88 @@
 import { useCallback, useRef } from 'react';
 
 interface UseLongPressOptions {
-  onLongPress: () => void;
+  onLongPress: (e: React.MouseEvent | React.TouchEvent) => void;
   onClick?: () => void;
   threshold?: number; // milliseconds
-  preventDefault?: boolean;
+  shouldPreventDefault?: boolean;
 }
 
 /**
  * Custom hook for detecting long press/long click gestures
- * Works for both mouse (long click) and touch (long press) events
- *
- * @param options Configuration object
- * @returns Event handlers for React components
+ * Optimized for scrolling lists (cancels on scroll/move)
  */
 export function useLongPress({
   onLongPress,
   onClick,
   threshold = 500,
-  preventDefault = true,
+  shouldPreventDefault = true,
 }: UseLongPressOptions) {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
+  // Track start position to allow small movement (jitter) but cancel on scroll
+  const startPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const cancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    isLongPressRef.current = false;
+    startPosRef.current = null;
+  }, []); // Added correct dependency array
 
   const start = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
-      if (preventDefault) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      // Don't prevent default here to allow scrolling to start
+      // e.preventDefault();
+      // e.stopPropagation();
 
       isLongPressRef.current = false;
+
+      if ('touches' in e) {
+        startPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else {
+        startPosRef.current = { x: (e as React.MouseEvent).clientX, y: (e as React.MouseEvent).clientY };
+      }
+
       longPressTimerRef.current = setTimeout(() => {
         isLongPressRef.current = true;
-        onLongPress();
+        if (shouldPreventDefault && e.target) {
+            // Try to prevent context menu if possible, but it might be too late
+        }
+        onLongPress(e);
       }, threshold);
     },
-    [onLongPress, threshold, preventDefault]
+    [onLongPress, threshold, shouldPreventDefault]
+  );
+
+  const move = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      if (longPressTimerRef.current && startPosRef.current) {
+        let clientX, clientY;
+        if ('touches' in e) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          // Mouse move
+          return; // Ignore mouse move for now, usually fine
+        }
+
+        const dx = Math.abs(clientX - startPosRef.current.x);
+        const dy = Math.abs(clientY - startPosRef.current.y);
+
+        // If moved more than 10px, assume scrolling and cancel long press
+        if (dx > 10 || dy > 10) {
+           cancel();
+        }
+      }
+    },
+    [cancel]
   );
 
   const end = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
-      if (preventDefault) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-
+      // Clear timer
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
@@ -54,9 +91,13 @@ export function useLongPress({
 
       const wasLongPress = isLongPressRef.current;
       isLongPressRef.current = false;
+      startPosRef.current = null;
 
-      // If it was a long press, don't trigger click
+      // If it was a long press, prevent click if possible and return
       if (wasLongPress) {
+        if (shouldPreventDefault) {
+          e.preventDefault();
+        }
         return;
       }
 
@@ -65,16 +106,10 @@ export function useLongPress({
         onClick();
       }
     },
-    [onClick, preventDefault]
+    [onClick, shouldPreventDefault] // Added shouldPreventDefault dependency
   );
 
-  const cancel = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    isLongPressRef.current = false;
-  }, []);
+
 
   return {
     onMouseDown: start,
@@ -82,7 +117,7 @@ export function useLongPress({
     onMouseLeave: cancel,
     onTouchStart: start,
     onTouchEnd: end,
+    onTouchMove: move, // Critical for scroll cancellation
     onTouchCancel: cancel,
   };
 }
-

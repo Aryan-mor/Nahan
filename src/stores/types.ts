@@ -22,6 +22,7 @@ export interface AuthSlice {
 export interface ContactSlice {
   contacts: Contact[];
   addContact: (contact: Contact) => void;
+  updateContact: (contact: Contact) => Promise<void>;
   removeContact: (fingerprint: string) => Promise<void>;
   getContactsWithBroadcast: () => Contact[];
 }

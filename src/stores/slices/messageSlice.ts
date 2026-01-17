@@ -396,15 +396,23 @@ export const createMessageSlice: StateCreator<AppState, [], [], MessageSlice> = 
           const newCache = { ...chatCache };
           delete newCache[fingerprint]; // Or set to empty: { ids: [], entities: {} }
 
+          // Clear Summary
+          const newSummaries = { ...state.chatSummaries };
+          delete newSummaries[fingerprint];
+
           const { activeChat } = state;
 
           if (activeChat && (activeChat.fingerprint === fingerprint || (activeChat.id === 'system_broadcast' && fingerprint === 'BROADCAST'))) {
              return {
                  messages: { ids: [], entities: {} },
-                 chatCache: newCache
+                 chatCache: newCache,
+                 chatSummaries: newSummaries
              };
           }
-          return { chatCache: newCache };
+          return {
+              chatCache: newCache,
+              chatSummaries: newSummaries
+          };
       });
     } catch (error) {
       logger.error('Failed to clear chat history:', error);

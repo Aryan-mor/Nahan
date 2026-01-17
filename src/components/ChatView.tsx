@@ -1,25 +1,26 @@
+/* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function, no-console */
 import {
-  Avatar,
-  Button,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
+    Avatar,
+    Button,
+    Dropdown,
+    DropdownItem,
+    DropdownMenu,
+    DropdownTrigger,
 } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ChevronDown, MoreVertical, Shield } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Edit2, MoreVertical, Share2, Shield, Trash2 } from 'lucide-react';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 
 import { useAppStore } from '../stores/appStore';
 import { useSteganographyStore } from '../stores/steganographyStore';
 import { useUIStore } from '../stores/uiStore';
-import * as logger from '../utils/logger';
 
+import { useContactActions } from '../hooks/useContactActions';
 import { ChatInput } from './ChatInput';
 import { ChatSkeleton } from './ChatSkeleton';
+import { ContactActionModals } from './ContactActionModals';
 import { MessageBubble } from './MessageBubble';
 import { TemporarySteganographyMessage } from './steganography/TemporarySteganographyMessage';
 
@@ -46,7 +47,6 @@ function ChatViewComponent() {
   const messages = useAppStore(state => state.messages);
   const isLoadingMessages = useAppStore(state => state.isLoadingMessages);
   const setActiveChat = useAppStore(state => state.setActiveChat);
-  const clearChatHistory = useAppStore(state => state.clearChatHistory);
 
   const encodingStatus = useSteganographyStore(state => state.encodingStatus);
   const scrollPositions = useUIStore(state => state.scrollPositions);
@@ -54,6 +54,14 @@ function ChatViewComponent() {
 
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'fa';
+
+  const {
+      openRename,
+      openShare,
+      openDeleteHistory,
+      openDeleteContact,
+      modals
+  } = useContactActions();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -165,22 +173,7 @@ function ChatViewComponent() {
     }
   }, [messages.ids, messages.entities]);
 
-  const handleClearHistory = async () => {
-    if (!activeChat) return;
 
-    // Confirm before clearing
-    if (!confirm(t('chat.clear_history_confirm', { name: activeChat.name }))) {
-      return;
-    }
-
-    try {
-      await clearChatHistory(activeChat.fingerprint);
-      toast.success(t('chat.clear_history_success'));
-    } catch (error) {
-      logger.error('Failed to clear history:', error);
-      toast.error(t('chat.clear_history_error'));
-    }
-  };
 
   if (!activeChat) return null;
 
@@ -236,24 +229,51 @@ function ChatViewComponent() {
               <MoreVertical className="w-5 h-5" />
             </Button>
           </DropdownTrigger>
+
           <DropdownMenu
             aria-label={t('chat.options')}
             className="bg-industrial-900 border border-industrial-800 text-industrial-200"
+            onAction={(key) => {
+               if (!activeChat) return;
+
+               if (key === 'rename') openRename(activeChat);
+               if (key === 'share') openShare(activeChat);
+               if (key === 'delete_history') openDeleteHistory(activeChat);
+               if (key === 'delete_contact') openDeleteContact(activeChat);
+            }}
           >
-            <DropdownItem key="verify" startContent={<Shield className="w-4 h-4" />}>
-              {t('chat.verify_key')}
-            </DropdownItem>
-            <DropdownItem
-              key="clear"
-              className="text-danger"
-              color="danger"
-              onPress={handleClearHistory}
-            >
-              {t('chat.clear_history')}
-            </DropdownItem>
-          </DropdownMenu>
+            {activeChat.fingerprint === 'BROADCAST' ? (
+              /* Broadcast: Delete History Only */
+              <DropdownItem
+                key="delete_history"
+                className="text-danger"
+                color="danger"
+                startContent={<Trash2 className="w-4 h-4" />}
+              >
+                {t('chat.list.delete_history', 'Delete History')}
+              </DropdownItem>
+            ) : (
+              /* Normal Contact: Full Options */
+              <>
+                 <DropdownItem key="rename" startContent={<Edit2 className="w-4 h-4 text-yellow-500" />}>
+                   {t('common.rename', 'Rename')}
+                 </DropdownItem>
+                 <DropdownItem key="share" startContent={<Share2 className="w-4 h-4 text-blue-500" />}>
+                   {t('common.share', 'Share')}
+                 </DropdownItem>
+                 <DropdownItem key="delete_history" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4" />}>
+                   {t('chat.list.delete_history', 'Delete History')}
+                 </DropdownItem>
+                 <DropdownItem key="delete_contact" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4 fill-current" />}>
+                   {t('chat.list.delete_contact', 'Delete Contact')}
+                 </DropdownItem>
+              </>
+            )}
+           </DropdownMenu>
         </Dropdown>
       </div>
+
+      <ContactActionModals modals={modals} />
 
       {/* Messages Area */}
       <div

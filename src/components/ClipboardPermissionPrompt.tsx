@@ -136,7 +136,7 @@ export function ClipboardPermissionPrompt({
               )}
             </ModalBody>
             <ModalFooter>
-              <Button variant="light" onPress={handleClose}>
+              <Button variant="light" onPress={handleClose} data-testid="clipboard-permission-dismiss">
                 {isDenied ? t('common.close', 'Close') : t('clipboard.permission.not_now')}
               </Button>
               {!isDenied && (

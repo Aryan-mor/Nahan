@@ -432,6 +432,14 @@ export class StorageService {
   }
 
   /**
+   * Update existing contact
+   */
+  async updateContact(contact: Contact, passphrase: string): Promise<void> {
+    if (!contact.id) throw new Error('Cannot update contact without ID');
+    await this.storeInVault(contact.id, contact, passphrase);
+  }
+
+  /**
    * Get all contacts
    */
   async getContacts(passphrase: string): Promise<Contact[]> {

@@ -2,7 +2,7 @@
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { Check, Copy, Download, Share } from 'lucide-react';
 import QRCode from 'qrcode';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -12,24 +12,43 @@ import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 import * as logger from '../utils/logger';
 
+import { Contact, Identity } from '../services/storage';
+
 interface MyQRModalProps {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (isOpen: boolean) => void;
+  contact?: Contact | null;
 }
 
-export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
-  const { identity } = useAppStore();
+export function MyQRModal({ isOpen, onOpenChange, contact }: MyQRModalProps) {
+  const { identity: myself } = useAppStore();
   const { camouflageLanguage } = useUIStore();
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const { t } = useTranslation();
 
+  // Use provided contact or fallback to self
+  // We construct a "partial identity" from the contact for display/QR purposes
+  const target = useMemo(() => {
+    if (contact) {
+      return {
+        name: contact.name,
+        fingerprint: contact.fingerprint,
+        publicKey: contact.publicKey,
+      } as unknown as Identity;
+    }
+    return myself;
+  }, [contact, myself]);
+
   useEffect(() => {
     const generateQRCode = async () => {
-      if (!identity) return;
+      if (!target) return;
       try {
-        // Format: Stealth ID (Poetry with embedded data)
-        const qrData = formatNahanIdentity(identity, camouflageLanguage || 'fa');
+        // Warning: formatNahanIdentity likely expects a full Identity object.
+        // If passing a Contact, we need to ensure compatibility.
+        // For shared contacts, we are sharing THEIR public info.
+        // formatNahanIdentity handles formatting the "stealth ID" string.
+        const qrData = formatNahanIdentity(target, camouflageLanguage || 'fa');
         const dataUrl = await QRCode.toDataURL(qrData, {
           width: 300,
           margin: 2,
@@ -45,15 +64,16 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
       }
     };
 
-    if (isOpen && identity) {
+    if (isOpen && target) {
       generateQRCode();
     }
-  }, [isOpen, identity, camouflageLanguage, t]);
+  }, [isOpen, target, camouflageLanguage, t]);
+
 
   const copyToClipboard = async () => {
-    if (!identity) return;
+    if (!target) return;
     try {
-      const data = formatNahanIdentity(identity, camouflageLanguage || 'fa');
+      const data = formatNahanIdentity(target, camouflageLanguage || 'fa');
       await navigator.clipboard.writeText(data);
       setIsCopied(true);
       toast.success(t('my_qr.success.copied'));
@@ -64,25 +84,25 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
   };
 
   const downloadQR = () => {
-    if (!qrCodeDataUrl || !identity) return;
+    if (!qrCodeDataUrl || !target) return;
     const link = document.createElement('a');
     link.href = qrCodeDataUrl;
-    link.download = `nahan-identity-${identity.name}.png`;
+    link.download = `nahan-identity-${target.name}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const shareQR = async () => {
-    if (!qrCodeDataUrl || !identity) return;
+    if (!qrCodeDataUrl || !target) return;
     try {
       const blob = dataURItoBlob(qrCodeDataUrl);
-      const file = new File([blob], `nahan-${identity.name}.png`, { type: 'image/png' });
+      const file = new File([blob], `nahan-${target.name}.png`, { type: 'image/png' });
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: t('my_qr.share_title', { name: identity.name }),
-          text: t('my_qr.share_text', { name: identity.name }),
+          title: t('my_qr.share_title', { name: target.name }),
+          text: t('my_qr.share_text', { name: target.name }),
           files: [file],
         });
       } else {
@@ -110,7 +130,7 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
         {() => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              {t('my_qr.title')}
+              {contact ? t('my_qr.contact_title', 'Contact Identity') : t('my_qr.title')}
               <span className="text-sm font-normal text-industrial-400">
                 {t('my_qr.subtitle')}
               </span>
@@ -131,9 +151,9 @@ export function MyQRModal({ isOpen, onOpenChange }: MyQRModalProps) {
               )}
 
               <div className="w-full text-center space-y-2">
-                <p className="text-xl font-bold text-industrial-100">{identity?.name}</p>
+                <p className="text-xl font-bold text-industrial-100">{target?.name}</p>
                 <p className="text-xs text-industrial-500 font-mono break-all px-4">
-                  {identity?.fingerprint}
+                  {target?.fingerprint}
                 </p>
               </div>
             </ModalBody>
