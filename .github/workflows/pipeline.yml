@@ -1,0 +1,156 @@
+# =============================================================================
+# Unified CI/CD Pipeline for Nahan
+# =============================================================================
+# This pipeline consolidates all verification, preview, and deployment jobs.
+# Zero-Request Policy: No external network requests during build/test.
+# All operations are local and offline-safe.
+# =============================================================================
+
+name: Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ===========================================================================
+  # JOB 1: VERIFY (The Gatekeeper)
+  # ===========================================================================
+  # Runs on ALL Pull Requests and Pushes to main/master.
+  # This job MUST succeed before any subsequent jobs start.
+  # ===========================================================================
+  verify:
+    name: 🧪 Verify
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    # Skip verification only for PR close events (cleanup only)
+    if: github.event.action != 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Use --legacy-peer-deps to avoid ERESOLVE conflict with React 18/19
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run E2E Tests
+        run: npm run test:e2e
+
+      # Upload test report regardless of test outcome
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Build
+        run: npm run build
+
+      # Upload build artifact for downstream jobs
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  # ===========================================================================
+  # JOB 2: PREVIEW (Conditional PR Preview)
+  # ===========================================================================
+  # Runs only on pull_request events AFTER verify succeeds.
+  # Deploys a preview to gh-pages branch under /pr-previews/<pr-number>
+  # ===========================================================================
+  preview:
+    name: 🔍 Preview
+    needs: verify
+    runs-on: ubuntu-latest
+    # Run on PR events (opened, synchronize, reopened) but NOT on push
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy PR Preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: dist
+          preview-branch: gh-pages
+          umbrella-dir: pr-previews
+
+  # ===========================================================================
+  # JOB 3: DEPLOY (Production Release)
+  # ===========================================================================
+  # Runs only on push to main/master (merges) AFTER verify succeeds.
+  # Updates the production site on the gh-pages branch.
+  # ===========================================================================
+  deploy:
+    name: 🚀 Deploy
+    needs: verify
+    runs-on: ubuntu-latest
+    # Run only on push to main/master (not on PRs)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
+
+  # ===========================================================================
+  # JOB 4: CLEANUP (PR Preview Cleanup)
+  # ===========================================================================
+  # Runs only when a PR is closed (merged or abandoned).
+  # Removes the preview deployment from gh-pages.
+  # ===========================================================================
+  cleanup:
+    name: 🧹 Cleanup
+    runs-on: ubuntu-latest
+    # Run only when PR is closed
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cleanup PR Preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: dist
+          preview-branch: gh-pages
+          umbrella-dir: pr-previews
+          action: remove

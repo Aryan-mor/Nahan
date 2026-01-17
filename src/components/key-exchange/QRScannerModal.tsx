@@ -85,7 +85,7 @@ export function QRScannerModal({ isOpen, onOpenChange, onClose, onScan }: QRScan
       toast.error('Failed to access camera');
       onClose();
     }
-  }, [onOpenChange, scanFrame]);
+  }, [onClose, scanFrame]);
 
   useEffect(() => {
     if (isOpen) {
