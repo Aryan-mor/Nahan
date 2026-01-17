@@ -35,6 +35,7 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
   const {
     isOpen: isScanOpen,
     onOpen: onScanOpen,
+    onClose: onScanClose,
     onOpenChange: onScanOpenChange,
   } = useDisclosure();
 
@@ -214,6 +215,7 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
       <QRScannerModal
         isOpen={isScanOpen}
         onOpenChange={onScanOpenChange}
+        onClose={onScanClose}
         onScan={handleScannedData}
       />
 

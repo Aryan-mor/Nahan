@@ -11,10 +11,11 @@ import * as logger from '../../utils/logger';
 interface QRScannerModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  onClose: () => void;
   onScan: (data: string) => void;
 }
 
-export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalProps) {
+export function QRScannerModal({ isOpen, onOpenChange, onClose, onScan }: QRScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -61,7 +62,7 @@ export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalP
   const startScanning = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast.error('Camera not supported');
-      onOpenChange(false);
+      onClose();
       return;
     }
 
@@ -82,7 +83,7 @@ export function QRScannerModal({ isOpen, onOpenChange, onScan }: QRScannerModalP
     } catch (error) {
       logger.error('Camera error:', error);
       toast.error('Failed to access camera');
-      onOpenChange(false);
+      onClose();
     }
   }, [onOpenChange, scanFrame]);
 
