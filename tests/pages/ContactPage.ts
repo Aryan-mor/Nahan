@@ -89,15 +89,19 @@ export class ContactPage {
   }
 
   async verifyScannerOpen() {
-    await expect(this.page.locator('video')).toBeVisible();
+    await expect(this.page.getByTestId('contact-scan-video')).toBeVisible();
     await expect(this.page.getByText('Point camera at a NAHAN QR code')).toBeVisible();
   }
 
   async verifyContactModalOpen(expectedName?: string) {
+    // Check for the detection modal container first
+    const modal = this.page.getByTestId('detection-modal');
+    await expect(modal).toBeVisible({ timeout: 15000 });
+
     // "New Contact Detected" or similar title
-    await expect(this.page.getByText('New Contact Detected', { exact: false })).toBeVisible();
+    await expect(modal.getByText('New Contact Detected', { exact: false })).toBeVisible();
     if (expectedName) {
-      await expect(this.page.getByText(expectedName)).toBeVisible();
+      await expect(modal.getByText(expectedName)).toBeVisible();
     }
   }
 

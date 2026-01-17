@@ -112,7 +112,7 @@ test.describe('Contact Addition E2E', () => {
     ).toBeVisible();
 
     // Verify modal closes (or is closed)
-    await expect(receiverPage.locator('video')).toBeHidden();
+    await expect(receiverPage.getByTestId('contact-scan-video')).toBeHidden();
 
     // Cleanup
     if (fs.existsSync(qrFilePath)) {
