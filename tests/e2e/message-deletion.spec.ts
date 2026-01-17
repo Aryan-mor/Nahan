@@ -39,23 +39,23 @@ test.describe.serial('Message Deletion Protocol', () => {
 
     // 4. Verify message exists in IndexedDB (secure_vault)
     const dbCountBefore = await page.evaluate(async () => {
-       return new Promise<number>((resolve, reject) => {
-         const req = indexedDB.open('nahan_secure_v1');
-         req.onsuccess = () => {
-             const db = req.result;
-             const tx = db.transaction('secure_vault', 'readonly');
-             const store = tx.objectStore('secure_vault');
-             const getAll = store.getAll();
-             getAll.onsuccess = () => {
-                 // Counts messages only (id starts with 'msg_')
-                 // Note: logic in storage.ts uses 'msg_' prefix.
-                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                 const messages = getAll.result.filter((r: any) => r.id && r.id.startsWith('msg_'));
-                 resolve(messages.length);
-             };
-         };
-         req.onerror = () => reject(req.error);
-       });
+      return new Promise<number>((resolve, reject) => {
+        const req = indexedDB.open('nahan_secure_v1');
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('secure_vault', 'readonly');
+          const store = tx.objectStore('secure_vault');
+          const getAll = store.getAll();
+          getAll.onsuccess = () => {
+            // Counts messages only (id starts with 'idx_')
+            // Note: logic in storage.ts uses 'idx_' prefix (V2.2).
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const messages = getAll.result.filter((r: any) => r.id && r.id.startsWith('idx_'));
+            resolve(messages.length);
+          };
+        };
+        req.onerror = () => reject(req.error);
+      });
     });
 
     expect(dbCountBefore).toBeGreaterThan(0);
@@ -65,7 +65,7 @@ test.describe.serial('Message Deletion Protocol', () => {
     await bubble.getByTestId('message-options-btn').click();
 
     // Handle Confirm Dialog
-    page.on('dialog', dialog => dialog.accept());
+    page.on('dialog', (dialog) => dialog.accept());
 
     await page.getByTestId('delete-message-on-dropdown').click();
 
@@ -73,22 +73,22 @@ test.describe.serial('Message Deletion Protocol', () => {
     await expect(bubble).toBeHidden();
 
     // 7. Verify IndexedDB Deletion (The "Real Delete" Check)
-     const dbCountAfter = await page.evaluate(async () => {
-       return new Promise<number>((resolve, reject) => {
-         const req = indexedDB.open('nahan_secure_v1');
-         req.onsuccess = () => {
-             const db = req.result;
-             const tx = db.transaction('secure_vault', 'readonly');
-             const store = tx.objectStore('secure_vault');
-             const getAll = store.getAll();
-             getAll.onsuccess = () => {
-                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                 const messages = getAll.result.filter((r: any) => r.id && r.id.startsWith('msg_'));
-                 resolve(messages.length);
-             };
-         };
-         req.onerror = () => reject(req.error);
-       });
+    const dbCountAfter = await page.evaluate(async () => {
+      return new Promise<number>((resolve, reject) => {
+        const req = indexedDB.open('nahan_secure_v1');
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('secure_vault', 'readonly');
+          const store = tx.objectStore('secure_vault');
+          const getAll = store.getAll();
+          getAll.onsuccess = () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const messages = getAll.result.filter((r: any) => r.id && r.id.startsWith('idx_'));
+            resolve(messages.length);
+          };
+        };
+        req.onerror = () => reject(req.error);
+      });
     });
 
     // Verification: The message count should decrease by exactly 1

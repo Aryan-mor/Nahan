@@ -91,13 +91,22 @@ All sensitive data is stored in a single `secure_vault` table:
 - Standardized IDs prevent metadata inference:
   - Identity: `user_identity`
   - Contacts: `con_{uuid}`
-  - Messages: `msg_{uuid}`
+  - Messages: `idx_{BlindIndex}_{uuid}` (Blind Indexed)
+
+**Metadata Privacy (V2.1):**
+- **Blind Indexing:** Record IDs use `HMAC-SHA256(MasterKey, Fingerprint)` instead of raw fingerprints.
+- **Timestamp Protection:** Timestamps are removed from IDs and stored only inside the encrypted payload.
+- **Dynamic Salting:** Each device generates a unique 16-byte random salt for Master Key wrapping (replacing hardcoded salts).
+- **Per-Record Salting (V2.2):** Every database record (Identity, Contact, Message) has a unique 16-byte random salt.
+- **HKDF Key Derivation (V2.2):** Record encryption keys are derived from `HKDF(MasterKey, RecordSalt, "RecordEncryption")`. This ensures that even if one record key is compromised (unlikely), others remain secure, and provides strict cryptographic separation.
 
 **Encryption Process:**
 1. Object serialized to JSON
-2. Encrypted with `sessionPassphrase` using `encryptData()` from `secureStorage.ts`
-3. Stored as encrypted blob in `payload` column
-4. Decryption happens on read using `decryptData()`
+2. Unique 16-byte `salt` generated
+3. `RecordKey` derived: `HKDF(MasterKey, salt)`
+4. Encrypted with `RecordKey` using AES-GCM (12-byte IV)
+5. Stored as encrypted blob in `payload` column (including salt)
+6. Decryption: Read salt -> Derive `RecordKey` -> Decrypt
 
 ### Store Separation
 

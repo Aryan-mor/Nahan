@@ -41,12 +41,13 @@ All sensitive data (identity, contacts, messages) is stored in a single `secure_
 - **Standardized IDs:**
   - Identity: `user_identity`
   - Contacts: `con_{uuid}`
-  - Messages: `msg_{uuid}`
+  - Messages: `idx_{BlindIndex}`
 
 #### Encrypted LocalStorage (Zustand Persist)
 Non-runtime sensitive state (identity, contacts) is persisted in `localStorage` using:
 
 - **AES-GCM Encryption:** Encrypted with key derived from user PIN
+- **Dynamic Salting (V2.1):** Per-installation random salt for key wrapping
 - **PBKDF2 Key Derivation:** 600,000 iterations for brute-force protection
 - **Versioned Storage:** Supports migration between storage formats
 

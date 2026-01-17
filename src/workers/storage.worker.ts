@@ -6,8 +6,8 @@ const ctx: Worker = self as unknown as Worker;
 
 let db: IDBPDatabase | null = null;
 const DB_NAME = 'nahan_secure_v1';
-const DB_VERSION = 3;
-const ID_PREFIX_MESSAGE = 'msg_';
+const DB_VERSION = 4;
+const ID_PREFIX_MESSAGE = 'idx_';
 
 interface WorkerRequest {
   id: string;
@@ -44,13 +44,36 @@ const initializeDB = async () => {
   return db;
 };
 
+const generateBlindIndexWithKey = async (input: string, masterKey: CryptoKey): Promise<string> => {
+  const mkRaw = await crypto.subtle.exportKey('raw', masterKey);
+
+  const hmacKey = await crypto.subtle.importKey(
+    'raw',
+    mkRaw,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    hmacKey,
+    new TextEncoder().encode(input),
+  );
+
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 // eslint-disable-next-line max-lines-per-function
 const handleGetMessages = async (payload: WorkerRequest['payload']) => {
   const start = performance.now();
   const { fingerprint, limit, offset, masterKey } = payload;
   const db = await initializeDB();
 
-  const prefix = `${ID_PREFIX_MESSAGE}${fingerprint}_`;
+  const blindIndex = await generateBlindIndexWithKey(fingerprint as string, masterKey);
+  const prefix = `${ID_PREFIX_MESSAGE}${blindIndex}_`;
   const range = IDBKeyRange.bound(prefix, prefix + '\uffff', false, false);
 
   const tx = db.transaction('secure_vault', 'readonly');

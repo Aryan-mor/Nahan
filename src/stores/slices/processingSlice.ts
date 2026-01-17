@@ -158,15 +158,15 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
         }
 
         const dataToHash = new TextEncoder().encode(sender.publicKey + payloadString);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', dataToHash);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        const validId = `msg_${sender.fingerprint}_BROADCAST_${hashHex}`;
-        logger.log(`[Processing] Persisting broadcast with ID: ${validId}`);
+        // Calculate hash for verification/logging if needed, but legacy ID generation is removed
+        await crypto.subtle.digest('SHA-256', dataToHash);
+        
+        // V2.2: Let storageService generate Blind Index ID
+        logger.log('[Processing] Persisting broadcast message');
 
         const newMessage = await storageService.storeMessage(
           {
-            id: validId,
+            // id: validId, // Removed legacy ID
             senderFingerprint: sender.fingerprint,
             recipientFingerprint: identity.fingerprint,
             content: {
