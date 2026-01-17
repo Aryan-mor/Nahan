@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+
 import { expect, test } from '@playwright/test';
 import { P2PUser, setupConnectedUsers } from '../utils/p2p-setup';
 

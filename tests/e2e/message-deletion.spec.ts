@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+ 
 import { expect, test } from '@playwright/test';
 import { P2PUser, setupConnectedUsers } from '../utils/p2p-setup';
 
@@ -40,7 +40,7 @@ test.describe.serial('Message Deletion Protocol', () => {
     // 4. Verify message exists in IndexedDB (secure_vault)
     const dbCountBefore = await page.evaluate(async () => {
       return new Promise<number>((resolve, reject) => {
-        const req = indexedDB.open('nahan_secure_v1');
+        const req = indexedDB.open('nahan');
         req.onsuccess = () => {
           const db = req.result;
           const tx = db.transaction('secure_vault', 'readonly');
@@ -75,7 +75,7 @@ test.describe.serial('Message Deletion Protocol', () => {
     // 7. Verify IndexedDB Deletion (The "Real Delete" Check)
     const dbCountAfter = await page.evaluate(async () => {
       return new Promise<number>((resolve, reject) => {
-        const req = indexedDB.open('nahan_secure_v1');
+        const req = indexedDB.open('nahan');
         req.onsuccess = () => {
           const db = req.result;
           const tx = db.transaction('secure_vault', 'readonly');

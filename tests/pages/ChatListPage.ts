@@ -172,6 +172,9 @@ export class ChatListPage {
     await this.openContextMenu(name);
     await this.selectButton.click();
     await expect(this.page.getByText('1 selected')).toBeVisible();
+    // Wait for the selection menu trigger (bulk actions) to be stable in the header
+    await expect(this.selectionMenuTrigger).toBeVisible({ timeout: 10000 });
+    await expect(this.selectionMenuTrigger).toBeEnabled({ timeout: 10000 });
   }
 
   async selectContact(name: string) {

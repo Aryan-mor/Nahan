@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { AuthPage } from '../pages/AuthPage';
 import { ChatListPage } from '../pages/ChatListPage';
 
-/* eslint-disable max-lines-per-function */
+
 test.describe('Chat List Actions (Contact Management)', () => {
   test.setTimeout(120000); // 2 minutes timeout for slow environments
 
@@ -28,11 +28,13 @@ test.describe('Chat List Actions (Contact Management)', () => {
       const dbs = await window.indexedDB.databases();
       for (const db of dbs) {
         if (db.name) {
-          await new Promise((resolve) => {
-            const req = window.indexedDB.deleteDatabase(db.name);
-            req.onsuccess = resolve;
-            req.onerror = resolve;
-            req.onblocked = resolve;
+          await new Promise<void>((resolve, reject) => {
+            const req = window.indexedDB.deleteDatabase(db.name!);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(new Error(`Failed to delete DB ${db.name}`));
+            req.onblocked = () => {
+              // console.warn(`DB ${db.name} deletion blocked. Waiting for connections to close...`);
+            };
           });
         }
       }

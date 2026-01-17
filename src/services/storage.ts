@@ -77,7 +77,7 @@ const getBlindIndexPrefix = async (type: string): Promise<string> => {
 export class StorageService {
   private static instance: StorageService;
   private db: IDBPDatabase<NahanDB> | null = null;
-  private readonly DB_NAME = 'nahan_secure_v1';
+  private readonly DB_NAME = 'nahan';
   private readonly DB_VERSION = 6; // V6: Per-Record Key Derivation (HKDF + Salt)
 
   private worker: Worker | null = null;
@@ -541,7 +541,7 @@ export class StorageService {
     // WORKER OFFLOAD: Reverted to Main Thread for stability during V2.2 Migration check
     // Worker seems to fail in test environment or build.
     // We will use direct main-thread encryption which is proven to work.
-    
+
     // Serialize and encrypt
     const jsonString = JSON.stringify(completeMessage);
     // encryptData uses the active master key internally
@@ -787,9 +787,10 @@ export class StorageService {
     if (!this.db) throw new Error('Database not initialized');
 
     try {
-      const tx = this.db.transaction('secure_vault', 'readwrite');
+      const tx = this.db.transaction(['secure_vault', 'system_settings'], 'readwrite');
       await tx.objectStore('secure_vault').clear();
-      await this.db.clear('secure_vault');
+      await tx.objectStore('system_settings').clear();
+      await tx.done;
     } catch (error) {
       logger.error('Failed to clear data:', error);
       throw new Error('Failed to clear data');
@@ -873,6 +874,10 @@ export class StorageService {
    * Close the database connection
    */
   async close(): Promise<void> {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
     if (this.db) {
       this.db.close();
       this.db = null;

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-/* eslint-disable max-lines-per-function */
+
 import { AuthPage } from '../pages/AuthPage';
 
 test.describe.serial('ChatList Realtime Updates & Sorting', () => {

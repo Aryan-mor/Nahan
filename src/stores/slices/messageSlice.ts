@@ -3,7 +3,7 @@
 import { StateCreator } from 'zustand';
 
 import { CryptoService } from '../../services/crypto';
-import { getMasterKey, generateBlindIndex } from '../../services/secureStorage';
+import { generateBlindIndex, getMasterKey } from '../../services/secureStorage';
 import { SecureMessage, storageService } from '../../services/storage';
 import * as logger from '../../utils/logger';
 import { AppState, MessageSlice } from '../types';

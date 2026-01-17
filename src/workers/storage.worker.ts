@@ -5,7 +5,7 @@ import { decryptWithKey, encryptWithKey } from '../services/secureStorage';
 const ctx: Worker = self as unknown as Worker;
 
 let db: IDBPDatabase | null = null;
-const DB_NAME = 'nahan_secure_v1';
+const DB_NAME = 'nahan';
 const DB_VERSION = 4;
 const ID_PREFIX_MESSAGE = 'idx_';
 
