@@ -1,51 +1,52 @@
 /* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import {
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    Divider,
-    Input,
-    Modal,
-    ModalBody,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    Select,
-    SelectItem,
-    Switch,
-    useDisclosure,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Divider,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Select,
+  SelectItem,
+  Switch,
+  useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-    Activity,
-    AlertTriangle,
-    ChevronDown,
-    Clock,
-    Download,
-    Eye,
-    EyeOff,
-    Fingerprint,
-    Globe,
-    Info,
-    Lock,
-    Settings as SettingsIcon,
-    Shield,
-    Trash2
+  Activity,
+  AlertTriangle,
+  ChevronDown,
+  Clock,
+  Download,
+  Eye,
+  EyeOff,
+  Fingerprint,
+  Globe,
+  Heart,
+  Info,
+  Lock,
+  Settings as SettingsIcon,
+  Share2,
+  Shield,
+  Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-
 import { useClipboardPermission } from '../hooks/useClipboardDetection';
-import { BiometricPromptModal } from './BiometricPromptModal';
-import { ClipboardPermissionPrompt } from './ClipboardPermissionPrompt';
-
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 import * as logger from '../utils/logger';
+import { downloadPortableFile, sharePortableFile } from '../utils/portable';
+import { BiometricPromptModal } from './BiometricPromptModal';
+import { ClipboardPermissionPrompt } from './ClipboardPermissionPrompt';
 
 export function Settings() {
   const {
@@ -56,7 +57,7 @@ export function Settings() {
     isBiometricsSupported,
     isBiometricsEnabled,
     enableBiometrics,
-    disableBiometrics
+    disableBiometrics,
   } = useAppStore();
 
   const {
@@ -92,6 +93,7 @@ export function Settings() {
   const [autoClearClipboard, setAutoClearClipboard] = useState(true);
   const [clipboardTimeout, setClipboardTimeout] = useState(60);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showOfflineSharingInfo, setShowOfflineSharingInfo] = useState(false);
   const [exportPassword, setExportPassword] = useState('');
   const [showExportPassword, setShowExportPassword] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -207,6 +209,129 @@ export function Settings() {
       transition={{ duration: 0.3 }}
       className="space-y-4 md:space-y-6"
     >
+      {/* Offline Sharing Section - First priority in Settings */}
+      <Card
+        className="bg-gradient-to-r from-purple-900/20 to-industrial-900 border-purple-500/30"
+        data-testid="offline-sharing-section"
+      >
+        <CardBody className="p-4">
+          <div className="flex flex-col gap-3">
+            {/* Header with toggle */}
+            <button
+              onClick={() => setShowOfflineSharingInfo(!showOfflineSharingInfo)}
+              className="w-full flex items-center justify-between"
+              aria-expanded={showOfflineSharingInfo}
+              data-testid="offline-sharing-accordion-toggle"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/20 rounded-lg">
+                  <Share2 className="w-5 h-5 text-purple-400" />
+                </div>
+                <div className="text-start">
+                  <p className="font-medium text-industrial-100">
+                    {t(
+                      'settings.offline_sharing.title',
+                      'Share application file for offline/restricted access',
+                    )}
+                  </p>
+                  <p className="text-xs text-industrial-400">
+                    {t(
+                      'settings.offline_sharing.subtitle',
+                      'Send this app to others without internet',
+                    )}
+                  </p>
+                </div>
+              </div>
+              <ChevronDown
+                className={`w-5 h-5 text-industrial-400 transition-transform duration-300 ${
+                  showOfflineSharingInfo ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {/* Expandable content */}
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                showOfflineSharingInfo ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="pt-3 border-t border-industrial-800">
+                <p className="text-sm text-industrial-300 leading-relaxed mb-3">
+                  {t(
+                    'settings.offline_sharing.description',
+                    'You can share this single application file directly with others via local messengers. Once they open it, they can use the app to exchange encrypted messages with you without needing global internet access. This ensures your communication remains private and accessible during network restrictions.',
+                  )}
+                </p>
+                <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-lg p-3 mb-4">
+                  <div className="flex items-start gap-2">
+                    <Heart className="w-4 h-4 text-pink-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-industrial-300">
+                      {t(
+                        'settings.offline_sharing.support_message',
+                        'We believe in free and open communication for everyone. 💜',
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Download & Share Actions */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    size="sm"
+                    color="secondary"
+                    variant="flat"
+                    startContent={<Download className="w-4 h-4" />}
+                    className="flex-1"
+                    data-testid="offline-sharing-download-button"
+                    onPress={() => {
+                      downloadPortableFile();
+                      toast.success(
+                        t('settings.offline_sharing.download_success', 'Portable file downloaded!'),
+                      );
+                    }}
+                  >
+                    {t('settings.offline_sharing.download_button', 'Download App File')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="primary"
+                    variant="flat"
+                    startContent={<Share2 className="w-4 h-4" />}
+                    className="flex-1"
+                    data-testid="offline-sharing-share-button"
+                    onPress={async () => {
+                      if (!navigator.share) {
+                        toast.error(
+                          t(
+                            'settings.offline_sharing.share_not_supported',
+                            'Sharing not supported on this device',
+                          ),
+                        );
+                        return;
+                      }
+                      try {
+                        const shared = await sharePortableFile();
+                        if (shared) {
+                          toast.success(
+                            t('settings.offline_sharing.share_success', 'Shared successfully!'),
+                          );
+                        }
+                      } catch (err) {
+                        if ((err as Error).name !== 'AbortError') {
+                          toast.error(t('settings.offline_sharing.share_error', 'Failed to share'));
+                        }
+                      }
+                    }}
+                  >
+                    {t('settings.offline_sharing.share_button', 'Share App File')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
       {/* Install App Card */}
       {!isStandalone && (
         <Card className="bg-gradient-to-r from-blue-900/20 to-industrial-900 border-blue-500/30">
@@ -335,8 +460,6 @@ export function Settings() {
               />
             </div>
 
-
-
             <div className="ml-8 space-y-4">
               {autoClearClipboard && (
                 <div className="space-y-2">
@@ -360,31 +483,29 @@ export function Settings() {
               )}
 
               {clipboardPermission.state !== 'granted' && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-industrial-950 border border-industrial-800">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-400">
-                    <AlertTriangle className="w-4 h-4" />
+                <div className="flex items-center justify-between p-3 rounded-lg bg-industrial-950 border border-industrial-800">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-400">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-industrial-100">
+                        {t('settings.general.clipboard.permission_title', 'Clipboard Access')}
+                      </p>
+                      <p className="text-xs text-industrial-400">
+                        {t(
+                          'settings.general.clipboard.permission_needed',
+                          'Permission required for auto-detection',
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-industrial-100">
-                      {t('settings.general.clipboard.permission_title', 'Clipboard Access')}
-                    </p>
-                    <p className="text-xs text-industrial-400">
-                      {t('settings.general.clipboard.permission_needed', 'Permission required for auto-detection')}
-                    </p>
-                  </div>
-                </div>
 
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="primary"
-                  onPress={onClipboardModalOpen}
-                >
-                  {t('settings.general.clipboard.grant_button', 'Allow Access')}
-                </Button>
-              </div>
-            )}
+                  <Button size="sm" variant="flat" color="primary" onPress={onClipboardModalOpen}>
+                    {t('settings.general.clipboard.grant_button', 'Allow Access')}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </CardBody>
@@ -428,19 +549,23 @@ export function Settings() {
                       {t('settings.security.biometrics.title', 'Biometric Unlock')}
                     </p>
                     <p className="text-sm text-industrial-400">
-                      {t('settings.security.biometrics.subtitle', 'Use fingerprint or face ID to unlock')}
+                      {t(
+                        'settings.security.biometrics.subtitle',
+                        'Use fingerprint or face ID to unlock',
+                      )}
                     </p>
                   </div>
                 </div>
                 <Switch
                   isSelected={isBiometricsEnabled}
                   onValueChange={async (val) => {
-                      if (val) {
-                          setShowBiometricModal(true);
-                      } else {
-                          const success = await disableBiometrics();
-                          if (success) toast.success(t('biometric.disabled', 'Biometric unlock disabled'));
-                      }
+                    if (val) {
+                      setShowBiometricModal(true);
+                    } else {
+                      const success = await disableBiometrics();
+                      if (success)
+                        toast.success(t('biometric.disabled', 'Biometric unlock disabled'));
+                    }
                   }}
                   classNames={{
                     wrapper: 'group-data-[selected=true]:bg-blue-600',
@@ -451,21 +576,20 @@ export function Settings() {
               {/* Biometric Confirmation Modal inside Settings */}
               {showBiometricModal && (
                 <BiometricPromptModal
-                    onClose={() => setShowBiometricModal(false)}
-                    onDecline={() => setShowBiometricModal(false)}
-                    onEnable={async () => {
-                        const success = await enableBiometrics();
-                        if (success) {
-                            toast.success(t('biometric.enabled', 'Biometric unlock enabled'));
-                            setShowBiometricModal(false);
-                        } else {
-                            toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
-                            setShowBiometricModal(false);
-                        }
-                    }}
+                  onClose={() => setShowBiometricModal(false)}
+                  onDecline={() => setShowBiometricModal(false)}
+                  onEnable={async () => {
+                    const success = await enableBiometrics();
+                    if (success) {
+                      toast.success(t('biometric.enabled', 'Biometric unlock enabled'));
+                      setShowBiometricModal(false);
+                    } else {
+                      toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
+                      setShowBiometricModal(false);
+                    }
+                  }}
                 />
               )}
-
             </>
           )}
 
@@ -505,7 +629,6 @@ export function Settings() {
               }`}
             >
               <div className="p-4 bg-industrial-900.5 space-y-4 border-t border-industrial-800">
-
                 {/* Warning Banner */}
                 <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-2">
@@ -514,38 +637,46 @@ export function Settings() {
                       {t('settings.security.advanced.warning')}
                     </span>
                   </div>
-                  <p className="text-sm text-yellow-300">{t('settings.security.advanced.warning_text', 'These actions are destructive or for debugging only.')}</p>
+                  <p className="text-sm text-yellow-300">
+                    {t(
+                      'settings.security.advanced.warning_text',
+                      'These actions are destructive or for debugging only.',
+                    )}
+                  </p>
                 </div>
 
                 {/* Debug Mode Toggle */}
                 <div className="flex items-center justify-between py-2">
-                    <div className="flex items-center space-x-3">
-                        <Activity className="w-5 h-5 text-industrial-400" />
-                        <div>
-                            <p className="font-medium text-industrial-100">
-                                {t('settings.debug.hud.title', 'Enable Performance HUD')}
-                            </p>
-                            <p className="text-sm text-industrial-400">
-                                {t('settings.debug.hud.subtitle', 'Show debug metrics overlay (Requires Reload)')}
-                            </p>
-                        </div>
+                  <div className="flex items-center space-x-3">
+                    <Activity className="w-5 h-5 text-industrial-400" />
+                    <div>
+                      <p className="font-medium text-industrial-100">
+                        {t('settings.debug.hud.title', 'Enable Performance HUD')}
+                      </p>
+                      <p className="text-sm text-industrial-400">
+                        {t(
+                          'settings.debug.hud.subtitle',
+                          'Show debug metrics overlay (Requires Reload)',
+                        )}
+                      </p>
                     </div>
-                    <Switch
-                        isSelected={localStorage.getItem('nahan_force_perf_hud') === 'true'}
-                        onValueChange={(val) => {
-                            if (val) {
-                                localStorage.setItem('nahan_force_perf_hud', 'true');
-                            } else {
-                                localStorage.removeItem('nahan_force_perf_hud');
-                            }
-                            // Force reload to apply clean state
-                            window.location.reload();
-                        }}
-                        classNames={{
-                            wrapper: 'group-data-[selected=true]:bg-blue-600',
-                        }}
-                        data-testid="perf-hud-toggle"
-                    />
+                  </div>
+                  <Switch
+                    isSelected={localStorage.getItem('nahan_force_perf_hud') === 'true'}
+                    onValueChange={(val) => {
+                      if (val) {
+                        localStorage.setItem('nahan_force_perf_hud', 'true');
+                      } else {
+                        localStorage.removeItem('nahan_force_perf_hud');
+                      }
+                      // Force reload to apply clean state
+                      window.location.reload();
+                    }}
+                    classNames={{
+                      wrapper: 'group-data-[selected=true]:bg-blue-600',
+                    }}
+                    data-testid="perf-hud-toggle"
+                  />
                 </div>
 
                 {/* Action Buttons */}
@@ -668,9 +799,9 @@ export function Settings() {
         size="md"
         placement="center"
         classNames={{
-          base: "bg-industrial-900 border border-industrial-800 m-4",
-          header: "border-b border-industrial-800",
-          footer: "border-t border-industrial-800"
+          base: 'bg-industrial-900 border border-industrial-800 m-4',
+          header: 'border-b border-industrial-800',
+          footer: 'border-t border-industrial-800',
         }}
       >
         <ModalContent>
@@ -681,7 +812,9 @@ export function Settings() {
                 <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                    <span className="font-medium text-yellow-400">{t('settings.security.advanced.warning')}</span>
+                    <span className="font-medium text-yellow-400">
+                      {t('settings.security.advanced.warning')}
+                    </span>
                   </div>
                   <p className="text-sm text-yellow-300">
                     {t('settings.logout.warning', 'You will be logged out.')}
@@ -692,11 +825,7 @@ export function Settings() {
                 <Button color="primary" variant="light" onPress={onClose}>
                   {t('settings.logout.cancel', 'Cancel')}
                 </Button>
-                <Button
-                  color="danger"
-                  onPress={handleLogoutConfirm}
-                  isLoading={isLoggingOut}
-                >
+                <Button color="danger" onPress={handleLogoutConfirm} isLoading={isLoggingOut}>
                   {t('settings.logout.confirm', 'Logout')}
                 </Button>
               </ModalFooter>
