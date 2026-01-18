@@ -209,9 +209,18 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
   },
 
   unlockApp: async (pin: string) => {
+    // 0. CRITICAL: Check if this is the self-destruct PIN (FIRST PRIORITY)
+    const isSelfDestructPin = await storageService.verifySelfDestructPin(pin);
+    if (isSelfDestructPin) {
+      logger.warn('[Auth] Self-destruct PIN entered. Initiating emergency data wipe...');
+      await get().wipeData();
+      return false; // Return false to prevent unlock
+    }
+
     // 1. Check for V2 (Master Key) existence
     const wrappedKey = await storageService.getSystemSetting<string>('wrapped_master_key');
     const deviceSeed = await storageService.getSystemSetting<string>('device_seed');
+
 
     try {
       if (wrappedKey) {

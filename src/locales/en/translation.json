@@ -1,9 +1,25 @@
 {
-  "broadcast_channel": "Broadcast Channel",
+  "add_contact": {
+    "buttons": {
+      "manual": "Manual",
+      "scan_qr": "Scan QR",
+      "upload_qr": "Upload QR"
+    },
+    "title": "Add Contact",
+    "toast": {
+      "image_decoded_no_text": "",
+      "invalid_format": "Invalid QR code format",
+      "no_qr_found": "No QR code found in image",
+      "process_fail": "Failed to process scanned data",
+      "scan_success": "QR code scanned!"
+    }
+  },
   "app": {
-    "title": "Nahan",
-    "subtitle": "Secure Messenger",
     "encrypted_locally": "Encrypted Locally",
+    "error": {
+      "retry": "Retry",
+      "title": "Initialization Error"
+    },
     "initializing": "Initializing NAHAN...",
     "nav": {
       "chats": "Chats",
@@ -11,165 +27,139 @@
       "settings": "Settings"
     },
     "security": {
-      "secure": "Secure",
-      "notice": "Messages are stored locally on your device."
+      "notice": "Messages are stored locally on your device.",
+      "secure": "Secure"
     },
-    "error": {
-      "title": "Initialization Error",
-      "retry": "Retry"
-    }
-  },
-  "biometric": {
-    "prompt": {
-      "title": "Enable Biometric Unlock?",
-      "description": "Use your fingerprint or face ID to unlock Nahan securely and quickly next time."
-    },
-    "enabled": "Biometric unlock enabled",
-    "enable_failed": "Failed to enable biometrics"
-  },
-  "language_selector": {
-    "title": "Select Language",
-    "subtitle": "Please choose your preferred language",
-    "persian_prompt": "لطفاً زبان مورد نظر خود را انتخاب کنید"
-  },
-  "identity_onboarding": {
-    "no_identity": "No Identity Found",
-    "create_description": "Create a secure identity to start exchanging messages.",
-    "create_button": "Create Identity",
-    "modal": {
-      "title": "Create New Identity",
-      "display_name": "Display Name",
-      "display_name_placeholder": "How others will see you",
-      "passphrase": "Passphrase",
-      "passphrase_placeholder": "Protect your private key",
-      "cancel": "Cancel",
-      "create": "Create"
-    },
-    "toast": {
-      "fill_name": "Please fill in your name",
-      "create_passphrase": "Please create a passphrase",
-      "missing_key": "SecureStorage: Missing key",
-      "success": "Identity generated successfully",
-      "fail": "Failed to generate identity"
-    }
-  },
-  "my_identity": {
-    "title": "My Identity",
-    "copy_id": "Copy ID",
-    "share_id": "Share ID",
-    "view_qr": "View QR",
-    "toast": {
-      "qr_gen_fail": "Failed to generate QR code",
-      "stealth_copy_success": "Secure Stealth ID copied as poetry!",
-      "stealth_copy_fail": "Failed to copy stealth ID",
-      "qr_copy_success": "QR Code copied to clipboard",
-      "qr_copy_fail": "Failed to copy QR Code",
-      "share_fail": "Failed to share"
-    },
-    "share_title": "NAHAN Identity - {{name}}"
-  },
-  "add_contact": {
-    "title": "Add Contact",
-    "buttons": {
-      "scan_qr": "Scan QR",
-      "upload_qr": "Upload QR",
-      "manual": "Manual"
-    },
-    "toast": {
-      "scan_success": "QR code scanned!",
-      "invalid_format": "Invalid QR code format",
-      "process_fail": "Failed to process scanned data",
-      "no_qr_found": "No QR code found in image"
-    }
-  },
-  "qr_scanner": {
-    "title": "Scan QR Code",
-    "camera_not_supported": "Camera not supported",
-    "access_fail": "Failed to access camera",
-    "instruction": "Point camera at a NAHAN QR code"
-  },
-  "contact_import": {
-    "title": "Add Contact",
-    "public_key_label": "Public Key",
-    "public_key_placeholder": "Paste public key block here (-----BEGIN PGP...)",
-    "instruction": "Paste the full PGP Public Key block, Stealth ID (Poetry), or encrypted message. The name will be automatically extracted.",
-    "import_button": "Import & Decode",
-    "name_label": "Name",
-    "name_placeholder": "Contact name",
-    "change_key": "Change Key",
-    "cancel": "Cancel",
-    "add_contact": "Add Contact",
-    "toast": {
-      "enter_decode": "Please enter content to decode",
-      "found_identity": "Found identity: {{name}}",
-      "valid_key": "Valid key detected",
-      "invalid_contact_key": "Invalid contact key format",
-      "handler_missing": "Contact key detected but handler not available",
-      "unknown_sender": "Unknown sender. Please add the contact first.",
-      "decode_fail": "Failed to decode content. Please check the format.",
-      "enter_name": "Please enter a contact name",
-      "key_missing": "Public key is missing",
-      "cannot_add_self": "You cannot add yourself as a contact",
-      "contact_exists": "Contact already exists as \"{{name}}\"",
-      "success": "Contact added successfully",
-      "invalid_key_format": "Invalid public key format"
-    }
+    "subtitle": "Secure Messenger",
+    "title": "Nahan"
   },
   "auth": {
-    "create_pin": {
-      "label": "Create PIN",
-      "sublabel": "Set a 6-digit security PIN"
-    },
+    "back": "Back",
     "confirm_pin": {
       "label": "Confirm PIN",
       "sublabel": "Re-enter your 6-digit PIN"
     },
-    "error": {
-      "pin_mismatch": "PINs don't match. Please try again.",
-      "generate": "Failed to generate identity",
-      "warning_required": "Please accept the warning",
-      "name_required": "Please enter your display name"
+    "create_pin": {
+      "label": "Create PIN",
+      "sublabel": "Set a 6-digit security PIN"
     },
-    "back": "Back",
-    "warning": {
-      "title": "Important Warning",
-      "desc1": "NAHAN is a decentralized, offline tool. We do not store your PIN or keys on any server.",
-      "desc2": "If you forget your PIN, your identity and messages cannot be recovered.",
-      "checkbox": "I understand that my PIN cannot be recovered",
-      "continue": "Continue"
+    "error": {
+      "generate": "Failed to generate identity",
+      "name_required": "Please enter your display name",
+      "pin_mismatch": "PINs don't match. Please try again.",
+      "warning_required": "Please accept the warning"
     },
     "identity": {
-      "title": "Create Identity",
-      "subtitle": "Final step to secure your communications",
       "display_name": "Display Name",
-      "placeholder": "How should others see you?",
       "generating": "Generating Keys...",
-      "submit": "Start Using NAHAN"
+      "placeholder": "How should others see you?",
+      "submit": "Start Using NAHAN",
+      "subtitle": "Final step to secure your communications",
+      "title": "Create Identity"
+    },
+    "required": "",
+    "warning": {
+      "checkbox": "I understand that my PIN cannot be recovered",
+      "continue": "Continue",
+      "desc1": "NAHAN is a decentralized, offline tool. We do not store your PIN or keys on any server.",
+      "desc2": "If you forget your PIN, your identity and messages cannot be recovered.",
+      "title": "Important Warning"
     },
     "welcome": "Welcome to NAHAN!"
   },
-  "welcome": {
-    "title": "Welcome to Nahan",
-    "subtitle": "Secure. Private. Offline-first.",
-    "logo_alt": "Nahan Logo",
-    "features": {
-      "encrypted": {
-        "title": "End-to-End Encrypted",
-        "desc": "Your messages never leave your device unencrypted."
-      },
-      "offline": {
-        "title": "Completely Offline",
-        "desc": "No data is ever sent to any server. Your privacy is absolute."
-      }
+  "biometric": {
+    "decline_tip": "You can always enable biometrics in Settings",
+    "disabled": "Biometric unlock disabled",
+    "enable_failed": "Failed to enable biometrics",
+    "enabled": "Biometric unlock enabled",
+    "prompt": {
+      "description": "Use your fingerprint or face ID to unlock Nahan securely and quickly next time.",
+      "title": "Enable Biometric Unlock?"
     },
-    "start": "Start Now"
+    "unlock": "Biometric Unlock"
+  },
+  "broadcast_channel": "Broadcast Channel",
+  "chat": {
+    "encrypted_notice": "Messages are end-to-end encrypted. Only you and {{name}} can read them.",
+    "input": {
+      "error": {
+        "missing_context": "Cannot send message: Missing context",
+        "prepare_stealth": "Failed to prepare stealth message"
+      },
+      "footer": "End-to-End Encrypted via PGP",
+      "long_press_tooltip": "Click/Tap: Auto-Stealth | Long Press/Long Click: Custom Stealth",
+      "placeholder": "Type a secure message...",
+      "send_error": "Failed to send message",
+      "send_success": "Message sent",
+      "send_success_clipboard": "Message sent & copied to clipboard"
+    },
+    "list": {
+      "actions_prompt": "Choose an action",
+      "add_contact": "Add Contact",
+      "add_new_contact": "Add New Contact",
+      "cancel": "Cancel",
+      "clipboard_empty": "Clipboard empty or format not supported",
+      "confirm_bulk_contact": "Are you sure you want to delete selected contacts? This will also delete their message history.",
+      "confirm_bulk_history": "Are you sure you want to delete history for selected contacts? This cannot be undone.",
+      "confirm_contact": "Are you sure you want to delete this contact? This will also delete all message history.",
+      "confirm_history": "Are you sure you want to delete message history for this contact? This cannot be undone.",
+      "contact_deleted": "Contact deleted successfully",
+      "contact_key_detected": "Contact key detected",
+      "delete_contact": "Delete Contact",
+      "delete_contact_desc": "Also removes form list",
+      "delete_contact_warning": "This will also delete the chat history permanently this action cannot be undone.",
+      "delete_history": "Delete History",
+      "delete_history_note": "Start fresh. Contact will remain in your list.",
+      "enter_new_name": "Enter new name",
+      "history_cleared": "History cleared successfully",
+      "image": "Image",
+      "import_error": "Failed to import message",
+      "import_title": "Import Message or Key",
+      "new_chat": {
+        "title": "New Chat"
+      },
+      "no_chats": "No chats found",
+      "no_contacts": "No contacts found",
+      "no_messages": "No messages yet",
+      "paste_encrypted": "Paste Encrypted Message",
+      "process_error": "Failed to process input",
+      "recent_conversations": "Recent Conversations",
+      "renamed": "Contact renamed successfully",
+      "search_contacts_placeholder": "Search contacts...",
+      "search_placeholder": "Search chats...",
+      "select_sender": {
+        "desc": "This message is unsigned or from an unknown key. Who sent it?",
+        "title": "Select Sender"
+      },
+      "start_chat": "Start a new chat",
+      "title": "Chats"
+    },
+    "message": {
+      "copied": "{{label}} copied",
+      "copy_block_btn": "Copy Block",
+      "copy_encrypted": "Copy Encrypted",
+      "copy_failed": "Failed to copy",
+      "copy_plain": "Copy Plain Text",
+      "copy_text": "Copy Text",
+      "delete": "Delete",
+      "delete_confirm": "Are you sure you want to delete this message?",
+      "deleted": "Message deleted",
+      "encrypted_block": "Encrypted block",
+      "encrypted_copied": "Encrypted block copied",
+      "options": "Message options",
+      "text": "Message text",
+      "text_copied": "Text copied"
+    },
+    "options": "Chat options"
   },
   "clipboard": {
     "permission": {
-      "title": "Enable Clipboard Detection",
-      "reason_title": "Why do we need this?",
-      "reason_desc": "To automatically detect encrypted messages from your contacts when you copy them. When you return to Nahan, we check if your clipboard contains a message from someone in your contact list and offer to import it automatically.",
-      "privacy_title": "Privacy Guarantee",
+      "denied_desc": "It looks like clipboard access was blocked. Browser security blocks access after a denial.",
+      "denied_title": "Permission Denied",
+      "grant": "Grant Permission",
+      "granted": "Clipboard permission granted",
+      "how_to_enable": "How to enable:",
+      "not_now": "Not Now",
       "privacy_desc": "This app is 100% OFFLINE. All encryption and decryption happens locally on your device. No data ever leaves your device. We only check the clipboard when you return to this tab, and only process messages from contacts you've already added.",
       "privacy_points": {
         "check": "Clipboard is only checked when you switch back to this tab",
@@ -177,475 +167,484 @@
         "local": "All processing happens locally - no network requests",
         "revoke": "You can revoke this permission anytime in your browser settings"
       },
-      "not_now": "Not Now",
-      "grant": "Grant Permission"
+      "privacy_title": "Privacy Guarantee",
+      "reason_desc": "To automatically detect encrypted messages from your contacts when you copy them. When you return to Nahan, we check if your clipboard contains a message from someone in your contact list and offer to import it automatically.",
+      "reason_title": "Why do we need this?",
+      "step_1": "Click the lock or settings icon in your address bar",
+      "step_2": "Find \"Clipboard\" or \"Permissions\"",
+      "step_3": "Change setting to \"Allow\" or \"Ask\"",
+      "step_4": "Refresh the page",
+      "title": "Enable Clipboard Detection"
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "copy": "Copy",
+    "copy_failed": "Failed to copy",
+    "copy_identity": "Copy Identity",
+    "copy_success": "Copied to clipboard",
+    "delete": "Delete",
+    "download": "Download",
+    "download_image": "Download Image",
+    "download_success": "Saved to gallery",
+    "enable": "Enable",
+    "image_preview": "Image Preview",
+    "learn_more": "Learn More",
+    "maybeLater": "Maybe Later",
+    "options": "",
+    "processing": "Processing",
+    "ready": "Ready",
+    "regenerate": "Regenerate / Choose Different Image",
+    "rename": "Rename Contact",
+    "save": "Save",
+    "select": "Select",
+    "selected": "selected",
+    "send": "Send Now",
+    "send_success": "Sent",
+    "share": "Share",
+    "view": "View"
+  },
+  "contact_import": {
+    "toast": {
+      "decode_fail": "Failed to decode content. Please check the format.",
+      "enter_decode": "Please enter content to decode",
+      "handler_missing": "Contact key detected but handler not available",
+      "invalid_contact_key": "Invalid contact key format",
+      "unknown_sender": "Unknown sender. Please add the contact first."
     }
   },
   "detection": {
+    "add_chat": "Add & Start Chat",
+    "contact_found": "A new contact <b>{{name}}</b> was detected in your clipboard. Would you like to add them and start a chat?",
+    "dismiss": "Dismiss",
+    "duplicate_info": "You have already received and stored this message.",
+    "duplicate_message": "Message Already Exists",
+    "message_info": "The message was detected from your clipboard and imported successfully.",
     "new_contact": "New Contact Detected",
     "new_message": "New Message Detected",
-    "duplicate_message": "Message Already Exists",
-    "contact_found": "A new contact <b>{{name}}</b> was detected in your clipboard. Would you like to add them and start a chat?",
     "steganography_info": "The contact information was hidden using steganography. No plaintext public keys were exposed.",
-    "message_found": "New message from <b>{{name}}</b> received. History updated.",
-    "duplicate_found": "This message from <b>{{name}}</b> is already in your chat history.",
-    "message_info": "The message was detected from your clipboard and imported successfully.",
-    "duplicate_info": "You have already received and stored this message.",
-    "dismiss": "Dismiss",
-    "add_chat": "Add & Start Chat",
     "view_chat": "View Chat"
   },
   "empty": {
     "message": "Empty"
   },
-  "pinpad": {
-    "enter_pin": "Enter PIN",
-    "backspace": "Backspace",
-    "enter": "Enter"
+  "errors": {
+    "blobCreationFailed": "Failed to create image blob",
+    "canvasInitFailed": "Failed to initialize canvas",
+    "capacityExceeded": "Image capacity exceeded. Needed: {{needed}}, Available: {{available}}",
+    "compressionFailed": "Image compression failed",
+    "imageLoadFailed": "Failed to load image",
+    "incompletePayload": "Failed to extract complete payload"
+  },
+  "identity_onboarding": {
+    "create_button": "Create Identity",
+    "create_description": "Create a secure identity to start exchanging messages.",
+    "modal": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "display_name": "Display Name",
+      "display_name_placeholder": "How others will see you",
+      "passphrase": "Passphrase",
+      "passphrase_placeholder": "Protect your private key",
+      "title": "Create New Identity"
+    },
+    "no_identity": "No Identity Found",
+    "toast": {
+      "create_passphrase": "Please create a passphrase",
+      "fail": "Failed to generate identity",
+      "fill_name": "Please fill in your name",
+      "missing_key": "SecureStorage: Missing key",
+      "success": "Identity generated successfully"
+    }
+  },
+  "language_selector": {
+    "persian_prompt": "لطفاً زبان مورد نظر خود را انتخاب کنید",
+    "subtitle": "Please choose your preferred language",
+    "title": "Select Language"
   },
   "lock": {
-    "select_identity": "Select Identity",
     "enter_pin": "Enter PIN",
-    "sublabel": "Enter your 6-digit security PIN",
     "error": {
-      "select": "Please select an identity",
+      "incorrect_pin_one": "",
+      "incorrect_pin_other": "",
       "max_attempts": "Maximum attempts reached. Wiping data...",
-      "incorrect_pin": "Incorrect PIN. {{count}} attempts remaining before data wipe.",
+      "select": "Please select an identity",
       "verify": "Verification failed",
       "verify_toast": "Failed to verify PIN"
     },
-    "welcome": "Welcome back!",
-    "logged_out": "Logged out successfully"
+    "logged_out": "Logged out successfully",
+    "sublabel": "Enter your 6-digit security PIN",
+    "welcome": "Welcome back!"
   },
   "manual_paste": {
-    "title_default": "Couldn't access clipboard",
-    "desc": "Please manually enter or paste your content below.",
-    "placeholder": "Paste or type your content here...",
-    "error": {
-      "too_short": "Content must be at least 10 characters long.",
-      "too_long": "Content cannot exceed 5000 characters.",
-      "failed": "Failed to process content. Please try again."
-    },
     "cancel": "Cancel",
-    "submit": "Submit Content"
+    "desc": "Please manually enter or paste your content below.",
+    "error": {
+      "failed": "Failed to process content. Please try again.",
+      "too_long": "Content cannot exceed 5000 characters.",
+      "too_short": "Content must be at least 10 characters long."
+    },
+    "import_decode": "Import & Decode",
+    "placeholder": "Paste or type your content here...",
+    "title_import": "Import from Text"
   },
   "message_editor": {
-    "encrypt_title": "Encrypt Message",
+    "copy_action": "Copy",
+    "copy_text_action": "Copy Text",
+    "decrypt_action": "Decrypt",
     "decrypt_title": "Decrypt Message",
+    "decrypted_content_label": "Decrypted Content",
+    "decrypted_message_label": "Decrypted message",
+    "download_action": "Download",
+    "encrypt_action": "Encrypt",
+    "encrypt_title": "Encrypt Message",
+    "encrypted_content_label": "Encrypted Content",
+    "encrypted_message_label": "Encrypted message",
+    "encrypted_placeholder": "Paste the encrypted message here...",
     "error": {
+      "empty_decrypt": "Please paste an encrypted message",
       "empty_encrypt": "Please enter a message to encrypt",
       "no_identity": "No identity configured. Please generate a key first.",
       "no_recipient": "Please select a recipient",
-      "recipient_not_found": "Selected recipient not found",
-      "prepare_encrypt": "Failed to prepare encryption",
-      "empty_decrypt": "Please paste an encrypted message",
+      "passphrase": "Please enter your passphrase",
       "prepare_decrypt": "Failed to prepare decryption",
-      "save": "Failed to save message",
-      "passphrase": "Please enter your passphrase"
+      "prepare_encrypt": "Failed to prepare encryption",
+      "recipient_not_found": "Selected recipient not found"
     },
-    "success": {
-      "hidden": "Message encrypted and hidden successfully!"
-    },
+    "error_copy": "Failed to copy to clipboard",
+    "error_share": "Failed to share message",
+    "fingerprint_label": "Fingerprint",
+    "identity_required_desc": "You need a secure identity to {{action}} messages. Please generate a key pair first.",
+    "identity_required_title": "Identity Required",
     "info": {
       "clipboard_cleared": "Clipboard cleared for security"
     },
-    "identity_required_title": "Identity Required",
-    "identity_required_desc": "You need a secure identity to {{action}} messages. Please generate a key pair first.",
+    "message_label": "Message",
+    "message_placeholder": "Enter your message here...",
+    "no_contacts": "No contacts available. Add contacts in the Keys tab.",
+    "output_title": "Output",
+    "passphrase_label": "Passphrase",
+    "passphrase_modal_desc_decrypt": "Enter your private key passphrase to decrypt this message.",
+    "passphrase_modal_desc_encrypt": "Enter your private key passphrase to sign and encrypt this message.",
+    "passphrase_modal_title": "Enter Passphrase",
+    "passphrase_placeholder": "Enter passphrase...",
     "recipient_label": "Recipient",
     "recipient_placeholder": "Choose a contact",
-    "no_contacts": "No contacts available. Add contacts in the Keys tab.",
-    "message_label": "Message",
-    "encrypted_content_label": "Encrypted Content",
-    "message_placeholder": "Enter your message here...",
-    "encrypted_placeholder": "Paste the encrypted message here...",
-    "encrypt_action": "Encrypt",
-    "decrypt_action": "Decrypt",
-    "copy_action": "Copy",
-    "share_action": "Share",
-    "download_action": "Download",
-    "copy_text_action": "Copy Text",
-    "output_title": "Output",
     "secure_block": "Secure Block",
-    "success_copy": "{{label}} copied to clipboard",
-    "error_copy": "Failed to copy to clipboard",
-    "error_share": "Failed to share message",
-    "success_download": "Message downloaded",
-    "encrypted_message_label": "Encrypted message",
-    "decrypted_message_label": "Decrypted message",
     "secure_message_title": "Secure Message",
-    "verified_sender": "Verified Sender",
-    "unverified_sender": "Unverified Sender",
     "sender_label": "Sender",
-    "fingerprint_label": "Fingerprint",
-    "signature_valid": "Signature Valid",
+    "share_action": "Share",
     "signature_invalid": "Signature Invalid",
-    "decrypted_content_label": "Decrypted Content",
-    "passphrase_modal_title": "Enter Passphrase",
-    "passphrase_modal_desc_encrypt": "Enter your private key passphrase to sign and encrypt this message.",
-    "passphrase_modal_desc_decrypt": "Enter your private key passphrase to decrypt this message.",
-    "passphrase_label": "Passphrase",
-    "passphrase_placeholder": "Enter passphrase...",
-    "unlock_action": "Unlock"
+    "signature_valid": "Signature Valid",
+    "success": {
+      "hidden": "Message encrypted and hidden successfully!"
+    },
+    "success_copy": "{{label}} copied to clipboard",
+    "success_download": "Message downloaded",
+    "unlock_action": "Unlock",
+    "unverified_sender": "Unverified Sender",
+    "verified_sender": "Verified Sender"
+  },
+  "my_identity": {
+    "share_id": "Share ID",
+    "share_title": "NAHAN Identity - {{name}}",
+    "title": "My Identity",
+    "toast": {
+      "qr_copy_fail": "Failed to copy QR Code",
+      "qr_copy_success": "QR Code copied to clipboard",
+      "qr_gen_fail": "Failed to generate QR code",
+      "share_fail": "Failed to share",
+      "stealth_copy_fail": "Failed to copy stealth ID",
+      "stealth_copy_success": "Secure Stealth ID copied as poetry!"
+    },
+    "view_qr": "View QR"
   },
   "my_qr": {
-    "title": "My Identity QR",
-    "subtitle": "Share this code to connect",
+    "contact_title": "Contact Identity",
+    "copied": "Copied",
     "error": {
-      "generate": "Failed to generate QR code",
-      "copy": "Failed to copy to clipboard"
+      "copy": "Failed to copy to clipboard",
+      "generate": "Failed to generate QR code"
     },
+    "save": "Save",
+    "share": "Share",
+    "share_text": "Scan to add {{name}} on NAHAN",
+    "share_title": "NAHAN Identity - {{name}}",
+    "subtitle": "Share this code to connect",
     "success": {
       "copied": "Identity copied to clipboard"
     },
-    "copy_string": "Copy String",
-    "copied": "Copied",
-    "save": "Save",
-    "share": "Share",
-    "share_title": "NAHAN Identity - {{name}}",
-    "share_text": "Scan to add {{name}} on NAHAN"
-  },
-  "stealth": {
-    "decode_success": "Image decoded successfully",
-    "decode_error": "Failed to decode image",
-    "image_mode_title": "Stealth Image",
-    "tab": {
-      "text": "Hide in Text",
-      "image": "Hide in Image"
-    },
-    "default_message": "Sent a stealth image",
-    "send_success": "Stealth image sent successfully",
-    "send_success_copy": "Sent & Copied to clipboard",
-    "send_error": "Failed to send stealth image",
-    "send_now": "Send & Copy Image",
-    "cover_text": "Cover Text",
-    "enter_cover_text": "Enter text to hide your message...",
-    "security_score": "Security Score",
-    "image_placeholder": "Generate a unique gradient mask to hide your data.",
-    "generate_mask": "Generate Mask",
-    "upload_carrier": "Upload Custom",
-    "send": "Send Stealth Message",
-    "warning": {
-      "file_transfer": "Important: Always send this image as a File/Document in messaging apps. Standard photo sharing will destroy the hidden data.",
-      "public_image": "Caution: Public images may reveal the existence of hidden data.",
-      "learn_more_content": "Using public images found online may allow observers to detect changes through bit-comparison. However, even if detected, your content remains cryptographically secure and unreadable without your private key."
-    },
-    "error": {
-      "generate_failed": "Failed to generate image",
-      "process_failed": "Failed to process image. It might be too small for the data.",
-      "no_data": "No data to hide",
-      "invalid_header": "No hidden message found. The image might be compressed or not contain stealth data.",
-      "invalid_payload": "Invalid data detected. The image might be corrupted."
-    },
-    "title": "Stealth Mode",
-    "subtitle": "Hide your encrypted message inside a cover text using invisible characters.",
-    "safety": "Stealth Safety",
-    "safety_levels": {
-      "safe": "Green Zone (Safe)",
-      "moderate": "Orange Zone (Moderate)",
-      "risky": "Red Zone (Risky)"
-    },
-    "reset": "Reset",
-    "reset_suggestion": "Reset Suggestion",
-    "mode": {
-      "auto": "Auto",
-      "custom": "Custom"
-    },
-    "placeholder": "Type or paste a cover text...",
-    "how_it_works": {
-      "title": "How it works",
-      "desc": "The encrypted data is encoded into Zero-Width Characters and embedded into the cover text. The output looks exactly like the cover text but contains the hidden message.",
-      "payload_size": "Payload Size: {{size}} bytes"
-    },
-    "status": {
-      "telegram_risk": "⚠️ Telegram Splitting Risk: {{length}} chars (limit: 4096). Message may be split.",
-      "too_short": "Text is too short for the payload size ({{size}} bytes). Minimum safety: {{threshold}}%. Please use longer cover text.",
-      "excellent": "Excellent! The message is well hidden with a safe ratio.",
-      "good": "Good length ratio. The message is reasonably hidden."
-    },
-    "buttons": {
-      "cancel": "Cancel",
-      "confirm_copy": "Confirm & Copy",
-      "confirm_low_safety": "Confirm (Low Safety)",
-      "too_large": "Too Large for Telegram"
-    },
-    "toast": {
-      "low_ratio": "Stealth ratio is low ({{score}}%). Recommendation: {{threshold}}%",
-      "telegram_risk": "Telegram Splitting Risk: Message is {{length}} chars (limit: 4096). Message may be split into multiple parts.",
-      "success": "Stealth message copied to clipboard!"
-    }
+    "title": "My Identity QR"
   },
   "new_message": {
-    "title_broadcast": "New Broadcast Detected",
-    "title_private": "New Message Detected",
     "broadcast_from": "Broadcast from {{name}}",
     "desc_broadcast": "A new broadcast message has been received and stored.",
     "desc_private": "A new private message has been received and stored.",
     "dismiss": "Dismiss",
+    "title_broadcast": "New Broadcast Detected",
+    "title_private": "New Message Detected",
     "view_chat": "View Chat"
   },
-  "chat": {
-    "options": "Chat options",
-    "verify_key": "Verify Key",
-    "clear_history": "Clear History",
-    "clear_history_confirm": "Are you sure you want to clear all messages with {{name}}? This cannot be undone.",
-    "clear_history_success": "Chat history cleared successfully",
-    "clear_history_error": "Failed to clear chat history",
-    "encrypted_notice": "Messages are end-to-end encrypted. Only you and {{name}} can read them.",
-    "input": {
-      "placeholder": "Type a secure message...",
-      "send_success_clipboard": "Message sent & copied to clipboard",
-      "send_success": "Message sent",
-      "send_error": "Failed to send message",
-      "decrypt_success": "Message decrypted and imported",
-      "decrypt_error": "Failed to decrypt message",
-      "paste_success": "Text pasted",
-      "clipboard_empty": "Clipboard empty",
-      "footer": "End-to-End Encrypted via PGP",
-      "error": {
-        "missing_context": "Cannot send message: Missing context",
-        "prepare_stealth": "Failed to prepare stealth message",
-        "signature_verification": "Signature verification failed. The message may be corrupted or from an unknown sender.",
-        "decryption_failed": "Decryption failed. The message may be corrupted or encrypted for a different recipient.",
-        "unknown_sender": "Unknown sender. Please select the sender manually."
-      },
-      "zwc": {
-        "recovered": "Some invisible characters may have been lost, but message recovered.",
-        "invalid_format": "Invalid stealth message format. Make sure you copied the entire message.",
-        "corrupted": "Message is too corrupted to recover. Some invisible characters were lost.",
-        "incomplete": "Message appears incomplete. Please copy the entire message.",
-        "extraction_failed": "Failed to extract hidden message. The message may be corrupted."
-      },
-      "long_press_tooltip": "Click/Tap: Auto-Stealth | Long Press/Long Click: Custom Stealth"
-    },
-    "list": {
-      "title": "Chats",
-      "new_chat": {
-        "title": "New Chat"
-      },
-      "search_placeholder": "Search chats...",
-      "no_chats": "No chats found",
-      "start_chat": "Start a new chat",
-      "no_messages": "No messages yet",
-      "recent_conversations": "Recent Conversations",
-      "paste_encrypted": "Paste Encrypted Message",
-      "search_contacts_placeholder": "Search contacts...",
-      "no_contacts": "No contacts found",
-      "import_title": "Import Message or Key",
-      "add_contact": "Add Contact",
-      "add_new_contact": "Add New Contact",
-      "cancel": "Cancel",
-      "contact_key_detected": "Contact key detected",
-      "process_error": "Failed to process input",
-      "import_error": "Failed to import message",
-      "unknown_sender": "Unknown sender. Please select the sender manually.",
-      "actions_prompt": "Choose an action",
-      "delete_contact": "Delete Contact",
-      "delete_history": "Delete History",
-      "renamed": "Contact renamed successfully",
-      "history_cleared": "History cleared successfully",
-      "contact_deleted": "Contact deleted successfully",
-      "enter_new_name": "Enter new name",
-      "confirm_bulk_history": "Are you sure you want to delete history for selected contacts? This cannot be undone.",
-      "confirm_history": "Are you sure you want to delete message history for this contact? This cannot be undone.",
-      "delete_history_note": "Start fresh. Contact will remain in your list.",
-      "confirm_bulk_contact": "Are you sure you want to delete selected contacts? This will also delete their message history.",
-      "confirm_contact": "Are you sure you want to delete this contact? This will also delete all message history.",
-      "select_sender": {
-        "title": "Select Sender",
-        "desc": "This message is unsigned or from an unknown key. Who sent it?"
-      }
-    },
-    "message": {
-      "encrypted_block": "Encrypted block",
-      "text": "Message text",
-      "copied": "{{label}} copied",
-      "copy_failed": "Failed to copy",
-      "encrypted_copied": "Encrypted block copied",
-      "delete_confirm": "Are you sure you want to delete this message?",
-      "deleted": "Message deleted",
-      "options": "Message options",
-      "copy_encrypted": "Copy Encrypted",
-      "copy_text": "Copy Text",
-      "copy_plain": "Copy Plain Text",
-      "text_copied": "Text copied",
-      "delete": "Delete",
-      "copy_block_btn": "Copy Block"
-    }
+  "pinpad": {
+    "backspace": "Backspace",
+    "enter_pin": "Enter PIN"
   },
   "pwa": {
     "install": {
-      "title": "Install Nahan",
-      "subtitle": "Secure. Fast. Private.",
+      "add_to_home": "Add to Home Screen",
+      "android": {
+        "add": "Select 'Install App' or 'Add to Home Screen'",
+        "menu": "Tap the Menu button (3 dots)",
+        "title": "To install on your device:"
+      },
+      "continue_browser": "Continue in browser",
+      "dismiss": "Maybe later",
       "features": {
         "offline": {
-          "title": "Offline Access",
-          "desc": "Use Nahan even without internet."
+          "desc": "Use Nahan even without internet.",
+          "title": "Offline Access"
         },
         "privacy": {
-          "title": "Privacy",
-          "desc": "No browser history or URL bars."
+          "desc": "No browser history or URL bars.",
+          "title": "Privacy"
         },
         "speed": {
-          "title": "Speed",
-          "desc": "Instant launch from your home screen."
+          "desc": "Instant launch from your home screen.",
+          "title": "Speed"
         }
       },
-      "ios": {
-        "title": "To install on iOS:",
-        "share": "Tap the Share button",
-        "add": "Select 'Add to Home Screen'"
-      },
-      "android": {
-        "title": "To install on your device:",
-        "menu": "Tap the Menu button (3 dots)",
-        "add": "Select 'Install App' or 'Add to Home Screen'"
-      },
       "install_button": "Install Now",
-      "add_to_home": "Add to Home Screen",
       "instant_install": "Installs instantly without App Store",
-      "continue_browser": "Continue in browser",
-      "dismiss": "Maybe later"
+      "ios": {
+        "add": "Select 'Add to Home Screen'",
+        "share": "Tap the Share button",
+        "title": "To install on iOS:"
+      },
+      "subtitle": "Secure. Fast. Private.",
+      "title": "Install Nahan"
     },
     "update": {
-      "title": "New Security Update",
-      "available": "v{{version}} Available",
       "available_generic": "Update available",
       "button": "Update",
-      "improvements": "Improvements:"
+      "title": "New Security Update"
     }
   },
+  "qr_scanner": {
+    "instruction": "Point camera at a NAHAN QR code",
+    "title": "Scan QR Code"
+  },
   "settings": {
+    "clear": {
+      "error": "Failed to clear data",
+      "success": "All data cleared successfully",
+      "title": "Clear All Data"
+    },
+    "clear_messages": {
+      "cancel": "Cancel",
+      "confirm": "Clear Messages",
+      "title": "Clear Message Data",
+      "warning": "This will remove all message history but keep your contacts and identity. You will remain logged in. This action cannot be undone."
+    },
+    "data": {
+      "contacts": "Contacts",
+      "current_identity": "Current Identity",
+      "identities": "Identities",
+      "none": "None",
+      "title": "Data Overview"
+    },
+    "debug": {
+      "hud": {
+        "subtitle": "Show debug metrics overlay (Requires Reload)",
+        "title": "Enable Performance HUD"
+      }
+    },
     "errors": {
       "missing_key": "SecureStorage: Missing key"
     },
-    "install": {
-      "title": "Install Nahan",
-      "subtitle": "Get the full experience",
-      "button": "Install"
+    "export": {
+      "cancel": "Cancel",
+      "confirm": "Export Data",
+      "error": "Failed to export data",
+      "info_desc": "This will export all your identities (with encrypted private keys) and contacts to a JSON file.",
+      "info_title": "Export Information",
+      "notes": {
+        "1": "Private keys remain encrypted with your original passphrases",
+        "2": "This export file should be stored securely",
+        "3": "The export password adds an additional layer of protection"
+      },
+      "notes_title": "Security Notes:",
+      "password_error": "Please enter a password for the export file",
+      "password_label": "Export Password",
+      "password_length_error": "Password must be at least 8 characters long",
+      "password_placeholder": "Enter a password to protect the export",
+      "success": "Data exported successfully",
+      "title": "Export All Data"
     },
     "general": {
-      "title": "General Settings",
-      "language": "Language",
+      "camouflage": "Default Camouflage Language",
       "clipboard": {
-        "title": "Auto Clear Clipboard",
+        "grant_button": "Allow Access",
+        "permission_needed": "Permission required for auto-detection",
+        "permission_title": "Clipboard Access",
         "subtitle": "Automatically clear sensitive data",
-        "timeout": "Clear After (seconds)"
+        "timeout": "Clear After (seconds)",
+        "title": "Auto Clear Clipboard"
       },
-      "camouflage": "Default Camouflage Language"
+      "language": "Language",
+      "title": "General Settings"
+    },
+    "install": {
+      "button": "Install",
+      "subtitle": "Get the full experience",
+      "title": "Install Nahan"
     },
     "languages": {
       "en": "English",
       "fa": "Persian (Farsi)"
     },
+    "logout": {
+      "cancel": "Cancel",
+      "confirm": "Logout & Wipe",
+      "error": "Logout failed",
+      "title": "Logout & Wipe",
+      "warning": "Logging out will permanently delete all your data. This action cannot be undone."
+    },
+    "offline_sharing": {
+      "description": "You can share this single application file directly with others via local messengers. Once they open it, they can use the app to exchange encrypted messages with you without needing global internet access. This ensures your communication remains private and accessible during network restrictions.",
+      "download_button": "Download App File",
+      "download_success": "Portable file downloaded!",
+      "share_button": "Share App File",
+      "share_error": "Failed to share",
+      "share_not_supported": "Sharing not supported on this device",
+      "share_success": "Shared successfully!",
+      "subtitle": "Send this app to others without internet",
+      "support_message": "We believe in free and open communication for everyone. 💜",
+      "title": "Share application file for offline/restricted access"
+    },
     "security": {
-      "title": "Security",
+      "advanced": {
+        "clear": "Clear & Logout",
+        "export": "Export All Data",
+        "logout": "Logout",
+        "subtitle": "Show additional security settings",
+        "title": "Advanced Options",
+        "warning": "These options are for advanced users. Use with caution.",
+        "warning_text": "These actions are destructive or for debugging only."
+      },
+      "biometrics": {
+        "subtitle": "Use fingerprint or face ID to unlock",
+        "title": "Biometric Unlock"
+      },
       "info": {
-        "title": "Security Information",
         "desc": "NAHAN uses industry-standard OpenPGP encryption with ECC Curve25519 keys.",
         "points": {
           "1": "All encryption happens locally on your device",
           "2": "No data is transmitted to external servers",
           "3": "Private keys are encrypted with your passphrase",
           "4": "Messages are signed and encrypted for authenticity"
-        }
+        },
+        "title": "Security Information"
       },
-      "advanced": {
-        "title": "Advanced Options",
-        "subtitle": "Show additional security settings",
-        "warning": "These options are for advanced users. Use with caution.",
-        "export": "Export All Data",
-        "clear": "Clear & Logout",
-        "logout": "Logout"
-      }
-    },
-    "data": {
-      "title": "Data Overview",
-      "identities": "Identities",
-      "contacts": "Contacts",
-      "current_identity": "Current Identity",
-      "none": "None"
-    },
-    "export": {
-      "title": "Export All Data",
-      "info_title": "Export Information",
-      "info_desc": "This will export all your identities (with encrypted private keys) and contacts to a JSON file.",
-      "password_label": "Export Password",
-      "password_placeholder": "Enter a password to protect the export",
-      "notes_title": "Security Notes:",
-      "notes": {
-        "1": "Private keys remain encrypted with your original passphrases",
-        "2": "This export file should be stored securely",
-        "3": "The export password adds an additional layer of protection"
+      "self_destruct": {
+        "change_button": "Change Emergency PIN",
+        "confirm_label": "Confirm Emergency PIN",
+        "confirm_sublabel": "Re-enter the same PIN to confirm",
+        "description": "This security feature allows you to configure a special PIN that will immediately delete all your data when entered on the lock screen. This is useful in emergency situations where you need to quickly destroy sensitive information.",
+        "pin_mismatch": "PINs do not match",
+        "pin_same_as_master": "Emergency PIN must be different from your unlock PIN",
+        "remove_button": "Remove Emergency PIN",
+        "remove_success": "Emergency PIN removed",
+        "setup_button": "Setup Emergency PIN",
+        "setup_error": "Failed to setup emergency PIN",
+        "setup_label": "Enter Emergency PIN",
+        "setup_sublabel": "This PIN will wipe all data when entered",
+        "setup_success": "Emergency PIN configured successfully",
+        "setup_title": "Setup Emergency PIN",
+        "status_disabled": "No emergency PIN configured",
+        "status_enabled": "Emergency PIN is configured",
+        "subtitle": "Set up a special PIN to instantly wipe all data",
+        "title": "Emergency Data Wipe",
+        "warning": "⚠️ This action is irreversible. All messages, contacts, and identity will be permanently deleted.",
+        "warning_title": "⚠️ Warning"
       },
-      "cancel": "Cancel",
-      "confirm": "Export Data",
-      "success": "Data exported successfully",
-      "error": "Failed to export data",
-      "password_error": "Please enter a password for the export file",
-      "password_length_error": "Password must be at least 8 characters long"
+      "title": "Security"
+    }
+  },
+  "stealth": {
+    "cover_text": "Cover Text",
+    "decode_success": "Image decoded successfully",
+    "enter_cover_text": "Enter text to hide your message...",
+    "error": {
+      "generate_failed": "Failed to generate image",
+      "invalid_header": "No hidden message found. The image might be compressed or not contain stealth data.",
+      "invalid_payload": "Invalid data detected. The image might be corrupted.",
+      "process_failed": "Failed to process image. It might be too small for the data.",
+      "verification_failed": "Warning: Integrity check failed. Image may be corrupted."
     },
-    "logout": {
-      "title": "Logout & Wipe",
-      "warning": "Logging out will permanently delete all your data. This action cannot be undone.",
-      "confirm": "Logout & Wipe",
-      "cancel": "Cancel",
-      "error": "Logout failed"
+    "generate_mask": "Generate Mask",
+    "image_mode_title": "Stealth Image",
+    "image_placeholder": "Generate a unique gradient mask to hide your data.",
+    "info": {
+      "no_message": "Note: No secret message is being hidden. Image will be sent as-is."
     },
-    "clear_messages": {
-      "title": "Clear Message Data",
-      "warning": "This will remove all message history but keep your contacts and identity. You will remain logged in. This action cannot be undone.",
-      "confirm": "Clear Messages",
-      "cancel": "Cancel"
+    "security_score": "Security Score",
+    "send": "Send Stealth Message",
+    "send_error": "Failed to send stealth image",
+    "send_now": "Send & Copy Image",
+    "send_success": "Stealth image sent successfully",
+    "send_success_copy": "Sent & Copied to clipboard",
+    "tab": {
+      "image": "Hide in Image",
+      "text": "Hide in Text"
     },
-    "clear": {
-      "title": "Clear All Data",
-      "warning": "This action will permanently delete all identities, contacts, and messages. This cannot be undone.",
-      "data_list_title": "Data to be deleted:",
-      "data_list": {
-        "identities": "• {{count}} identity(ies)",
-        "contacts": "• {{count}} contact(s)",
-        "messages": "• All encrypted messages",
-        "settings": "• Application settings"
-      },
-      "recommendation_title": "Recommendation:",
-      "recommendation": "Consider exporting your data first before clearing it, in case you need it later.",
-      "cancel": "Cancel",
-      "confirm": "Clear All Data",
-      "confirm_alert": "Are you sure you want to clear all data? This action cannot be undone.",
-      "success": "All data cleared successfully",
-      "error": "Failed to clear data"
+    "upload_carrier": "Upload Custom",
+    "warning": {
+      "file_transfer": "Important: Always send this image as a File/Document in messaging apps. Standard photo sharing will destroy the hidden data.",
+      "learn_more_content": "Using public images found online may allow observers to detect changes through bit-comparison. However, even if detected, your content remains cryptographically secure and unreadable without your private key.",
+      "public_image": "Caution: Public images may reveal the existence of hidden data."
     }
   },
   "steganography": {
-    "preview_title": "Encrypted Image Ready",
-    "decode_title": "Hidden Message",
-    "preview_subtitle": "Your message is hidden inside this image",
-    "decode_subtitle": "Content extracted from the image",
-    "decoding": "Extracting hidden message...",
-    "warning_file_transfer": "You MUST send this image as a FILE. Sending it as a standard photo will corrupt the hidden data.",
-    "download_image": "Download as File",
-    "copy_image": "Copy Image",
-    "image_copied": "Image copied to clipboard",
+    "clip_tooltip": "Hide data in image",
     "copy_failed": "Failed to copy image",
+    "copy_image": "Copy Image",
     "decode_error": "Failed to decode image",
+    "decode_image": "Decode Stego Image",
+    "decode_subtitle": "Content extracted from the image",
+    "decode_success": "Decoded successfully",
+    "decode_title": "Hidden Message",
+    "decoding": "Extracting hidden message...",
+    "download_image": "Download as File",
+    "download_success": "Image saved. Send it as a FILE!",
+    "encode_error": "Failed to encode image",
+    "encoding": "ENCODING...",
+    "encrypted_image_ready": "Encrypted Image Ready",
+    "hidden_message": "Hidden Message",
+    "image_copied": "Image copied to clipboard",
+    "message_saved": "Message saved to chat",
+    "preview_subtitle": "Your message is hidden inside this image",
+    "preview_title": "Encrypted Image Ready",
     "unknown_sender": "Decoded from unknown sender",
-    "message_saved": "Message saved to chat"
+    "view_carrier": "View Encoded Carrier",
+    "view_image": "View Image",
+    "view_in_chat": "View in Chat",
+    "warning_file_transfer": "You MUST send this image as a FILE. Sending it as a standard photo will corrupt the hidden data."
   },
-  "common": {
-    "send": "Send Now",
-    "close": "Close",
-    "download_image": "Download Image",
-    "image_preview": "Image Preview",
-    "download": "Download",
-    "copy": "Copy",
-    "regenerate": "Regenerate / Choose Different Image",
-    "cancel": "Cancel",
-    "learn_more": "Learn More",
-    "copy_success": "Copied to clipboard",
-    "copy_failed": "Failed to copy",
-    "maybeLater": "Maybe Later",
-    "enable": "Enable",
-    "save": "Save",
-    "delete": "Delete"
+  "welcome": {
+    "features": {
+      "encrypted": {
+        "desc": "Your messages never leave your device unencrypted.",
+        "title": "End-to-End Encrypted"
+      },
+      "offline": {
+        "desc": "No data is ever sent to any server. Your privacy is absolute.",
+        "title": "Completely Offline"
+      }
+    },
+    "logo_alt": "Nahan Logo",
+    "start": "Start Now",
+    "subtitle": "Secure. Private. Offline-first.",
+    "title": "Welcome to Nahan"
   }
 }
