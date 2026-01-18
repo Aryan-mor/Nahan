@@ -3,6 +3,7 @@ import { IDBPDatabase, openDB } from 'idb';
 
 import * as logger from '../utils/logger';
 
+import StorageWorker from '../workers/storage.worker?worker&inline';
 import { decryptData, encryptData, generateBlindIndex } from './secureStorage';
 
 export interface Identity {
@@ -100,9 +101,7 @@ export class StorageService {
 
   private initializeWorker() {
     if (typeof Worker !== 'undefined') {
-      this.worker = new Worker(new URL('../workers/storage.worker.ts', import.meta.url), {
-        type: 'module',
-      });
+      this.worker = new StorageWorker();
       this.worker.onmessage = this.handleWorkerMessage.bind(this);
       this.worker.onerror = (error) => {
         logger.error('Storage Worker Error:', error);

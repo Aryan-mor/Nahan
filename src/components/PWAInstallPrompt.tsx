@@ -3,6 +3,7 @@ import { Download, MoreVertical, Share, Shield, WifiOff, X, Zap } from 'lucide-r
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
+import pwaLogo from '../assets/pwa-192x192.png?inline';
 import { useUIStore } from '../stores/uiStore';
 
 /* eslint-disable max-lines-per-function */
@@ -60,11 +61,7 @@ export function PWAInstallPrompt() {
 
           <div className="flex items-center gap-4 mb-6">
             <div className="w-14 h-14 bg-industrial-800 rounded-xl p-2.5 shadow-inner">
-              <img
-                src={`${import.meta.env.BASE_URL}pwa-192x192.png`}
-                alt="Nahan Logo"
-                className="w-full h-full object-contain"
-              />
+              <img src={pwaLogo} alt="Nahan Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-industrial-100">{t('pwa.install.title')}</h2>
@@ -78,7 +75,9 @@ export function PWAInstallPrompt() {
                 <WifiOff className="w-4 h-4 text-blue-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-industrial-200">{t('pwa.install.features.offline.title')}</h3>
+                <h3 className="text-sm font-semibold text-industrial-200">
+                  {t('pwa.install.features.offline.title')}
+                </h3>
                 <p className="text-xs text-industrial-400 leading-relaxed">
                   {t('pwa.install.features.offline.desc')}
                 </p>
@@ -90,7 +89,9 @@ export function PWAInstallPrompt() {
                 <Shield className="w-4 h-4 text-green-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-industrial-200">{t('pwa.install.features.privacy.title')}</h3>
+                <h3 className="text-sm font-semibold text-industrial-200">
+                  {t('pwa.install.features.privacy.title')}
+                </h3>
                 <p className="text-xs text-industrial-400 leading-relaxed">
                   {t('pwa.install.features.privacy.desc')}
                 </p>
@@ -102,7 +103,9 @@ export function PWAInstallPrompt() {
                 <Zap className="w-4 h-4 text-purple-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-industrial-200">{t('pwa.install.features.speed.title')}</h3>
+                <h3 className="text-sm font-semibold text-industrial-200">
+                  {t('pwa.install.features.speed.title')}
+                </h3>
                 <p className="text-xs text-industrial-400 leading-relaxed">
                   {t('pwa.install.features.speed.desc')}
                 </p>
@@ -120,7 +123,10 @@ export function PWAInstallPrompt() {
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
                   <Share className="w-5 h-5 text-blue-400 shrink-0" />
                   <span>
-                    <Trans i18nKey="pwa.install.ios.share" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
+                    <Trans
+                      i18nKey="pwa.install.ios.share"
+                      components={{ bold: <span className="font-bold text-industrial-100" /> }}
+                    />
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
@@ -128,7 +134,10 @@ export function PWAInstallPrompt() {
                     +
                   </div>
                   <span>
-                    <Trans i18nKey="pwa.install.ios.add" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
+                    <Trans
+                      i18nKey="pwa.install.ios.add"
+                      components={{ bold: <span className="font-bold text-industrial-100" /> }}
+                    />
                   </span>
                 </div>
               </div>
@@ -152,13 +161,19 @@ export function PWAInstallPrompt() {
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
                   <MoreVertical className="w-5 h-5 text-industrial-400 shrink-0" />
                   <span>
-                    <Trans i18nKey="pwa.install.android.menu" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
+                    <Trans
+                      i18nKey="pwa.install.android.menu"
+                      components={{ bold: <span className="font-bold text-industrial-100" /> }}
+                    />
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-industrial-300">
                   <Download className="w-5 h-5 text-industrial-400 shrink-0" />
                   <span>
-                    <Trans i18nKey="pwa.install.android.add" components={{ bold: <span className="font-bold text-industrial-100" /> }} />
+                    <Trans
+                      i18nKey="pwa.install.android.add"
+                      components={{ bold: <span className="font-bold text-industrial-100" /> }}
+                    />
                   </span>
                 </div>
               </div>

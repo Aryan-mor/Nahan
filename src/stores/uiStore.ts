@@ -91,6 +91,11 @@ export const useUIStore = create<UIState>()(
       name: 'nahan-ui-storage',
       version: 1,
       storage: createJSONStorage(() => localStorage), // Plain localStorage (non-sensitive)
+      migrate: (persistedState: unknown, _version: number) => {
+        // Handle migration if needed in the future
+        // For now, just return the state as is if version matches or is 0 (legacy)
+        return persistedState;
+      },
     },
   ),
     {

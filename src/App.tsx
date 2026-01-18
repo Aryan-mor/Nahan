@@ -3,18 +3,19 @@
 import { Avatar, Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-    Download,
-    FileUser,
-    Lock,
-    MessageSquare,
-    QrCode,
-    Settings as SettingsIcon,
-    Users
+  Download,
+  FileUser,
+  Lock,
+  MessageSquare,
+  QrCode,
+  Settings as SettingsIcon,
+  Users,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast, Toaster } from 'sonner';
 
+import pwaLogo from './assets/pwa-192x192.png?inline';
 import { BiometricPromptModal } from './components/BiometricPromptModal';
 import { ChatList } from './components/ChatList';
 import { ChatView } from './components/ChatView';
@@ -33,9 +34,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-    DetectionResult,
-    useClipboardDetection,
-    useClipboardPermission,
+  DetectionResult,
+  useClipboardDetection,
+  useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -44,7 +45,9 @@ import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
 import * as logger from './utils/logger';
 
-const PerfHUD = lazy(() => import('./components/dev/PerfHUD').then(module => ({ default: module.PerfHUD })));
+const PerfHUD = lazy(() =>
+  import('./components/dev/PerfHUD').then((module) => ({ default: module.PerfHUD })),
+);
 
 type TabType = 'chats' | 'keys' | 'settings';
 
@@ -52,7 +55,9 @@ export default function App() {
   // [PERF] Re-render counter for telemetry
   const renderCountRef = useRef(0);
   renderCountRef.current++;
-  console.log(`[PERF][RENDER] App - Render Count: ${renderCountRef.current} - Time: ${performance.now().toFixed(2)}ms`);
+  console.log(
+    `[PERF][RENDER] App - Render Count: ${renderCountRef.current} - Time: ${performance.now().toFixed(2)}ms`,
+  );
 
   useOfflineSync();
   usePWA();
@@ -60,9 +65,11 @@ export default function App() {
   // GLOBAL CLEANUP: Handle tab close events
   useEffect(() => {
     const handleUnload = () => {
-       import('./services/workerService').then(({ workerService }) => {
-           workerService.terminate();
-       }).catch(() => {});
+      import('./services/workerService')
+        .then(({ workerService }) => {
+          workerService.terminate();
+        })
+        .catch(() => {});
     };
 
     window.addEventListener('beforeunload', handleUnload);
@@ -76,30 +83,32 @@ export default function App() {
   }, []);
 
   // ATOMIC SELECTORS: Each selector only re-renders when its specific state changes
-  const initializeApp = useAppStore(state => state.initializeApp);
-  const isLoading = useAppStore(state => state.isLoading);
-  const error = useAppStore(state => state.error);
-  const identity = useAppStore(state => state.identity);
-  const activeChat = useAppStore(state => state.activeChat);
-  const showStealthModal = useAppStore(state => state.showStealthModal);
-  const setShowStealthModal = useAppStore(state => state.setShowStealthModal);
-  const sessionPassphrase = useAppStore(state => state.sessionPassphrase);
-  const setActiveChat = useAppStore(state => state.setActiveChat);
-  const handleUniversalInput = useAppStore(state => state.handleUniversalInput);
+  const initializeApp = useAppStore((state) => state.initializeApp);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const error = useAppStore((state) => state.error);
+  const identity = useAppStore((state) => state.identity);
+  const activeChat = useAppStore((state) => state.activeChat);
+  const showStealthModal = useAppStore((state) => state.showStealthModal);
+  const setShowStealthModal = useAppStore((state) => state.setShowStealthModal);
+  const sessionPassphrase = useAppStore((state) => state.sessionPassphrase);
+  const setActiveChat = useAppStore((state) => state.setActiveChat);
+  const handleUniversalInput = useAppStore((state) => state.handleUniversalInput);
 
   // ATOMIC SELECTORS for UI Store
-  const language = useUIStore(state => state.language);
-  const isLocked = useUIStore(state => state.isLocked);
-  const setLocked = useUIStore(state => state.setLocked);
-  const activeTab = useUIStore(state => state.activeTab);
-  const setActiveTab = useUIStore(state => state.setActiveTab);
-  const camouflageLanguage = useUIStore(state => state.camouflageLanguage);
-  const isStandalone = useUIStore(state => state.isStandalone);
-  const deferredPrompt = useUIStore(state => state.deferredPrompt);
-  const setInstallPromptVisible = useUIStore(state => state.setInstallPromptVisible);
+  const language = useUIStore((state) => state.language);
+  const isLocked = useUIStore((state) => state.isLocked);
+  const setLocked = useUIStore((state) => state.setLocked);
+  const activeTab = useUIStore((state) => state.activeTab);
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const camouflageLanguage = useUIStore((state) => state.camouflageLanguage);
+  const isStandalone = useUIStore((state) => state.isStandalone);
+  const deferredPrompt = useUIStore((state) => state.deferredPrompt);
+  const setInstallPromptVisible = useUIStore((state) => state.setInstallPromptVisible);
 
   // [PERF] Selector stability telemetry - track which selectors are changing
-  console.log(`[PERF][RENDER] App - Selectors: { identity: ${!!identity}, activeChat: ${activeChat?.fingerprint || 'null'}, isLocked: ${isLocked}, isLoading: ${isLoading} }`);
+  console.log(
+    `[PERF][RENDER] App - Selectors: { identity: ${!!identity}, activeChat: ${activeChat?.fingerprint || 'null'}, isLocked: ${isLocked}, isLoading: ${isLoading} }`,
+  );
 
   const { t, i18n } = useTranslation();
 
@@ -197,29 +206,35 @@ export default function App() {
 
   // Biometric Prompt State
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
-  const isBiometricsEnabled = useAppStore(state => state.isBiometricsEnabled);
-  const isBiometricsSupported = useAppStore(state => state.isBiometricsSupported);
-  const enableBiometrics = useAppStore(state => state.enableBiometrics);
+  const isBiometricsEnabled = useAppStore((state) => state.isBiometricsEnabled);
+  const isBiometricsSupported = useAppStore((state) => state.isBiometricsSupported);
+  const enableBiometrics = useAppStore((state) => state.enableBiometrics);
 
   // Show biometric prompt after unlock if supported but not enabled
   useEffect(() => {
     logger.debug('[Biometrics] Checking prompt conditions:', {
-        isLocked,
-        hasIdentity: !!identity,
-        hasPassphrase: !!sessionPassphrase,
-        isSupported: isBiometricsSupported,
-        isEnabled: isBiometricsEnabled,
-        dismissed: localStorage.getItem('biometric_onboarding_dismissed') === 'true',
-        checkResult: (!isLocked && identity && sessionPassphrase && isBiometricsSupported && !isBiometricsEnabled && localStorage.getItem('biometric_onboarding_dismissed') !== 'true')
-    });
-
-    if (
+      isLocked,
+      hasIdentity: !!identity,
+      hasPassphrase: !!sessionPassphrase,
+      isSupported: isBiometricsSupported,
+      isEnabled: isBiometricsEnabled,
+      dismissed: localStorage.getItem('biometric_onboarding_dismissed') === 'true',
+      checkResult:
         !isLocked &&
         identity &&
         sessionPassphrase &&
         isBiometricsSupported &&
         !isBiometricsEnabled &&
-        localStorage.getItem('biometric_onboarding_dismissed') !== 'true'
+        localStorage.getItem('biometric_onboarding_dismissed') !== 'true',
+    });
+
+    if (
+      !isLocked &&
+      identity &&
+      sessionPassphrase &&
+      isBiometricsSupported &&
+      !isBiometricsEnabled &&
+      localStorage.getItem('biometric_onboarding_dismissed') !== 'true'
     ) {
       logger.debug('[Biometrics] Scheduling prompt...');
       const timer = setTimeout(() => {
@@ -232,16 +247,16 @@ export default function App() {
 
   const handleEnableBiometrics = async () => {
     try {
-       const success = await enableBiometrics();
-       if (success) {
-          toast.success(t('biometric.enabled', 'Biometric unlock enabled'));
-          setShowBiometricPrompt(false);
-       } else {
-          toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
-       }
+      const success = await enableBiometrics();
+      if (success) {
+        toast.success(t('biometric.enabled', 'Biometric unlock enabled'));
+        setShowBiometricPrompt(false);
+      } else {
+        toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
+      }
     } catch (e) {
-       console.error('Biometric enable error:', e);
-       toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
+      console.error('Biometric enable error:', e);
+      toast.error(t('biometric.enable_failed', 'Failed to enable biometrics'));
     }
   };
 
@@ -410,59 +425,62 @@ export default function App() {
       }
 
       try {
-         // handleUniversalInput handles everything: parsing, decrypting, storing
-         const result = await handleUniversalInput(text, undefined, true);
-         if (result && result.type === 'message') {
-            // Success - show manual paste modal populated?
-            // Or just navigate?
-            // Current flow usually shows ManualPasteModal or toast
-            // For now, let's toast success or show detection logic if appropriate
-            toast.success('Message imported successfully');
-         }
+        // handleUniversalInput handles everything: parsing, decrypting, storing
+        const result = await handleUniversalInput(text, undefined, true);
+        if (result && result.type === 'message') {
+          // Success - show manual paste modal populated?
+          // Or just navigate?
+          // Current flow usually shows ManualPasteModal or toast
+          // For now, let's toast success or show detection logic if appropriate
+          toast.success('Message imported successfully');
+        }
       } catch (err) {
-         logger.error('Manual paste failed:', err);
-         toast.error('Invalid code or message');
-         manualPasteModal.onOpen(); // Fallback to manual entry
+        logger.error('Manual paste failed:', err);
+        toast.error('Invalid code or message');
+        manualPasteModal.onOpen(); // Fallback to manual entry
       }
-
     } catch (err) {
-      if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
-         toast.error('Clipboard permission denied');
+      if (
+        err instanceof Error &&
+        (err.name === 'NotAllowedError' || err.name === 'SecurityError')
+      ) {
+        toast.error('Clipboard permission denied');
       } else {
-         manualPasteModal.onOpen();
+        manualPasteModal.onOpen();
       }
     }
   };
 
-
-
   // Handle new message from clipboard detection - STABILIZED
-  const handleNewMessage = useCallback((result: {
-    type: 'message';
-    fingerprint: string;
-    isBroadcast: boolean;
-    senderName: string;
-  }) => {
-    console.log(`[PERF][TRACE] 6. App.tsx received detection result: ${result.fingerprint}`);
-    const _showNewMessageModal = showNewMessageModalRef.current;
-    const _newMessageResult = newMessageResultRef.current;
+  const handleNewMessage = useCallback(
+    (result: {
+      type: 'message';
+      fingerprint: string;
+      isBroadcast: boolean;
+      senderName: string;
+    }) => {
+      console.log(`[PERF][TRACE] 6. App.tsx received detection result: ${result.fingerprint}`);
+      const _showNewMessageModal = showNewMessageModalRef.current;
+      const _newMessageResult = newMessageResultRef.current;
 
-    // DUPLICATE PREVENTION: If modal is already open for same fingerprint, ignore
-    if (_showNewMessageModal && _newMessageResult?.fingerprint === result.fingerprint) {
-      logger.debug('App: Ignoring duplicate new message - modal already open');
-      return;
-    }
+      // DUPLICATE PREVENTION: If modal is already open for same fingerprint, ignore
+      if (_showNewMessageModal && _newMessageResult?.fingerprint === result.fingerprint) {
+        logger.debug('App: Ignoring duplicate new message - modal already open');
+        return;
+      }
 
-    // UNIFICATION: Use NewMessageModal for messages to ensure consistent UI and testability
-    setNewMessageResult({
-      type: 'message',
-      fingerprint: result.fingerprint,
-      isBroadcast: result.isBroadcast,
-      senderName: result.senderName,
-    });
-    console.log(`[PERF][TRACE] 7. Setting modal state: NewMessageModal to true`);
-    setShowNewMessageModal(true);
-  }, []); // STABLE: Empty dependency array guarantees hook never re-inits
+      // UNIFICATION: Use NewMessageModal for messages to ensure consistent UI and testability
+      setNewMessageResult({
+        type: 'message',
+        fingerprint: result.fingerprint,
+        isBroadcast: result.isBroadcast,
+        senderName: result.senderName,
+      });
+      console.log(`[PERF][TRACE] 7. Setting modal state: NewMessageModal to true`);
+      setShowNewMessageModal(true);
+    },
+    [],
+  ); // STABLE: Empty dependency array guarantees hook never re-inits
 
   const handleCopyIdentity = async () => {
     if (!identity) return;
@@ -520,7 +538,9 @@ export default function App() {
 
       lockTimeoutRef.current = setTimeout(() => {
         if (identity) {
-          console.log(`[PERF][Security] Lock timeout exceeded at ${performance.now().toFixed(2)}ms, locking app`);
+          console.log(
+            `[PERF][Security] Lock timeout exceeded at ${performance.now().toFixed(2)}ms, locking app`,
+          );
           setLocked(true);
         }
         lockTimeoutRef.current = null;
@@ -529,7 +549,9 @@ export default function App() {
 
     const cancelLockTimer = () => {
       if (lockTimeoutRef.current) {
-        console.log(`[PERF][Security] cancelLockTimer triggered at ${performance.now().toFixed(2)}ms`);
+        console.log(
+          `[PERF][Security] cancelLockTimer triggered at ${performance.now().toFixed(2)}ms`,
+        );
         clearTimeout(lockTimeoutRef.current);
         lockTimeoutRef.current = null;
       }
@@ -625,7 +647,7 @@ export default function App() {
       <div className="min-h-screen bg-industrial-950 text-industrial-100 flex flex-col relative overflow-hidden">
         {(import.meta.env.DEV || localStorage.getItem('nahan_force_perf_hud') === 'true') && (
           <Suspense fallback={null}>
-             <PerfHUD />
+            <PerfHUD />
           </Suspense>
         )}
         <PWAInstallPrompt />
@@ -705,11 +727,7 @@ export default function App() {
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-industrial-800 rounded-lg flex items-center justify-center overflow-hidden border border-industrial-700">
-                <img
-                  src={`${import.meta.env.BASE_URL}pwa-192x192.png`}
-                  alt="Nahan"
-                  className="w-full h-full object-cover"
-                />
+                <img src={pwaLogo} alt="Nahan" className="w-full h-full object-cover" />
               </div>
               <h1 className="text-xl font-bold text-industrial-100">{t('app.title')}</h1>
               <span className="text-xs text-industrial-400 bg-industrial-800 px-2 py-1 rounded hidden sm:inline-block">
@@ -733,7 +751,6 @@ export default function App() {
 
               {identity && (
                 <div className="flex items-center gap-2">
-
                   <Button
                     isIconOnly
                     variant="flat"
@@ -811,13 +828,15 @@ export default function App() {
                   <Avatar
                     name={identity.name}
                     classNames={{
-                      base: "flex-shrink-0 bg-gradient-to-br from-industrial-700 to-industrial-800 text-industrial-200"
+                      base: 'flex-shrink-0 bg-gradient-to-br from-industrial-700 to-industrial-800 text-industrial-200',
                     }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-industrial-100 truncate">{identity.name}</p>
                     <div className="flex items-center gap-1 text-xs text-industrial-500">
-                      <span className="truncate" dir="ltr">{identity.fingerprint.slice(0, 8)}...{identity.fingerprint.slice(-8)}</span>
+                      <span className="truncate" dir="ltr">
+                        {identity.fingerprint.slice(0, 8)}...{identity.fingerprint.slice(-8)}
+                      </span>
                     </div>
                   </div>
                 </div>

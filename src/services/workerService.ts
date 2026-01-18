@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable max-lines-per-function */
 import * as logger from '../utils/logger';
+import ProcessingWorker from '../workers/processing.worker?worker&inline';
+import StorageWorker from '../workers/storage.worker?worker&inline';
 
 // Type definitions for Worker Tasks
 export interface WorkerTask<T = unknown> {
@@ -43,16 +45,12 @@ export class WorkerService {
     this.isTerminated = false;
     if (typeof Worker !== 'undefined') {
       // Storage Worker (DB Access)
-      this.storageWorker = new Worker(new URL('../workers/storage.worker.ts', import.meta.url), {
-        type: 'module',
-      });
+      this.storageWorker = new StorageWorker();
       this.storageWorker.onmessage = (e) => this.handleWorkerMessage(e, 'storage');
       this.storageWorker.onerror = (e) => this.handleWorkerError(e, 'storage');
 
       // Processing Worker (CPU Intensive)
-      this.processingWorker = new Worker(new URL('../workers/processing.worker.ts', import.meta.url), {
-        type: 'module',
-      });
+      this.processingWorker = new ProcessingWorker();
       this.processingWorker.onmessage = (e) => this.handleWorkerMessage(e, 'processing');
       this.processingWorker.onerror = (e) => this.handleWorkerError(e, 'processing');
     }

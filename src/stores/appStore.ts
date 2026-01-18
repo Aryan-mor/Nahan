@@ -36,6 +36,21 @@ export const useAppStore = create<AppState>()(
         // Messages are stored in IndexedDB only (via storageService)
         // UI state (language, PWA, isLocked, failedAttempts) is in separate unencrypted store
       }),
+      migrate: (persistedState: unknown, _version: number) => {
+        // SecureStorage Wraps data in { version: 2, encrypted: ... }
+        // If we see this, it means we have the encrypted blob, not the state.
+        // We cannot decrypt it here (sync), so we return empty state to use defaults.
+        // The app will manually rehydrate/decrypt when the Master Key is available.
+        if (
+          persistedState &&
+          typeof persistedState === 'object' &&
+          'encrypted' in persistedState &&
+          'iv' in persistedState
+        ) {
+          return {};
+        }
+        return persistedState;
+      },
     },
   ),
 );

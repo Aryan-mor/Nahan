@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import * as logger from '../utils/logger';
+import AuthWorker from '../workers/auth.worker?worker&inline';
 
 /**
  * SecureStorage - Encrypted localStorage wrapper
@@ -227,9 +228,7 @@ const _pendingAuthRequests = new Map<
 
 function getAuthWorker(): Worker {
   if (!_authWorker) {
-    _authWorker = new Worker(new URL('../workers/auth.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    _authWorker = new AuthWorker();
     _authWorker.onmessage = (event) => {
       const { id, success, data, error } = event.data;
       const request = _pendingAuthRequests.get(id);

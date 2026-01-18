@@ -72,7 +72,26 @@ export class ContactPage {
   }
 
   async verifyContactAdded(name: string) {
-    await this.page.getByTestId('nav-chats-tab').click();
+    // If Chat View is open (blocking navigation), close it first
+    if (await this.page.getByTestId('chat-view-container').isVisible()) {
+      await this.page.getByTestId('back-to-list-btn').click();
+      await expect(this.page.getByTestId('chat-view-container')).toBeHidden();
+    }
+
+    // Try to click the chats tab (handling potential mobile/desktop visibility if needed, 
+    // but trusting the existing selector if it was just an overlay issue)
+    const chatsTab = this.page.getByTestId('nav-chats-tab');
+    const mobileChatsTab = this.page.getByTestId('nav-mobile-chats-tab');
+
+    if (await chatsTab.isVisible()) {
+      await chatsTab.click();
+    } else if (await mobileChatsTab.isVisible()) {
+      await mobileChatsTab.click();
+    } else {
+        // Fallback or force click one of them if neither seems visible (unlikely if chat view is closed)
+        await chatsTab.click({ force: true });
+    }
+    
     await expect(this.page.getByTestId(`chat-item-${name}`).first()).toBeVisible();
   }
 

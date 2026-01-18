@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import pwaLogo from '../../assets/pwa-192x192.png?inline';
 
 export function WelcomeHeader() {
   const { t } = useTranslation();
@@ -14,7 +15,7 @@ export function WelcomeHeader() {
         className="w-24 h-24 bg-industrial-800 rounded-2xl p-4 shadow-2xl border border-industrial-700"
       >
         <img
-          src={`${import.meta.env.BASE_URL}pwa-192x192.png`}
+          src={pwaLogo}
           alt={t('welcome.logo_alt')}
           className="w-full h-full object-contain"
         />

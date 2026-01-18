@@ -14,9 +14,13 @@ const inlineFaviconPlugin = () => {
       try {
         const faviconPath = path.resolve(__dirname, 'public/favicon.ico');
         const appleIconPath = path.resolve(__dirname, 'public/apple-touch-icon.png');
+        const pwa192Path = path.resolve(__dirname, 'public/pwa-192x192.png');
+        const pwa512Path = path.resolve(__dirname, 'public/pwa-512x512.png');
 
         const faviconBase64 = fs.readFileSync(faviconPath).toString('base64');
         const appleIconBase64 = fs.readFileSync(appleIconPath).toString('base64');
+        const pwa192Base64 = fs.readFileSync(pwa192Path).toString('base64');
+        const pwa512Base64 = fs.readFileSync(pwa512Path).toString('base64');
 
         return html
           .replace(
@@ -26,6 +30,14 @@ const inlineFaviconPlugin = () => {
           .replace(
             '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />',
             `<link rel="apple-touch-icon" href="data:image/png;base64,${appleIconBase64}" />`,
+          )
+          .replace(
+            'href="/pwa-192x192.png"',
+            `href="data:image/png;base64,${pwa192Base64}"`,
+          )
+          .replace(
+            'href="/pwa-512x512.png"',
+            `href="data:image/png;base64,${pwa512Base64}"`,
           );
       } catch (error) {
         console.warn('Failed to inline favicon/icons:', error);
@@ -48,8 +60,8 @@ export default defineConfig({
   publicDir: false,
   resolve: {
     alias: {
-      'virtual:pwa-register/react': path.resolve(__dirname, 'src/mocks/pwa-register.ts'),
-      'virtual:pwa-register': path.resolve(__dirname, 'src/mocks/pwa-register.ts'),
+      'virtual:pwa-register/react': path.resolve(__dirname, 'src/utils/pwa-shim.ts'),
+      'virtual:pwa-register': path.resolve(__dirname, 'src/utils/pwa-shim.ts'),
     },
   },
   build: {
@@ -62,8 +74,8 @@ export default defineConfig({
     reportCompressedSize: false,
     sourcemap: false,
     rollupOptions: {
-      inlineDynamicImports: true,
       output: {
+        inlineDynamicImports: true,
         format: 'iife',
         manualChunks: undefined,
         // entryFileNames: 'assets/[name]-[hash].js', // Default is fine
