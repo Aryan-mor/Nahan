@@ -128,7 +128,7 @@ export const PinPad: React.FC<PinPadProps> = ({
 
         {/* Error Message */}
         <div className="h-6">
-          {error && <p className="text-red-400 text-sm animate-pulse">{error}</p>}
+          {error && <p className="text-red-400 text-sm animate-pulse" data-testid="pin-pad-error">{error}</p>}
         </div>
       </div>
 

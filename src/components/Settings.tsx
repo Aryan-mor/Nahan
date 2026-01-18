@@ -1,42 +1,43 @@
 /* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Divider,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Switch,
-  useDisclosure,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    Divider,
+    Input,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Select,
+    SelectItem,
+    Switch,
+    useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-  Activity,
-  AlertTriangle,
-  ChevronDown,
-  Clock,
-  Download,
-  Eye,
-  EyeOff,
-  Fingerprint,
-  Globe,
-  Heart,
-  Info,
-  Lock,
-  Settings as SettingsIcon,
-  Share2,
-  Shield,
-  Trash2,
+    Activity,
+    AlertTriangle,
+    Bomb,
+    ChevronDown,
+    Clock,
+    Download,
+    Eye,
+    EyeOff,
+    Fingerprint,
+    Globe,
+    Heart,
+    Info,
+    Lock,
+    Settings as SettingsIcon,
+    Share2,
+    Shield,
+    Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useClipboardPermission } from '../hooks/useClipboardDetection';
@@ -47,6 +48,8 @@ import * as logger from '../utils/logger';
 import { downloadPortableFile, sharePortableFile } from '../utils/portable';
 import { BiometricPromptModal } from './BiometricPromptModal';
 import { ClipboardPermissionPrompt } from './ClipboardPermissionPrompt';
+import { SelfDestructPinSetup } from './SelfDestructPinSetup';
+
 
 export function Settings() {
   const {
@@ -94,6 +97,9 @@ export function Settings() {
   const [clipboardTimeout, setClipboardTimeout] = useState(60);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showOfflineSharingInfo, setShowOfflineSharingInfo] = useState(false);
+  const [showSelfDestruct, setShowSelfDestruct] = useState(false);
+  const [isSelfDestructEnabled, setIsSelfDestructEnabled] = useState(false);
+  const [showSelfDestructSetup, setShowSelfDestructSetup] = useState(false);
   const [exportPassword, setExportPassword] = useState('');
   const [showExportPassword, setShowExportPassword] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -201,6 +207,15 @@ export function Settings() {
     { key: 'en', label: 'English', flag: '🇺🇸' },
     { key: 'fa', label: 'فارسی', flag: '🇮🇷' },
   ];
+
+  // Check if self-destruct PIN is enabled on mount
+  useEffect(() => {
+    const checkSelfDestructStatus = async () => {
+      const pin = await storageService.getSelfDestructPin();
+      setIsSelfDestructEnabled(!!pin);
+    };
+    checkSelfDestructStatus();
+  }, []);
 
   return (
     <motion.div
@@ -593,6 +608,139 @@ export function Settings() {
 
           <Divider className="bg-industrial-800" />
 
+          {/* Self-Destruct PIN Section */}
+          <div className="border border-industrial-800 rounded-lg overflow-hidden transition-all duration-300">
+            <button
+              onClick={() => setShowSelfDestruct(!showSelfDestruct)}
+              className="w-full flex items-center justify-between p-4 bg-industrial-900 hover:bg-industrial-800 transition-colors"
+              aria-expanded={showSelfDestruct}
+              data-testid="self-destruct-accordion-toggle"
+            >
+              <div className="flex items-center space-x-3">
+                <Bomb className="w-5 h-5 text-red-400" />
+                <div className="text-left">
+                  <p className="font-medium text-industrial-100">
+                    {t('settings.security.self_destruct.title', 'Emergency Data Wipe')}
+                  </p>
+                  <p className="text-sm text-industrial-400">
+                    {t(
+                      'settings.security.self_destruct.subtitle',
+                      'Set up a special PIN to instantly wipe all data',
+                    )}
+                  </p>
+                </div>
+              </div>
+              <ChevronDown
+                className={`w-5 h-5 text-industrial-400 transition-transform duration-300 ${
+                  showSelfDestruct ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {/* Collapsible Content */}
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                showSelfDestruct ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="p-4 bg-industrial-900.5 space-y-4 border-t border-industrial-800">
+                {/* Description */}
+                <p className="text-sm text-industrial-300 leading-relaxed">
+                  {t(
+                    'settings.security.self_destruct.description',
+                    'This security feature allows you to configure a special PIN that will immediately delete all your data when entered on the lock screen. This is useful in emergency situations where you need to quickly destroy sensitive information.',
+                  )}
+                </p>
+
+                {/* Warning Banner */}
+                <div className="bg-red-900/20 border border-red-700 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-300">
+                      {t(
+                        'settings.security.self_destruct.warning',
+                        '⚠️ This action is irreversible. All messages, contacts, and identity will be permanently deleted.',
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-industrial-950 border border-industrial-800">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        isSelfDestructEnabled ? 'bg-green-400' : 'bg-industrial-600'
+                      }`}
+                    />
+                    <span className="text-sm text-industrial-300" data-testid="self-destruct-status">
+                      {isSelfDestructEnabled
+                        ? t(
+                            'settings.security.self_destruct.status_enabled',
+                            'Emergency PIN is configured',
+                          )
+                        : t(
+                            'settings.security.self_destruct.status_disabled',
+                            'No emergency PIN configured',
+                          )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  {!isSelfDestructEnabled ? (
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="warning"
+                      startContent={<Shield className="w-4 h-4" />}
+                      onPress={() => setShowSelfDestructSetup(true)}
+                      className="flex-1 py-3"
+                      data-testid="setup-self-destruct-button"
+                    >
+                      {t('settings.security.self_destruct.setup_button', 'Setup Emergency PIN')}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="warning"
+                        startContent={<Shield className="w-4 h-4" />}
+                        onPress={() => setShowSelfDestructSetup(true)}
+                        className="flex-1 py-3"
+                        data-testid="change-self-destruct-button"
+                      >
+                        {t('settings.security.self_destruct.change_button', 'Change Emergency PIN')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="danger"
+                        startContent={<Trash2 className="w-4 h-4" />}
+                        onPress={async () => {
+                          await storageService.removeSelfDestructPin();
+                          setIsSelfDestructEnabled(false);
+                          toast.success(
+                            t(
+                              'settings.security.self_destruct.remove_success',
+                              'Emergency PIN removed',
+                            ),
+                          );
+                        }}
+                        className="flex-1 py-3"
+                        data-testid="remove-self-destruct-button"
+                      >
+                        {t('settings.security.self_destruct.remove_button', 'Remove Emergency PIN')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Divider className="bg-industrial-800" />
 
           {/* Advanced Options Accordion */}
@@ -962,6 +1110,16 @@ export function Settings() {
           // Force re-check or just toast
           toast.success(t('clipboard.permission.granted', 'Clipboard permission granted'));
           onClipboardModalOpenChange();
+        }}
+      />
+
+      {/* Self-Destruct PIN Setup Modal */}
+      <SelfDestructPinSetup
+        isOpen={showSelfDestructSetup}
+        onClose={() => setShowSelfDestructSetup(false)}
+        onSuccess={() => {
+          setIsSelfDestructEnabled(true);
+          setShowSelfDestructSetup(false);
         }}
       />
     </motion.div>

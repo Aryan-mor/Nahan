@@ -160,6 +160,13 @@ export function MyQRModal({ isOpen, onOpenChange, contact }: MyQRModalProps) {
             </ModalBody>
             <ModalFooter className="justify-center gap-3">
               <Button
+                variant="light"
+                onPress={() => onOpenChange(false)}
+                data-testid="qr-modal-close-button"
+              >
+                {t('common.close')}
+              </Button>
+              <Button
                 variant="flat"
                 onPress={copyToClipboard}
                 startContent={

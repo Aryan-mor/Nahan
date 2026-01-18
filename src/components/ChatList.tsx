@@ -288,10 +288,21 @@ function ChatListComponent({
                      if (key === 'delete_contact') onBulkDeleteContact();
                    }}
                  >
-                   <DropdownItem key="delete_history" startContent={<Trash2 className="w-4 h-4" />} className="text-danger">
+                   <DropdownItem
+                     key="delete_history"
+                     startContent={<Trash2 className="w-4 h-4" />}
+                     className="text-danger"
+                     data-testid="contact-option-bulk-delete-history"
+                   >
                      {t('chat.list.delete_history')}
                    </DropdownItem>
-                   <DropdownItem key="delete_contact" startContent={<Trash2 className="w-4 h-4" />} className="text-danger" description={t('chat.list.delete_contact_desc', "Also removes form list")}>
+                   <DropdownItem
+                     key="delete_contact"
+                     startContent={<Trash2 className="w-4 h-4" />}
+                     className="text-danger"
+                     description={t('chat.list.delete_contact_desc', "Also removes form list")}
+                     data-testid="contact-option-bulk-delete-contact"
+                   >
                      {t('chat.list.delete_contact')}
                    </DropdownItem>
                  </DropdownMenu>
@@ -609,29 +620,54 @@ function ChatListComponent({
                 <span className="text-xs font-normal text-industrial-500">{t('chat.list.actions_prompt', 'Choose an action')}</span>
               </ModalHeader>
               <ModalBody className="py-4 gap-3">
-                 <Button className="justify-start gap-3 bg-industrial-800 text-industrial-100" size="lg" onPress={enterSelectionMode}>
+                 <Button
+                    className="justify-start gap-3 bg-industrial-800 text-industrial-100"
+                    size="lg"
+                    onPress={enterSelectionMode}
+                    data-testid="contact-option-select"
+                  >
                     <CheckCircle className="w-5 h-5 text-primary-500" />
                     {t('common.select', 'Select')}
                  </Button>
 
-                 <Button className="justify-start gap-3 bg-industrial-800 text-industrial-100" size="lg" onPress={onShareAction}>
+                 <Button
+                    className="justify-start gap-3 bg-industrial-800 text-industrial-100"
+                    size="lg"
+                    onPress={onShareAction}
+                    data-testid="contact-option-share"
+                  >
                     <Share2 className="w-5 h-5 text-blue-400" />
                     {t('common.share', 'Share')}
                  </Button>
 
-                 <Button className="justify-start gap-3 bg-industrial-800 text-industrial-100" size="lg" onPress={onRenameAction}>
+                 <Button
+                    className="justify-start gap-3 bg-industrial-800 text-industrial-100"
+                    size="lg"
+                    onPress={onRenameAction}
+                    data-testid="contact-option-rename"
+                  >
                      <Edit2 className="w-5 h-5 text-yellow-400" />
                      {t('common.rename', 'Rename')}
                  </Button>
 
                  <div className="h-px bg-industrial-800 my-1" />
 
-                 <Button className="justify-start gap-3 bg-industrial-800 text-danger-400" size="lg" onPress={onDeleteHistoryAction}>
+                 <Button
+                    className="justify-start gap-3 bg-industrial-800 text-danger-400"
+                    size="lg"
+                    onPress={onDeleteHistoryAction}
+                    data-testid="contact-option-delete-history"
+                  >
                      <Trash2 className="w-5 h-5" />
                      {t('chat.list.delete_history', 'Delete History')}
                  </Button>
 
-                 <Button className="justify-start gap-3 bg-industrial-800 text-danger-500" size="lg" onPress={onDeleteContactAction}>
+                 <Button
+                    className="justify-start gap-3 bg-industrial-800 text-danger-500"
+                    size="lg"
+                    onPress={onDeleteContactAction}
+                    data-testid="contact-option-delete-contact"
+                  >
                      <Trash2 className="w-5 h-5 fill-current" />
                      {t('chat.list.delete_contact', 'Delete Contact')}
                  </Button>

@@ -780,6 +780,116 @@ export class StorageService {
   }
 
   /**
+   * Set self-destruct PIN (stores hashed version)
+   * @param pin The self-destruct PIN to set
+   * @param masterPin The user's master PIN (to verify it's different)
+   */
+  async setSelfDestructPin(pin: string, masterPin: string): Promise<void> {
+    if (pin === masterPin) {
+      throw new Error('Self-destruct PIN must be different from master PIN');
+    }
+
+    // Hash the PIN using PBKDF2 for secure storage
+    const encoder = new TextEncoder();
+    const pinData = encoder.encode(pin);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      pinData,
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+
+    const hashBuffer = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      256
+    );
+
+    // Store both the hash and salt
+    const hash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+    const saltStr = btoa(String.fromCharCode(...salt));
+
+    await this.setSystemSetting('self_destruct_pin_hash', hash);
+    await this.setSystemSetting('self_destruct_pin_salt', saltStr);
+  }
+
+  /**
+   * Get the stored self-destruct PIN hash
+   */
+  async getSelfDestructPin(): Promise<{ hash: string; salt: string } | null> {
+    const hash = await this.getSystemSetting<string>('self_destruct_pin_hash');
+    const salt = await this.getSystemSetting<string>('self_destruct_pin_salt');
+
+    if (!hash || !salt) {
+      return null;
+    }
+
+    return { hash, salt };
+  }
+
+  /**
+   * Verify if the entered PIN matches the self-destruct PIN
+   * @param pin The PIN to verify
+   * @returns true if it matches the self-destruct PIN, false otherwise
+   */
+  async verifySelfDestructPin(pin: string): Promise<boolean> {
+    const stored = await this.getSelfDestructPin();
+    if (!stored) {
+      return false; // No self-destruct PIN configured
+    }
+
+    try {
+      // Hash the entered PIN with the stored salt
+      const encoder = new TextEncoder();
+      const pinData = encoder.encode(pin);
+      const salt = Uint8Array.from(atob(stored.salt), c => c.charCodeAt(0));
+
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        pinData,
+        'PBKDF2',
+        false,
+        ['deriveBits']
+      );
+
+      const hashBuffer = await crypto.subtle.deriveBits(
+        {
+          name: 'PBKDF2',
+          salt: salt,
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        256
+      );
+
+      const hash = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+
+      // Compare hashes
+      return hash === stored.hash;
+    } catch (error) {
+      logger.error('Failed to verify self-destruct PIN:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove the self-destruct PIN configuration
+   */
+  async removeSelfDestructPin(): Promise<void> {
+    await this.setSystemSetting('self_destruct_pin_hash', null);
+    await this.setSystemSetting('self_destruct_pin_salt', null);
+  }
+
+  /**
    * Clear all data
    */
   async clearAllData(): Promise<void> {
