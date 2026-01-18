@@ -66,6 +66,15 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # For PR previews, we want the build to be agnostic or handle relative paths if possible.
+          # However, rossjrw/pr-preview-action serves from /Nahan/pr-previews/pr-XX/
+          # We can't easily know the PR number here during build time in a simple way without extra steps.
+          # STRATEGY CHANGE: Use relative base path './' for PR builds if possible, or
+          # rely on the action to handle it.
+          # Actually, rossjrw/pr-preview-action recommends building with a relative base or specific base.
+          # Let's try building with base='./' for PRs to make assets relative.
+          VITE_BASE_URL: ${{ github.event_name == 'pull_request' && './' || '/Nahan/' }}
 
       # Upload build artifact for downstream jobs
       - name: Upload Build Artifact
