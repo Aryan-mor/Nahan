@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
-export default defineConfig(({ command, mode: _mode }) => {
+export default defineConfig(({ command }) => {
   // Set base path:
   // - Production: '/Nahan/' (for GitHub Pages main deployment)
   // - PR Previews: Dynamic based on VITE_BASE_URL env var or relative './' if supported

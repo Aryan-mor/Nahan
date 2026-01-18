@@ -74,6 +74,7 @@ jobs:
           # rely on the action to handle it.
           # Actually, rossjrw/pr-preview-action recommends building with a relative base or specific base.
           # Let's try building with base='./' for PRs to make assets relative.
+          # If the action can't handle relative paths, we can fallback to '/Nahan/'
           VITE_BASE_URL: ${{ github.event_name == 'pull_request' && './' || '/Nahan/' }}
 
       # Upload build artifact for downstream jobs
