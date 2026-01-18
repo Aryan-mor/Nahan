@@ -277,11 +277,10 @@ export function Settings() {
                 {/* Download & Share Actions */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button
-                    size="sm"
                     color="secondary"
                     variant="flat"
                     startContent={<Download className="w-4 h-4" />}
-                    className="flex-1"
+                    className="flex-1 py-3"
                     data-testid="offline-sharing-download-button"
                     onPress={() => {
                       downloadPortableFile();
@@ -293,11 +292,10 @@ export function Settings() {
                     {t('settings.offline_sharing.download_button', 'Download App File')}
                   </Button>
                   <Button
-                    size="sm"
                     color="primary"
                     variant="flat"
                     startContent={<Share2 className="w-4 h-4" />}
-                    className="flex-1"
+                    className="flex-1 py-3"
                     data-testid="offline-sharing-share-button"
                     onPress={async () => {
                       if (!navigator.share) {
