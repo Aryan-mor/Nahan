@@ -48,3 +48,6 @@ build/
 test-results/
 playwright-report/
 tests/fixtures/*.png
+
+# Portable Build Artifacts
+public/nahan-portable.html
