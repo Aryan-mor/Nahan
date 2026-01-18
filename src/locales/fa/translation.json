@@ -266,8 +266,8 @@
   "lock": {
     "enter_pin": "پین را وارد کنید",
     "error": {
-      "incorrect_pin_one": "",
-      "incorrect_pin_other": "",
+      "incorrect_pin_one": "پین اشتباه است. {{count}} تلاش باقی\u200cمانده.",
+      "incorrect_pin_other": "پین اشتباه است. {{count}} تلاش باقی\u200cمانده.",
       "max_attempts": "تعداد تلاش\u200cهای مجاز تمام شد. در حال حذف داده\u200cها...",
       "select": "لطفاً یک هویت انتخاب کنید",
       "verify": "تایید ناموفق بود",

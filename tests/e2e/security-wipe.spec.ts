@@ -50,7 +50,7 @@ test.describe('Security Wipe (Rule 07 & 10)', () => {
         // Wait for clear toast feedback
         const remaining = 5 - i;
         const pattern = new RegExp(`Incorrect PIN.*${remaining}`, 'i');
-        await expect(page.getByText(pattern).first()).toBeVisible();
+        await expect(page.getByTestId('pin-pad-error')).toHaveText(pattern);
         await page.waitForTimeout(1000); // Allow toast to settle/animate
     }
 

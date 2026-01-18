@@ -266,8 +266,8 @@
   "lock": {
     "enter_pin": "Enter PIN",
     "error": {
-      "incorrect_pin_one": "",
-      "incorrect_pin_other": "",
+      "incorrect_pin_one": "Incorrect PIN. {{count}} attempt remaining.",
+      "incorrect_pin_other": "Incorrect PIN. {{count}} attempts remaining.",
       "max_attempts": "Maximum attempts reached. Wiping data...",
       "select": "Please select an identity",
       "verify": "Verification failed",

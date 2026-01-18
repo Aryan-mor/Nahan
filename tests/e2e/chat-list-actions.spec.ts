@@ -71,7 +71,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 2. Open Context Menu -> Delete History
     await chatListPage.openContextMenu(contactName);
-    await page.getByText('Delete History').click();
+    await page.getByTestId('contact-option-delete-history').click();
 
     // Confirm
     await page.getByTestId('confirm-delete-history').click();
@@ -96,7 +96,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 2. Open Context Menu -> Delete Contact
     await chatListPage.openContextMenu(contactName);
-    await page.getByText('Delete Contact').click();
+    await page.getByTestId('contact-option-delete-contact').click();
 
     // Confirm
     await page.getByTestId('confirm-delete-contact').click();
@@ -114,7 +114,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 2. Open Context Menu -> Rename
     await chatListPage.openContextMenu(oldName);
-    await page.getByRole('button', { name: 'Rename', exact: true }).click();
+    await page.getByTestId('contact-option-rename').click();
 
     // 3. Fill Rename Modal
     await expect(page.getByTestId('rename-modal-header')).toBeVisible();
@@ -134,7 +134,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 2. Open Context Menu -> Share
     await chatListPage.openContextMenu(contactName);
-    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await page.getByTestId('contact-option-share').click();
 
     // 3. Verify QR Code Modal
     // The modal usually has a header or QR code element
@@ -143,7 +143,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
     await expect(page.locator('canvas, svg').first()).toBeVisible();
 
     // Close modal
-    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByTestId('qr-modal-close-button').click();
   });
 
   // -------------------------------------------------------------------------
@@ -170,7 +170,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 4. Bulk Menu -> Delete History
     await chatListPage.selectionMenuTrigger.click();
-    await page.getByText('Delete History').click();
+    await page.getByTestId('contact-option-bulk-delete-history').click(); // Need to check if I updated bulk menu too
 
     // Confirm
     await page.getByTestId('confirm-delete-history').click();
@@ -201,7 +201,7 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 3. Bulk Menu -> Delete Contact
     await chatListPage.selectionMenuTrigger.click();
-    await page.getByText('Delete Contact').click();
+    await page.getByTestId('contact-option-bulk-delete-contact').click();
 
     // Confirm
     await page.getByTestId('confirm-delete-contact').click();
