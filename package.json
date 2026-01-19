@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:portable && tsc -b && vite build",
-    "build:portable": "tsc -b && vite build --config vite.portable.config.ts && move /Y public\\index.html public\\nahan-portable.html",
+    "build:portable": "tsc -b && vite build --config vite.portable.config.ts && node -e \"const fs=require('fs'); try{fs.unlinkSync('public/nahan-portable.html')}catch(e){} fs.renameSync('public/index.html', 'public/nahan-portable.html')\"",
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
