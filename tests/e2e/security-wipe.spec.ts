@@ -10,21 +10,33 @@ test.describe('Security Wipe (Rule 07 & 10)', () => {
 
     // 1. Clear State (Execute inside browser)
     await page.goto('/');
+
+    // Performance Optimization: Disable all animations/transitions
+    await page.addStyleTag({
+      content: '* { transition: none !important; animation: none !important; }',
+    });
+
     await page.evaluate(async () => {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
       // Direct IDB cleanup to ensure clean slate
-      // Close any existing connection from the app to prevent blocking
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((window as any).nahanStorage) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        try {
           await (window as any).nahanStorage.close();
+        } catch { /* ignore */ }
       }
 
-      await new Promise((resolve) => {
-        const req = indexedDB.deleteDatabase('nahan');
-        req.onsuccess = () => resolve(undefined);
-        req.onerror = () => resolve(undefined);
-        req.onblocked = () => resolve(undefined);
-      });
+      const dbs = await window.indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name) {
+          await new Promise<void>((resolve) => {
+            const req = window.indexedDB.deleteDatabase(db.name!);
+            const timeout = setTimeout(() => resolve(), 3000);
+            req.onsuccess = () => { clearTimeout(timeout); resolve(); };
+            req.onerror = () => { clearTimeout(timeout); resolve(); };
+            req.onblocked = () => { clearTimeout(timeout); resolve(); };
+          });
+        }
+      }
       localStorage.clear();
       sessionStorage.clear();
     });

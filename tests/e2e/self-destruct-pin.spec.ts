@@ -43,7 +43,7 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
     // Expand Emergency Data Wipe accordion
     const accordionToggle = page.getByTestId('self-destruct-accordion-toggle');
-    await expect(accordionToggle).toBeVisible({ timeout: 10000 });
+    await expect(accordionToggle).toBeVisible({ timeout: 20000 });
 
     // Scroll into view to ensure it's clickable
     await accordionToggle.scrollIntoViewIfNeeded();

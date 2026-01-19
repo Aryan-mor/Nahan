@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:portable": "tsc -b && vite build --config vite.portable.config.ts && move public\\index.html public\\nahan-portable.html",
+    "build": "npm run build:portable && tsc -b && vite build",
+    "build:portable": "tsc -b && vite build --config vite.portable.config.ts && move /Y public\\index.html public\\nahan-portable.html",
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc -b --noEmit",

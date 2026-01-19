@@ -907,6 +907,31 @@ export class StorageService {
   }
 
   /**
+   * Clear only contact data
+   */
+  async clearAllContacts(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const tx = this.db.transaction('secure_vault', 'readwrite');
+      const store = tx.objectStore('secure_vault');
+      const contactPrefix = await getBlindIndexPrefix('CONTACTS');
+      let cursor = await store.openCursor();
+
+      while (cursor) {
+        if (cursor.key.toString().startsWith(contactPrefix)) {
+          await cursor.delete();
+        }
+        cursor = await cursor.continue();
+      }
+      await tx.done;
+    } catch (error) {
+      logger.error('Failed to clear contacts:', error);
+      throw new Error('Failed to clear contacts');
+    }
+  }
+
+  /**
    * Clear only message data (keep identities and contacts)
    */
   async clearAllMessages(): Promise<void> {
