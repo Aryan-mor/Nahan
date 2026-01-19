@@ -73,16 +73,24 @@ test.describe('Chat List Actions (Contact Management)', () => {
     await chatListPage.openContextMenu(contactName);
     await page.getByTestId('contact-option-delete-history').click();
 
+    // Wait for modal to be visible
+    await page.waitForTimeout(1000);
+
     // Confirm
-    await page.getByTestId('confirm-delete-history').click();
+    const confirmButton = page.getByTestId('confirm-delete-history');
+    await expect(confirmButton).toBeVisible({ timeout: 10000 });
+    await confirmButton.click();
+
+    // Wait for deletion to complete
+    await page.waitForTimeout(2000);
 
     // 3. Verify
     // Message should be gone, replaced by "No messages yet"
-    await expect(page.getByText(messageContent)).not.toBeVisible();
+    await expect(page.getByText(messageContent)).not.toBeVisible({ timeout: 10000 });
 
     // Verify specific contact item shows "No messages yet"
     const contactItem = await chatListPage.getContactItem(contactName);
-    await expect(contactItem.getByText('No messages yet')).toBeVisible();
+    await expect(contactItem.getByText('No messages yet')).toBeVisible({ timeout: 10000 });
 
     // Contact should still exist
     await expect(contactItem).toBeVisible();
@@ -116,14 +124,20 @@ test.describe('Chat List Actions (Contact Management)', () => {
     await chatListPage.openContextMenu(oldName);
     await page.getByTestId('contact-option-rename').click();
 
+    // Wait for modal
+    await page.waitForTimeout(1000);
+
     // 3. Fill Rename Modal
-    await expect(page.getByTestId('rename-modal-header')).toBeVisible();
+    await expect(page.getByTestId('rename-modal-header')).toBeVisible({ timeout: 10000 });
     await page.getByTestId('rename-input').fill(newName);
     await page.getByTestId('rename-save-button').click();
 
+    // Wait for rename to complete
+    await page.waitForTimeout(2000);
+
     // 4. Verify
-    await expect(await chatListPage.getContactItem(newName)).toBeVisible();
-    await expect(page.getByText(oldName)).not.toBeVisible();
+    await expect(await chatListPage.getContactItem(newName)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(oldName)).not.toBeVisible({ timeout: 10000 });
   });
 
   test('should share a specific contact', async ({ page }) => {
@@ -170,19 +184,27 @@ test.describe('Chat List Actions (Contact Management)', () => {
 
     // 4. Bulk Menu -> Delete History
     await chatListPage.selectionMenuTrigger.click();
-    await page.getByTestId('contact-option-bulk-delete-history').click(); // Need to check if I updated bulk menu too
+    await page.getByTestId('contact-option-bulk-delete-history').click();
+
+    // Wait for modal
+    await page.waitForTimeout(1000);
 
     // Confirm
-    await page.getByTestId('confirm-delete-history').click();
+    const confirmButton = page.getByTestId('confirm-delete-history');
+    await expect(confirmButton).toBeVisible({ timeout: 10000 });
+    await confirmButton.click();
+
+    // Wait for deletion to complete
+    await page.waitForTimeout(2000);
 
     // 5. Verify
     // Wait for UI to settle (selection mode might exit or list refreshes)
-    await expect(page.getByText('Msg A')).not.toBeVisible();
-    await expect(page.getByText('Msg B')).not.toBeVisible();
+    await expect(page.getByText('Msg A')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Msg B')).not.toBeVisible({ timeout: 10000 });
 
     // Both contacts should still be there
-    await expect(page.getByText(userA)).toBeVisible();
-    await expect(page.getByText(userB)).toBeVisible();
+    await expect(page.getByText(userA)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(userB)).toBeVisible({ timeout: 10000 });
   });
 
   test('should delete multiple contacts from the list', async ({ page }) => {

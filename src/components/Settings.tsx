@@ -1,45 +1,46 @@
 /* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
 import {
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    Divider,
-    Input,
-    Modal,
-    ModalBody,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    Select,
-    SelectItem,
-    Switch,
-    useDisclosure,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Divider,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Select,
+  SelectItem,
+  Switch,
+  useDisclosure,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
-    Activity,
-    AlertTriangle,
-    Bomb,
-    ChevronDown,
-    Clock,
-    Download,
-    Eye,
-    EyeOff,
-    Fingerprint,
-    Globe,
-    Heart,
-    Info,
-    Lock,
-    Settings as SettingsIcon,
-    Share2,
-    Shield,
-    Trash2,
+  Activity,
+  AlertTriangle,
+  Bomb,
+  ChevronDown,
+  Clock,
+  Download,
+  Eye,
+  EyeOff,
+  Fingerprint,
+  Globe,
+  Heart,
+  Info,
+  Lock,
+  Settings as SettingsIcon,
+  Share2,
+  Shield,
+  Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { APP_VERSION } from '../constants/app';
 import { useClipboardPermission } from '../hooks/useClipboardDetection';
 import { storageService } from '../services/storage';
 import { useAppStore } from '../stores/appStore';
@@ -936,6 +937,14 @@ export function Settings() {
         >
           {t('settings.clear.title')}
         </Button>
+      </div>
+
+      {/* Version Display */}
+      <div className="flex justify-center pt-2">
+        {/* eslint-disable-next-line i18next/no-literal-string */}
+        <p className="text-xs text-industrial-500" data-testid="app-version">
+          v{APP_VERSION}
+        </p>
       </div>
 
       {/* Logout Modal */}

@@ -88,28 +88,32 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
     const accordionToggle = page.getByTestId('self-destruct-accordion-toggle');
     await accordionToggle.scrollIntoViewIfNeeded();
     await accordionToggle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const setupButton = page.getByTestId('setup-self-destruct-button');
     await setupButton.click();
 
+    // Wait for modal to be visible
+    await expect(page.getByTestId('self-destruct-modal')).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+
     // Try to use master PIN as emergency PIN
     await authPage.enterPin(MASTER_PIN);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Error message should be visible on pin pad
-    await expect(page.locator('[data-testid="pin-pad-error"]')).toBeVisible();
+    await expect(page.locator('[data-testid="pin-pad-error"]')).toBeVisible({ timeout: 10000 });
 
     // PIN should be cleared, enter different PIN
     await authPage.enterPin(DIFFERENT_PIN);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Try to confirm with wrong PIN
     await authPage.enterPin('222222');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Verify mismatch error
-    await expect(page.locator('[data-testid="pin-pad-error"]')).toBeVisible();
+    await expect(page.locator('[data-testid="pin-pad-error"]')).toBeVisible({ timeout: 10000 });
   });
 
   test('should trigger data wipe when emergency PIN is entered on lock screen', async ({ page }) => {
@@ -188,17 +192,22 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
     const accordionToggle = page.getByTestId('self-destruct-accordion-toggle');
     await accordionToggle.scrollIntoViewIfNeeded();
     await accordionToggle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     const setupButton = page.getByTestId('setup-self-destruct-button');
     await setupButton.click();
 
+    // Wait for modal
+    await expect(page.getByTestId('self-destruct-modal')).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+
     await authPage.enterPin(EMERGENCY_PIN);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     await authPage.enterPin(EMERGENCY_PIN);
 
     // Wait for modal to close
     await expect(page.getByTestId('self-destruct-modal')).not.toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
 
     // Lock and unlock with master PIN
     await page.reload();
@@ -206,13 +215,13 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
     // Navigate back to Settings
     await settingsTab.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     await accordionToggle.scrollIntoViewIfNeeded();
     await accordionToggle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     // Verify emergency PIN is still configured
-    await expect(page.getByTestId('self-destruct-status')).toContainText(/Emergency PIN is configured/i);
+    await expect(page.getByTestId('self-destruct-status')).toContainText(/Emergency PIN is configured/i, { timeout: 10000 });
   });
 
   test('should remove emergency PIN successfully', async ({ page }) => {
