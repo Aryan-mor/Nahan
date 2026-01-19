@@ -5,18 +5,33 @@ import * as logger from './logger';
  * Helpers for sharing and downloading the application as a single HTML file.
  */
 
+// Get the base URL from Vite config (e.g., '/Nahan/' or './')
+const PORTABLE_FILE_URL = `${import.meta.env.BASE_URL}nahan-portable.html`;
+
 /**
  * Share the current application file (Self-Replication)
- * Uses Web Share API to share the stored portable HTML file.
+ * Uses Web Share API to share the current HTML or a pre-built portable file.
  */
 export async function sharePortableFile(): Promise<boolean> {
   try {
-    // Fetch the pre-built portable file from public directory
-    const response = await fetch('/nahan-portable.html');
-    if (!response.ok) {
-      throw new Error('Portable file not found');
+    let blob: Blob;
+
+    // Use current HTML if on file:// or if fetch fails
+    if (window.location.protocol === 'file:') {
+      const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      blob = new Blob([html], { type: 'text/html' });
+    } else {
+      try {
+        const response = await fetch(PORTABLE_FILE_URL);
+        if (!response.ok) throw new Error('Fetch failed');
+        blob = await response.blob();
+      } catch (e) {
+        logger.warn('Share fetch failed, falling back to current HTML:', e);
+        const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        blob = new Blob([html], { type: 'text/html' });
+      }
     }
-    const blob = await response.blob();
+
     const file = new File([blob], 'nahan-portable.html', { type: 'text/html' });
 
     // Check if sharing is supported and valid
@@ -41,25 +56,29 @@ export async function sharePortableFile(): Promise<boolean> {
 
 /**
  * Download the current application file (Self-Replication)
- * Triggers a download of the stored portable HTML file.
+ * Triggers a download of the current HTML or a pre-built portable file.
  */
 export async function downloadPortableFile(): Promise<void> {
   try {
-    // Fetch the pre-built portable file from public directory
-    const response = await fetch('/nahan-portable.html');
-    if (!response.ok) {
-      // Fallback to current HTML if file not found (dev mode or error)
+    // If running on file:// protocol, fetch will fail due to CORS
+    if (window.location.protocol === 'file:') {
       const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
       const blob = new Blob([html], { type: 'text/html' });
       triggerDownload(blob);
       return;
     }
 
+    // Try to fetch the pre-built portable file from public directory
+    const response = await fetch(PORTABLE_FILE_URL);
+    if (!response.ok) {
+      throw new Error('Portable file not found');
+    }
+
     const blob = await response.blob();
     triggerDownload(blob);
   } catch (error) {
-    logger.error('Download failed:', error);
-    // Fallback
+    logger.error('Download via fetch failed, falling back to current HTML:', error);
+    // Fallback to current HTML
     const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
     const blob = new Blob([html], { type: 'text/html' });
     triggerDownload(blob);

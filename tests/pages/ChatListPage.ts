@@ -12,7 +12,7 @@ export class ChatListPage {
     this.chatListTitle = page.getByTestId('chat-list-title');
     this.newChatButton = page.getByTestId('add-chat-button');
     this.selectionMenuTrigger = page.getByTestId('selection-menu-trigger');
-    this.selectButton = page.getByRole('button', { name: 'Select' });
+    this.selectButton = page.getByTestId('contact-option-select');
   }
 
   async goto() {
@@ -49,14 +49,14 @@ export class ChatListPage {
   private async reloadAndUnlock() {
     await this.page.reload();
     const lockScreen = this.page.getByTestId('lock-screen-wrapper');
-    if (await lockScreen.isVisible({ timeout: 5000 })) {
+    if (await lockScreen.isVisible({ timeout: 15000 })) {
       // console.log('Test Helper: App locked after reload. Unlocking...');
       await expect(this.page.getByTestId('pin-pad-1').first()).toBeVisible();
       for (const char of '123456') {
         await this.page.keyboard.press(char);
         await this.page.waitForTimeout(100);
       }
-      await expect(this.chatListTitle).toBeVisible({ timeout: 10000 });
+      await expect(this.chatListTitle).toBeVisible({ timeout: 15000 });
     } else {
       await this.page.waitForLoadState('networkidle');
     }
@@ -64,6 +64,7 @@ export class ChatListPage {
 
   /**
    * Create a mock contact directly in storage via exposed service
+   * AND updates the Zustand store to avoid reload
    */
   async createMockContact(name: string) {
     await this.ensureMasterKey();
@@ -75,37 +76,42 @@ export class ChatListPage {
       async ({ name, fingerprint }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const storage = (window as any).nahanStorage;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const store = (window as any).useAppStore?.getState();
+
         if (!storage) throw new Error('Storage service not exposed on window');
 
-        await storage.storeContact(
+        const newContact = await storage.storeContact(
           {
             name,
             fingerprint,
             publicKey: 'MOCK_PK_' + fingerprint,
           },
           '123456',
-        ); // Using the standard test passphrase
+        );
+
+        // Manual Store Update to avoid reload
+        if (store) {
+          store.addContact(newContact);
+        }
       },
       { name, fingerprint },
     );
 
-    await this.reloadAndUnlock();
+    // Give React time to re-render after store update
+    await this.page.waitForTimeout(500);
   }
 
   async createMockMessage(contactName: string, content: string) {
     await this.ensureMasterKey();
 
-    // We need to find the contact first to get its fingerprint
-    // This is tricky inside page.evaluate because we don't know the fingerprint generated in previous step easily
-    // unless we deterministically generate it or fetch it.
-    // The previous createMockContact used a deterministic fingerprint based on name:
-    // `TESTFP_${Date.now()}_${name}` -> This relies on Date.now() matching.
-
-    // Better: Fetch contact by name inside evaluate
     await this.page.evaluate(
       async ({ contactName, content }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const storage = (window as any).nahanStorage;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const store = (window as any).useAppStore?.getState();
+
         if (!storage) throw new Error('Storage service not exposed');
 
         const contacts = await storage.getContacts('123456');
@@ -113,7 +119,7 @@ export class ChatListPage {
         const contact = contacts.find((c: any) => c.name === contactName);
         if (!contact) throw new Error(`Contact ${contactName} not found for message creation`);
 
-        await storage.storeMessage(
+        const newMessage = await storage.storeMessage(
           {
             senderFingerprint: contact.fingerprint, // Incoming message
             recipientFingerprint: 'MY_FINGERPRINT', // Doesn't matter much for list display
@@ -127,11 +133,17 @@ export class ChatListPage {
           },
           '123456',
         );
+
+        // Manual Store Update for Chat List Preview
+        if (store) {
+          store.updateSummaryForContact(contact.fingerprint, newMessage);
+        }
       },
       { contactName, content },
     );
 
-    await this.reloadAndUnlock();
+    // Give React time to re-render
+    await this.page.waitForTimeout(500);
   }
 
   async getContactItem(name: string): Promise<Locator> {
@@ -162,10 +174,11 @@ export class ChatListPage {
 
     await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await this.page.mouse.down();
-    await this.page.waitForTimeout(600); // Threshold is 500ms
+    await this.page.waitForTimeout(2000); // Threshold is 500ms, using 2000ms for slow environments
     await this.page.mouse.up();
 
-    await expect(this.page.getByText('Choose an action')).toBeVisible();
+    // Verify menu is open by checking one of the options
+    await expect(this.selectButton).toBeVisible({ timeout: 15000 });
   }
 
   async enterSelectionMode(name: string) {

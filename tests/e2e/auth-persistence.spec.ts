@@ -9,9 +9,29 @@ test.describe('Authentication Persistence', () => {
     const pin = '123456';
     const name = 'TestUser';
 
+    // 0. Setup: Clean Slate
+    await page.goto('/');
+    await page.evaluate(async () => {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      // Direct IDB cleanup to ensure clean slate
+      if ((window as any).nahanStorage) {
+        try { await (window as any).nahanStorage.close(); } catch { /* ignore */ }
+      }
+      const dbs = await window.indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name) window.indexedDB.deleteDatabase(db.name);
+      }
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+
     // 1. Initial Signup
     await test.step('Signup Flow', async () => {
       await page.goto('/');
+      // Disable animations
+      await page.addStyleTag({
+        content: '* { transition: none !important; animation: none !important; }',
+      });
       await authPage.performSignup(name, pin);
     });
 

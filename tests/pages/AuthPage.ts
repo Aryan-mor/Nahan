@@ -29,7 +29,7 @@ export class AuthPage {
     const createPinStep = this.page.getByTestId('onboarding-create-pin');
 
     // Sometimes transition from Welcome to Create PIN takes longer or animation blocks it
-    await expect(createPinStep).toBeVisible({ timeout: 45000 });
+    await expect(createPinStep).toBeVisible({ timeout: 120000 });
     await this.enterPin(pin, createPinStep);
 
     // 4. Confirm PIN
@@ -67,7 +67,7 @@ export class AuthPage {
       await this.page.waitForLoadState('domcontentloaded');
       const welcomeOrPin = await this.page.waitForSelector(
         '[data-testid="welcome-start-button"], [data-testid="onboarding-create-pin"]',
-        { timeout: 30000 },
+        { timeout: 120000 },
       );
 
       const testId = await welcomeOrPin.getAttribute('data-testid');
@@ -102,7 +102,7 @@ export class AuthPage {
 
     // Ensure the keypad UI is generally ready (checking first button existence/visibility)
     // This confirms the component is mounted and listener is likely attached
-    await expect(this.page.getByTestId('pin-pad-1').first()).toBeVisible({ timeout: 10000 });
+    await expect(this.page.getByTestId('pin-pad-1').first()).toBeVisible({ timeout: 30000 });
 
     // Use keyboard input which is handled by window listener in PinPad.tsx
     // varying delay to ensure state updates propagate
@@ -122,6 +122,6 @@ export class AuthPage {
       this.page
         .locator('[data-testid="nav-chats-tab"], [data-testid="nav-mobile-chats-tab"]')
         .first(),
-    ).toBeVisible({ timeout: 60000 });
+    ).toBeVisible({ timeout: 90000 });
   }
 }

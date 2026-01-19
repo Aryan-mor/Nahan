@@ -38,7 +38,13 @@ const inlineFaviconPlugin = () => {
           .replace(
             'href="/pwa-512x512.png"',
             `href="data:image/png;base64,${pwa512Base64}"`,
-          );
+          )
+          // Remove external fonts that cause CORS errors on file://
+          .replace(/<link [^>]*href="https:\/\/fonts\.googleapis\.com[^>]*>/g, '')
+          .replace(/<link [^>]*href="https:\/\/fonts\.gstatic\.com[^>]*>/g, '')
+          .replace(/<link [^>]*rel="preconnect"[^>]*>/g, '')
+          // Remove manifest link as it causes CORS errors and isn't needed for portable
+          .replace(/<link [^>]*rel="manifest"[^>]*>/g, '');
       } catch (error) {
         console.warn('Failed to inline favicon/icons:', error);
         return html;
@@ -53,8 +59,8 @@ export default defineConfig({
     tsconfigPaths(),
     inlineFaviconPlugin(),
     viteSingleFile({
-      useRecommendedBuildConfig: false,
-      removeViteModuleLoader: false, // Keep the loader to avoid syntax errors with module resolution
+      useRecommendedBuildConfig: true,
+      removeViteModuleLoader: true,
     }),
   ],
   publicDir: false,
@@ -64,22 +70,19 @@ export default defineConfig({
       'virtual:pwa-register': path.resolve(__dirname, 'src/utils/pwa-shim.ts'),
     },
   },
+  base: './',
   build: {
     target: 'esnext',
     outDir: 'public',
     emptyOutDir: false,
     assetsInlineLimit: 100000000,
     chunkSizeWarningLimit: 100000000,
-    cssCodeSplit: true, // Enable CSS code split to generate CSS file for plugin to inline
+    cssCodeSplit: false, // Do not split CSS, let it be inlined
     reportCompressedSize: false,
     sourcemap: false,
     rollupOptions: {
       output: {
         inlineDynamicImports: true,
-        format: 'iife',
-        manualChunks: undefined,
-        // entryFileNames: 'assets/[name]-[hash].js', // Default is fine
-        assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
   },
