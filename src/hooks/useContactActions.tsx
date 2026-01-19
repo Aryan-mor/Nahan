@@ -22,6 +22,7 @@ export function useContactActions() {
     const setActiveChat = useAppStore(state => state.setActiveChat);
 
     const [targetContact, setTargetContact] = useState<Contact | null>(null);
+    const [targetContacts, setTargetContacts] = useState<Contact[]>([]);
     const [newName, setNewName] = useState('');
 
     // Selection Mode context (optional, if actions are triggered from bulk selection)
@@ -39,8 +40,51 @@ export function useContactActions() {
         renameModal.onOpen();
     };
 
-    const openShare = (contact: Contact) => {
-        setTargetContact(contact);
+    const openShare = (contactOrContacts: Contact | Contact[]) => {
+        if (Array.isArray(contactOrContacts)) {
+            setTargetContacts(contactOrContacts);
+            setTargetContact(null);
+        } else {
+            setTargetContact(contactOrContacts);
+            setTargetContacts([]);
+        }
+        // If sharing multiple contacts, wait for prompt confirmation inside the QR modal logic
+        // But the prompt needs to happen BEFORE showing the QR modal with the final list.
+        // So we might need an intermediate state or a separate "Confirm Share Identity" modal.
+        // Or we can handle this inside MyQRModal?
+        // The user request implies a prompt "Do you want include your identity also?".
+        // If we handle it here, we need another modal.
+        // Let's add a `shareConfirmModal` state.
+        
+        if (Array.isArray(contactOrContacts) && contactOrContacts.length > 0) {
+             shareConfirmModal.onOpen();
+        } else {
+             qrModal.onOpen();
+        }
+    };
+
+    const shareConfirmModal = useDisclosure();
+    
+    const handleConfirmShare = (includeIdentity: boolean) => {
+        if (includeIdentity) {
+            const { identity } = useAppStore.getState();
+            if (identity) {
+                 // Convert identity to Contact-like structure to append
+                 // However, identity has privateKey. We need to be careful.
+                 // MyQRModal expects Contact[] or Identity.
+                 // Let's construct a temporary Contact object for "Me"
+                 const meAsContact: Contact = {
+                     id: 'me',
+                     name: identity.name,
+                     publicKey: identity.publicKey,
+                     fingerprint: identity.fingerprint,
+                     createdAt: new Date(),
+                     lastUsed: new Date()
+                 };
+                 setTargetContacts(prev => [...prev, meAsContact]);
+            }
+        }
+        shareConfirmModal.onClose();
         qrModal.onOpen();
     };
 
@@ -141,10 +185,16 @@ export function useContactActions() {
                 isSelectionMode,
                 handleConfirmDeleteContact,
             },
+            shareConfirm: {
+                isOpen: shareConfirmModal.isOpen,
+                onOpenChange: shareConfirmModal.onOpenChange,
+                handleConfirm: handleConfirmShare,
+            },
             qr: {
                 isOpen: qrModal.isOpen,
                 onOpenChange: qrModal.onOpenChange,
                 contact: targetContact,
+                contacts: targetContacts,
             },
         },
     };

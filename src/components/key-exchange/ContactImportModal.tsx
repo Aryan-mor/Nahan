@@ -102,6 +102,20 @@ export function ContactImportModal({
         } else {
           toast.error(t('contact_import.toast.handler_missing'));
         }
+      } else if (err.message === 'MULTI_CONTACT_INTRO_DETECTED') {
+        // Handle multi-contact detection
+        const multiErr = err as { contacts: Array<{ name: string; publicKey: string }> };
+        if (onDetection && multiErr.contacts && multiErr.contacts.length > 0) {
+           onDetection({
+              type: 'multi_id',
+              contactName: `${multiErr.contacts.length} Contacts`,
+              contacts: multiErr.contacts
+           });
+           setContactForm({ ...contactForm, publicKey: '' });
+           onOpenChange(false);
+        } else {
+           toast.error(t('contact_import.toast.invalid_contact_key'));
+        }
       } else if (err.message === 'SENDER_UNKNOWN') {
         toast.error(t('contact_import.toast.unknown_sender'));
       } else {

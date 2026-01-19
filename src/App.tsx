@@ -3,13 +3,13 @@
 import { Avatar, Button, HeroUIProvider, useDisclosure } from '@heroui/react';
 import { AnimatePresence } from 'framer-motion';
 import {
-  Download,
-  FileUser,
-  Lock,
-  MessageSquare,
-  QrCode,
-  Settings as SettingsIcon,
-  Users,
+    Download,
+    FileUser,
+    Lock,
+    MessageSquare,
+    QrCode,
+    Settings as SettingsIcon,
+    Users,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,9 +34,9 @@ import { Settings } from './components/Settings';
 import { UnifiedStealthDrawer } from './components/stealth/UnifiedStealthDrawer';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import {
-  DetectionResult,
-  useClipboardDetection,
-  useClipboardPermission,
+    DetectionResult,
+    useClipboardDetection,
+    useClipboardPermission,
 } from './hooks/useClipboardDetection';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
@@ -349,6 +349,16 @@ export default function App() {
           logger.debug('App: Ignoring own identity detection');
           return;
         }
+
+        // Check if contact already exists in the contact list
+        const { contacts } = useAppStore.getState();
+        const existingContact = contacts.find((c) => c.fingerprint === detectedFingerprint);
+        if (existingContact) {
+          // Contact already exists - silently ignore
+          logger.debug('App: Ignoring detection for existing contact:', existingContact.name);
+          return;
+        }
+
         // If fingerprints don't match, proceed with detection (valid new contact)
       } catch (error) {
         // If fingerprint generation fails, proceed with detection (fail-safe)
@@ -357,6 +367,47 @@ export default function App() {
           'Failed to verify identity in handleDetection, proceeding with detection:',
           error,
         );
+      }
+    }
+
+    // Check for multi_id type - filter out already existing contacts
+    if (result.type === 'multi_id' && result.contacts && result.contacts.length > 0) {
+      try {
+        const { CryptoService } = await import('./services/crypto');
+        const cryptoService = CryptoService.getInstance();
+        const { contacts: existingContacts } = useAppStore.getState();
+
+        // Filter out contacts that already exist
+        const newContacts: Array<{ name: string; publicKey: string }> = [];
+        for (const contact of result.contacts) {
+          const fingerprint = await cryptoService.getFingerprint(contact.publicKey);
+
+          // Check if it's the user's own identity
+          if (_identity && fingerprint === _identity.fingerprint) {
+            continue;
+          }
+
+          // Check if contact already exists
+          const exists = existingContacts.find((c) => c.fingerprint === fingerprint);
+          if (!exists) {
+            newContacts.push(contact);
+          }
+        }
+
+        // If all contacts already exist, silently ignore
+        if (newContacts.length === 0) {
+          logger.debug('App: All detected contacts already exist, ignoring');
+          return;
+        }
+
+        // Update result with only new contacts
+        result = {
+          ...result,
+          contacts: newContacts,
+          contactName: `${newContacts.length} contacts`,
+        };
+      } catch (error) {
+        logger.debug('Failed to filter existing contacts, proceeding with all:', error);
       }
     }
 
@@ -679,6 +730,7 @@ export default function App() {
             contactPublicKey={detectionResult.contactPublicKey}
             contactFingerprint={detectionResult.contactFingerprint}
             encryptedData={detectionResult.encryptedData}
+            contacts={detectionResult.contacts}
           />
         )}
 

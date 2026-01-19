@@ -190,6 +190,15 @@ function ChatListComponent({
     openDeleteContact(null, selectedFingerprints);
   };
 
+  const onBulkShare = () => {
+    // Get all selected contacts from fingerprints
+    const selectedContacts = contacts.filter(c => selectedFingerprints.has(c.fingerprint));
+    if (selectedContacts.length > 0) {
+      openShare(selectedContacts);
+      exitSelectionMode();
+    }
+  };
+
 
 
   // Get contacts with broadcast at index 0
@@ -282,30 +291,38 @@ function ChatListComponent({
                    </Button>
                  </DropdownTrigger>
                  <DropdownMenu
-                   aria-label="Selection Actions"
-                   onAction={(key) => {
-                     if (key === 'delete_history') onBulkDeleteHistory();
-                     if (key === 'delete_contact') onBulkDeleteContact();
-                   }}
-                 >
-                   <DropdownItem
-                     key="delete_history"
-                     startContent={<Trash2 className="w-4 h-4" />}
-                     className="text-danger"
-                     data-testid="contact-option-bulk-delete-history"
-                   >
-                     {t('chat.list.delete_history')}
-                   </DropdownItem>
-                   <DropdownItem
-                     key="delete_contact"
-                     startContent={<Trash2 className="w-4 h-4" />}
-                     className="text-danger"
-                     description={t('chat.list.delete_contact_desc', "Also removes form list")}
-                     data-testid="contact-option-bulk-delete-contact"
-                   >
-                     {t('chat.list.delete_contact')}
-                   </DropdownItem>
-                 </DropdownMenu>
+                    aria-label="Selection Actions"
+                    onAction={(key) => {
+                      if (key === 'share') onBulkShare();
+                      if (key === 'delete_history') onBulkDeleteHistory();
+                      if (key === 'delete_contact') onBulkDeleteContact();
+                    }}
+                  >
+                    <DropdownItem
+                      key="share"
+                      startContent={<Share2 className="w-4 h-4 text-blue-400" />}
+                      data-testid="contact-option-bulk-share"
+                    >
+                      {t('common.share', 'Share')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="delete_history"
+                      startContent={<Trash2 className="w-4 h-4" />}
+                      className="text-danger"
+                      data-testid="contact-option-bulk-delete-history"
+                    >
+                      {t('chat.list.delete_history')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="delete_contact"
+                      startContent={<Trash2 className="w-4 h-4" />}
+                      className="text-danger"
+                      description={t('chat.list.delete_contact_desc', "Also removes form list")}
+                      data-testid="contact-option-bulk-delete-contact"
+                    >
+                      {t('chat.list.delete_contact')}
+                    </DropdownItem>
+                  </DropdownMenu>
                </Dropdown>
              </div>
            </div>

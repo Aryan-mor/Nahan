@@ -15,7 +15,7 @@ export interface ProcessingContext {
 }
 
 export interface ProcessedResult {
-  type: 'message' | 'id' | 'none';
+  type: 'message' | 'id' | 'multi_id' | 'none';
   fingerprint?: string;
   senderName?: string;
   isBroadcast?: boolean;
@@ -170,6 +170,12 @@ export async function analyzeClipboard(
         if (error.message === 'CONTACT_INTRO_DETECTED') {
           return {
             processed: { type: 'id', data: error.keyData, source: 'text' },
+            textContent: text,
+          };
+        }
+        if (error.message === 'MULTI_CONTACT_INTRO_DETECTED') {
+          return {
+            processed: { type: 'multi_id', data: error.contacts, source: 'text' },
             textContent: text,
           };
         }

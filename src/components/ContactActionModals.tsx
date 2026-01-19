@@ -35,10 +35,16 @@ interface ContactActionModalsProps {
             isSelectionMode: boolean;
             handleConfirmDeleteContact: () => void;
         };
-        qr: {
-            isOpen: boolean;
+    shareConfirm: {
+        isOpen: boolean;
+        onOpenChange: (isOpen: boolean) => void;
+        handleConfirm: (includeIdentity: boolean) => void;
+    };
+    qr: {
+        isOpen: boolean;
             onOpenChange: (isOpen: boolean) => void;
             contact: Contact | null;
+            contacts: Contact[];
         };
     };
 }
@@ -171,11 +177,53 @@ export const ContactActionModals: React.FC<ContactActionModalsProps> = ({ modals
                 </ModalContent>
             </Modal>
 
+            {/* SHARE CONFIRM MODAL */}
+            <Modal
+                isOpen={modals.shareConfirm.isOpen}
+                onOpenChange={modals.shareConfirm.onOpenChange}
+                classNames={{ base: 'bg-industrial-900 border-industrial-800' }}
+            >
+                <ModalContent>
+                    {() => (
+                        <>
+                            <ModalHeader className="text-industrial-100">
+                                {t('chat.list.share_contacts_title', 'Share Contacts')}
+                            </ModalHeader>
+                            <ModalBody>
+                                <p className="text-industrial-300">
+                                    {t(
+                                        'chat.list.share_include_identity',
+                                        'Would you like to include your own identity in this shared list? This allows the recipient to add you back immediately.',
+                                    )}
+                                </p>
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button
+                                    variant="flat"
+                                    onPress={() => modals.shareConfirm.handleConfirm(false)}
+                                    data-testid="share-confirm-no"
+                                >
+                                    {t('common.no', 'No, just contacts')}
+                                </Button>
+                                <Button
+                                    color="primary"
+                                    onPress={() => modals.shareConfirm.handleConfirm(true)}
+                                    data-testid="share-confirm-yes"
+                                >
+                                    {t('common.yes', 'Yes, include me')}
+                                </Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
+
             {/* SHARE QR MODAL */}
             <MyQRModal
                 isOpen={modals.qr.isOpen}
                 onOpenChange={modals.qr.onOpenChange}
                 contact={modals.qr.contact}
+                contacts={modals.qr.contacts}
             />
         </>
     );

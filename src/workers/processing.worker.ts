@@ -30,7 +30,7 @@ interface WorkerResponse {
  * Returned by the 'analyzeInput' worker task.
  */
 export interface AnalysisResult {
-  type: 'message' | 'id' | 'broadcast' | 'unknown';
+  type: 'message' | 'id' | 'multi_id' | 'broadcast' | 'unknown';
   extractedBinary: Uint8Array | null;
   isZWC: boolean;
   keyData?: { name: string; publicKey: string };
@@ -349,13 +349,20 @@ const handleAnalyzeInput = (payload: unknown): WorkerResponse => {
         if (result.extractedBinary.length > 0) {
           const version = result.extractedBinary[0];
           result.protocolVersion = version;
+          console.log(`[Worker] Decoded ZWC Binary. Length: ${result.extractedBinary.length}, Version: ${version} (0x${version.toString(16)})`);
 
           if (version === 0x01) {
             result.type = 'message';
           } else if (version === 0x02) {
             // Could be identity or broadcast - will be determined by main thread
             result.type = 'id'; // Default, main thread will verify
+          } else if (version === 0x03) {
+            // Multi-identity packet
+            result.type = 'multi_id';
           }
+          console.log(`[Worker] Assigned type: ${result.type}`);
+        } else {
+          console.log(`[Worker] Decoded ZWC Binary is empty`);
         }
       }
     } catch {
@@ -412,6 +419,8 @@ const handleAnalyzeInput = (payload: unknown): WorkerResponse => {
         result.type = 'message';
       } else if (version === 0x02) {
         result.type = 'id';
+      } else if (version === 0x03) {
+        result.type = 'multi_id';
       }
     }
 

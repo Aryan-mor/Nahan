@@ -2,7 +2,7 @@
 import { StateCreator } from 'zustand';
 
 import { CryptoService } from '../../services/crypto';
-import { parseStealthID } from '../../services/stealthId';
+import { parseMultiStealthID, parseStealthID } from '../../services/stealthId';
 import { storageService } from '../../services/storage';
 import { workerService } from '../../services/workerService';
 import * as logger from '../../utils/logger';
@@ -61,9 +61,31 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
       throw contactIntroError;
     }
 
+    // STEP 2b: Handle multi_id type from worker - proceed to binary parsing
+    // The multi_id type means the worker detected protocol version 0x03
+    // We need to let it continue to binary processing where parseMultiStealthID will handle it
+
     // STEP 3: Handle unknown input
+    // STEP 3: Handle unknown input
+    // Failsafe: If worker returned 'unknown' check if we have valid binary data that was extracted
+    // This handles cases where worker might not recognize version 0x03 properly yet
     if (analysisResult.type === 'unknown') {
-      throw new Error('Invalid message format: Not a valid key, ZWC, PGP, or Base64 message');
+      const hasValidBinary = analysisResult.extractedBinary &&
+                             analysisResult.extractedBinary.length > 0 &&
+                             (analysisResult.extractedBinary[0] === 0x01 ||
+                              analysisResult.extractedBinary[0] === 0x02 ||
+                              analysisResult.extractedBinary[0] === 0x03);
+
+      if (!hasValidBinary) {
+        console.error('[Processing] Worker Analysis Failed. Result:', JSON.stringify({
+             type: analysisResult.type,
+             isZWC: analysisResult.isZWC,
+             extractedBinaryLength: analysisResult.extractedBinary?.length,
+             coverTextLength: analysisResult.coverText?.length
+        }));
+        throw new Error('Invalid message format: Not a valid key, ZWC, PGP, or Base64 message');
+      }
+      logger.warn('[UniversalInput] Worker returned unknown type but valid binary detected. Proceeding.');
     }
 
     // Get binary payload - worker already extracted it
@@ -88,8 +110,25 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
       version === 0x01 ? '(Encrypted)' : version === 0x02 ? '(Signed/Broadcast)' : '(Unknown)',
     );
 
-    if (version !== 0x01 && version !== 0x02) {
+    if (version !== 0x01 && version !== 0x02 && version !== 0x03) {
       throw new Error(`Unsupported protocol version: 0x${version.toString(16).padStart(2, '0')}`);
+    }
+
+    // STEP 4a: Handle v0x03 (Multi-Identity)
+    if (version === 0x03) {
+      logger.log('[UniversalInput] Version 0x03 detected - Multi-Identity packet');
+
+      const parsedContacts = parseMultiStealthID(messageBytes);
+      if (parsedContacts && parsedContacts.length > 0) {
+        logger.log('[Protocol] Multi-Identity Packet Detected:', parsedContacts.length, 'contacts');
+        const multiContactError = new Error('MULTI_CONTACT_INTRO_DETECTED') as Error & {
+          contacts: Array<{ name: string; publicKey: string }>;
+        };
+        multiContactError.contacts = parsedContacts;
+        throw multiContactError;
+      } else {
+        throw new Error('Invalid multi-identity packet');
+      }
     }
 
     // STEP 4: Handle v0x02 (Identity/Broadcast)
@@ -160,7 +199,7 @@ export const createProcessingSlice: StateCreator<AppState, [], [], ProcessingSli
         const dataToHash = new TextEncoder().encode(sender.publicKey + payloadString);
         // Calculate hash for verification/logging if needed, but legacy ID generation is removed
         await crypto.subtle.digest('SHA-256', dataToHash);
-        
+
         // V2.2: Let storageService generate Blind Index ID
         logger.log('[Processing] Persisting broadcast message');
 

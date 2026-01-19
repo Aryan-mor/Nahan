@@ -101,11 +101,12 @@ export async function requestClipboardPermission(): Promise<boolean> {
  * The actual detection is now handled by handleUniversalInput
  */
 export interface DetectionResult {
-  type: 'id' | 'message' | 'duplicate_message';
+  type: 'id' | 'multi_id' | 'message' | 'duplicate_message';
   contactName: string;
   contactPublicKey?: string; // For ID type
   contactFingerprint?: string; // For message type
   encryptedData?: string; // Base64-encoded encrypted message (for message type)
+  contacts?: Array<{ name: string; publicKey: string }>; // For multi_id type
 }
 
 /**
@@ -262,6 +263,12 @@ export function useClipboardDetection(
                  contactFingerprint: processed.fingerprint,
                  contactPublicKey: processed.data?.publicKey || processed.data?.key,
                });
+            } else if (processed.type === 'multi_id' && _onDetection) {
+              _onDetection({
+                type: 'multi_id',
+                contactName: `${processed.data?.length} contacts`,
+                contacts: processed.data,
+              });
             }
           });
         }
@@ -309,6 +316,20 @@ export function useClipboardDetection(
             } else {
               logger.warn('[Detector] CONTACT_INTRO_DETECTED missing public key');
             }
+          }
+        } else if (err.message === 'MULTI_CONTACT_INTRO_DETECTED') {
+          logger.log('[Detector] Multi-contact intro detected, signaling App.tsx');
+          const multiContactError = error as Error & {
+            contacts?: Array<{ name: string; publicKey: string }>;
+          };
+          if (onDetection && multiContactError.contacts && multiContactError.contacts.length > 0) {
+            onDetection({
+              type: 'multi_id',
+              contactName: `${multiContactError.contacts.length} contacts`,
+              contacts: multiContactError.contacts,
+            });
+          } else {
+            logger.warn('[Detector] MULTI_CONTACT_INTRO_DETECTED missing contacts');
           }
         } else if (err.message === 'Authentication required') {
           // Ignore
