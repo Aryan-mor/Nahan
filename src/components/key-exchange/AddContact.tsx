@@ -61,10 +61,26 @@ export function AddContact({ onDetection, onNewMessage }: AddContactProps) {
         try {
           const binary = camouflageService.decodeFromZWC(data, true); // lenient=true
           const idData = parseStealthID(binary);
+
           if (idData) {
             publicKey = idData.publicKey;
             name = idData.name;
             logger.info('Detected Stealth ID in QR scan', { name });
+          } else {
+             // Check for Multi-ID
+             const { parseMultiStealthID } = await import('../../services/stealthId');
+             const multiData = parseMultiStealthID(binary);
+             if (multiData && multiData.length > 0) {
+                 toast.success(t('add_contact.toast.scan_success'));
+                 if (onDetection) {
+                     onDetection({
+                        type: 'multi_id',
+                        contactName: `${multiData.length} Contacts`,
+                        contacts: multiData
+                     });
+                     return;
+                 }
+             }
           }
         } catch (e) {
           logger.warn('Failed to decode potential Stealth ID', e);

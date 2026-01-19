@@ -267,6 +267,19 @@ export function ManualPasteButton({ onNewChat, onDetection, className, variant =
           toast.info(t('chat.list.contact_key_detected'));
           onNewChat();
         }
+      } else if (err.message === 'MULTI_CONTACT_INTRO_DETECTED') {
+        setIsManualPasteOpen(false);
+        const multiErr = err as { contacts: Array<{ name: string; publicKey: string }> };
+        if (onDetection && multiErr.contacts && multiErr.contacts.length > 0) {
+           onDetection({
+              type: 'multi_id',
+              contactName: `${multiErr.contacts.length} Contacts`,
+              contacts: multiErr.contacts
+           });
+        } else {
+            toast.info(t('chat.list.contact_key_detected'));
+            onNewChat();
+        }
       } else {
         toast.error(t('chat.list.process_error'));
         logger.error('[UniversalInput] Error:', error);

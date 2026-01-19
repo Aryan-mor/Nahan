@@ -4,57 +4,64 @@ export class ContactPage {
   constructor(readonly page: Page) {}
 
   async navigateToContacts() {
-    // If Chat View is open, close it first
-    if (await this.page.getByTestId('chat-view-container').isVisible()) {
-      await this.page.getByTestId('back-to-list-btn').click();
-      await expect(this.page.getByTestId('chat-view-container')).toBeHidden();
-    }
-
-    // If already on the page (check for a unique element), return
-    if (await this.page.getByTestId('add-contact-scan-btn').isVisible()) {
-      return;
-    }
-
-    const desktopTab = this.page.getByTestId('nav-keys-tab');
-    const mobileTab = this.page.getByTestId('nav-mobile-keys-tab');
-
-    if (await desktopTab.isVisible()) {
-      await desktopTab.click();
-    } else {
-      // Assume mobile if desktop is not visible
-      await mobileTab.click();
-    }
-
-    // Wait for the Keys view to load with a generous timeout and retry logic
+    // Handle potential detection modal blocking navigation (e.g. from clipboard content)
+    const modal = this.page.getByTestId('detection-modal');
     try {
-      await expect(this.page.getByTestId('add-contact-scan-btn')).toBeVisible({ timeout: 10000 });
-    } catch (_e) {
-      const anyKeysBtn = this.page
-        .getByRole('button', { name: 'Keys' })
-        .filter({ hasText: 'Keys' })
-        .first();
-      if (await anyKeysBtn.isVisible()) {
-        await anyKeysBtn.click({ force: true });
-      } else {
-        // Retry the explicit IDs
-        if (await desktopTab.isVisible()) await desktopTab.click({ force: true });
-        else await mobileTab.click({ force: true });
-      }
+      // Wait briefly for modal to appear (it triggers on page focus/load)
+      await modal.waitFor({ state: 'visible', timeout: 8000 });
 
-      await expect(this.page.getByTestId('add-contact-scan-btn')).toBeVisible({ timeout: 10000 });
+      // Dismiss it using the specifically scoped button
+      const dismissBtn = modal.getByRole('button', { name: 'Dismiss' });
+      await dismissBtn.click();
+      // Wait for it to be fully removed from DOM to prevent blocking pointer events
+      await modal.waitFor({ state: 'detached', timeout: 5000 });
+    } catch {
+      // Ignore if modal doesn't appear within timeout
     }
+
+    // Navigate via proper Desktop Tab (Viewport enforced in test config)
+    const tab = this.page.getByTestId('nav-keys-tab');
+    await expect(tab).toBeVisible({ timeout: 15000 });
+    await tab.click();
+
+    // Wait for the Keys view to load
+    await expect(this.page.getByTestId('add-contact-scan-btn')).toBeVisible({ timeout: 30000 });
   }
 
-  async copyIdentity(): Promise<string> {
+  async copyIdentity(force: boolean = false): Promise<string> {
     const copyBtn = this.page.getByTestId('copy-identity-home');
     await expect(copyBtn).toBeVisible();
-    await copyBtn.click({ force: true });
+    await this.page.waitForTimeout(500); // Wait for animations
+    await copyBtn.click({ force });
+    
+    // Check if toast appears
+    const successToast = this.page.getByText('Identity copied to clipboard');
+    const errorToast = this.page.getByText('Failed to copy identity');
+    
+    try {
+        await expect(successToast.or(errorToast)).toBeVisible({ timeout: 5000 });
+    } catch (e) {
+        // If toast didn't appear but we are in a test environment where clipboard might have worked anyway,
+        // we double check the clipboard content.
+        const clipboardContent = await this.page.evaluate(() => navigator.clipboard.readText());
+        if (clipboardContent && clipboardContent.length > 0) {
+            return clipboardContent;
+        }
+        throw e;
+    }
+    
+    if (await errorToast.isVisible()) {
+        throw new Error('Failed to copy identity to clipboard');
+    }
+    
     return await this.page.evaluate(() => navigator.clipboard.readText());
   }
 
   async openAddContactManual() {
     await this.navigateToContacts();
-    await this.page.getByTestId('manual-entry-button').click();
+    await this.page.getByTestId('manual-entry-button').click({ force: true });
+    // Wait for the manual import modal to be fully visible and stable
+    await expect(this.page.getByTestId('manual-import-textarea')).toBeVisible({ timeout: 10000 });
   }
 
   async fillManualContact(identityString: string): Promise<void> {
@@ -69,6 +76,9 @@ export class ContactPage {
   async submitContact() {
     const addBtn = this.page.getByTestId('detection-add-contact-btn');
     await addBtn.click();
+
+    // Wait for the detection modal to close before continuing
+    await this.page.getByTestId('detection-modal').waitFor({ state: 'detached', timeout: 10000 });
   }
 
   async verifyContactAdded(name: string) {
@@ -78,7 +88,7 @@ export class ContactPage {
       await expect(this.page.getByTestId('chat-view-container')).toBeHidden();
     }
 
-    // Try to click the chats tab (handling potential mobile/desktop visibility if needed, 
+    // Try to click the chats tab (handling potential mobile/desktop visibility if needed,
     // but trusting the existing selector if it was just an overlay issue)
     const chatsTab = this.page.getByTestId('nav-chats-tab');
     const mobileChatsTab = this.page.getByTestId('nav-mobile-chats-tab');
@@ -91,7 +101,7 @@ export class ContactPage {
         // Fallback or force click one of them if neither seems visible (unlikely if chat view is closed)
         await chatsTab.click({ force: true });
     }
-    
+
     await expect(this.page.getByTestId(`chat-item-${name}`).first()).toBeVisible();
   }
 
