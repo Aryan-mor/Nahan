@@ -5,6 +5,9 @@ import * as logger from './logger';
  * Helpers for sharing and downloading the application as a single HTML file.
  */
 
+// Get the base URL from Vite config (e.g., '/Nahan/' or './')
+const PORTABLE_FILE_URL = `${import.meta.env.BASE_URL}nahan-portable.html`;
+
 /**
  * Share the current application file (Self-Replication)
  * Uses Web Share API to share the current HTML or a pre-built portable file.
@@ -19,7 +22,7 @@ export async function sharePortableFile(): Promise<boolean> {
       blob = new Blob([html], { type: 'text/html' });
     } else {
       try {
-        const response = await fetch('/nahan-portable.html');
+        const response = await fetch(PORTABLE_FILE_URL);
         if (!response.ok) throw new Error('Fetch failed');
         blob = await response.blob();
       } catch (e) {
@@ -66,7 +69,7 @@ export async function downloadPortableFile(): Promise<void> {
     }
 
     // Try to fetch the pre-built portable file from public directory
-    const response = await fetch('/nahan-portable.html');
+    const response = await fetch(PORTABLE_FILE_URL);
     if (!response.ok) {
       throw new Error('Portable file not found');
     }
