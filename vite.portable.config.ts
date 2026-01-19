@@ -70,6 +70,7 @@ export default defineConfig({
       'virtual:pwa-register': path.resolve(__dirname, 'src/utils/pwa-shim.ts'),
     },
   },
+  base: './',
   build: {
     target: 'esnext',
     outDir: 'public',
@@ -79,5 +80,10 @@ export default defineConfig({
     cssCodeSplit: false, // Do not split CSS, let it be inlined
     reportCompressedSize: false,
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
   },
 });
