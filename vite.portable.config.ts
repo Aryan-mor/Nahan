@@ -38,7 +38,11 @@ const inlineFaviconPlugin = () => {
           .replace(
             'href="/pwa-512x512.png"',
             `href="data:image/png;base64,${pwa512Base64}"`,
-          );
+          )
+          // Remove external fonts that cause CORS errors on file://
+          .replace(/<link [^>]*href="https:\/\/fonts\.googleapis\.com[^>]*>/g, '')
+          .replace(/<link [^>]*href="https:\/\/fonts\.gstatic\.com[^>]*>/g, '')
+          .replace(/<link [^>]*rel="preconnect"[^>]*>/g, '');
       } catch (error) {
         console.warn('Failed to inline favicon/icons:', error);
         return html;
