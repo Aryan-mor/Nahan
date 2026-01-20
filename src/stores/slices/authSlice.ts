@@ -158,6 +158,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         security_version: 2,
       }, pin);
 
+      // Securely backup the PIN for Biometric Recovery (Self-Healing)
+      await storageService.storeSystemPin(pin);
+
       // 7. Update State
       set({
         identity,
@@ -245,6 +248,10 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         const masterKey = await unwrapMasterKey(wrappedKey, pin, hardwareSecret);
         setMasterKey(masterKey);
+
+        // Self-Healing: Ensure PIN is securely stored for future biometric sessions
+        // This handles migration cases or if the PIN wasn't backed up previously
+        await storageService.storeSystemPin(pin);
 
         // Load Data
         const identity = await storageService.getIdentity(pin); // Note: getIdentity still takes pin but we handle it
@@ -420,12 +427,28 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
       setMasterKey(masterKey);
 
       // 3. Load Data & Unlock
+      // Try to recover the original PIN from the secure vault (now accessible via MasterKey)
+      const systemPin = await storageService.getSystemPin();
+
+      // Fallback: If no PIN stored (legacy), use placeholder.
+      // NOTE: This will fail decryption of private keys if they strictly require the original PIN hash.
+      // But we are moving to Master Key architecture, so if keys were migrated to V2,
+      // the Master Key should be enough to decrypt the vault.
+      // HOWEVER: decryptPrivateKey function in keys.ts MIGHT still use the sessionPassphrase directly!
+      // Let's check keys.ts -> Yes, decryptPrivateKey derives key from passphrase.
+      // SO WE MUST HAVE THE REAL PIN.
+      const sessionPassphrase = systemPin || 'BIOMETRIC_SESSION';
+
+      if (!systemPin) {
+          logger.warn('[Auth] Biometric Unlock: System PIN not found in vault. Some crypto ops may fail.');
+      }
+
       // We don't have the text PIN, so we pass mocked PIN or rely on V2 structure ignoring it if MK is set
       const identity = await storageService.getIdentity('BIOMETRIC_AUTH');
       if (identity) {
           const contacts = await storageService.getContacts('BIOMETRIC_AUTH');
           set({
-            sessionPassphrase: 'BIOMETRIC_SESSION', // Placeholder to indicate session is active
+            sessionPassphrase, // Use recovered PIN or placeholder
             identity,
             contacts,
           });

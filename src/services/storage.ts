@@ -1005,6 +1005,54 @@ export class StorageService {
   }
 
   /**
+   * Securely store the System PIN (User's main PIN) in the vault
+   * Encrypted via Master Key (which is wrapped by PIN/Biometrics)
+   * This allows the PIN to be retrieved during Biometric Unlock to decrypt the private key
+   */
+  async storeSystemPin(pin: string): Promise<void> {
+    if (!this.db) await this.initialize();
+
+    // Store in secure_vault with a special ID
+    // Since this is encrypted by the Master Key (which is set in secureStorage),
+    // we just need to call encryptData.
+    const entryId = 'system_pin_backup';
+
+    // Create the entry manually to bypass the ID prefixing of storeMessage/Contact
+    const jsonString = JSON.stringify({ pin });
+    const encryptedPayload = await encryptData(jsonString); // Uses Master Key
+
+    const entry: VaultEntry = {
+      id: entryId,
+      payload: encryptedPayload,
+    };
+
+    await this.db!.put('secure_vault', entry);
+    logger.debug('[Storage] System PIN backed up to secure vault');
+  }
+
+  /**
+   * Retrieve the System PIN from the vault
+   * Used during Biometric Unlock to recover the session passphrase
+   */
+  async getSystemPin(): Promise<string | null> {
+    if (!this.db) await this.initialize();
+
+    const entryId = 'system_pin_backup';
+    const entry = await this.db!.get('secure_vault', entryId);
+
+    if (!entry) return null;
+
+    try {
+      const decryptedJson = await decryptData(entry.payload); // Uses Master Key
+      const parsed = JSON.parse(decryptedJson) as { pin: string };
+      return parsed.pin;
+    } catch (error) {
+      logger.error('[Storage] Failed to decrypt system PIN backup', error);
+      return null; // Decryption failed (wrong Master Key?)
+    }
+  }
+
+  /**
    * Close the database connection
    */
   async close(): Promise<void> {
