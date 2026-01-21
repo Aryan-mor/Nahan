@@ -113,7 +113,7 @@ test.describe.serial('ChatList Realtime Updates & Sorting', () => {
         const msg1 = `Hello User 1 - ${Date.now()}`;
         await test.step('Action: Send to User 1', async () => {
             await page.getByTestId(`chat-item-${user1.name}`).click();
-            await page.getByTestId('chat-input').fill(msg1);
+            await page.getByTestId('chat-input-field').fill(msg1);
             await page.getByTestId('chat-send-btn').click();
             await expect(page.locator(`text=${msg1}`).first()).toBeVisible();
 
@@ -138,7 +138,7 @@ test.describe.serial('ChatList Realtime Updates & Sorting', () => {
         const msg2 = `Hello User 2 - ${Date.now()}`;
         await test.step('Action: Send to User 2', async () => {
             await page.getByTestId(`chat-item-${user2.name}`).click();
-            await page.getByTestId('chat-input').fill(msg2);
+            await page.getByTestId('chat-input-field').fill(msg2);
             await page.getByTestId('chat-send-btn').click();
             await expect(page.locator(`text=${msg2}`).first()).toBeVisible();
             await page.waitForTimeout(500);

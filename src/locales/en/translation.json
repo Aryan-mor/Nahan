@@ -191,6 +191,7 @@
     "download_image": "Download Image",
     "download_success": "Saved to gallery",
     "enable": "Enable",
+    "help": "Help",
     "image_preview": "Image Preview",
     "learn_more": "Learn More",
     "maybeLater": "Maybe Later",
@@ -252,6 +253,21 @@
     "compressionFailed": "Image compression failed",
     "imageLoadFailed": "Failed to load image",
     "incompletePayload": "Failed to extract complete payload"
+  },
+  "help": {
+    "concept": {
+      "desc1": "Think of Nahan not as a chat app, but as a digital envelope.",
+      "desc2": "When you write a message, you are sealing it in an envelope that only the recipient can open. We do not have a postman. You are the courier.",
+      "desc3": "You must physically transport this sealed envelope (the encrypted text) to your recipient using any existing channel: Email, SMS, WhatsApp, or even a printed QR code.",
+      "title": "The Sealed Letter Metaphor"
+    },
+    "restart_tour": "Restart Full Tour",
+    "title": "Nahan Field Guide",
+    "topic": {
+      "contacts": "How to Add Contacts",
+      "identity": "Identity & Keys",
+      "messaging": "Sending & Receiving"
+    }
   },
   "identity_onboarding": {
     "create_button": "Create Identity",
@@ -652,6 +668,58 @@
     "view_image": "View Image",
     "view_in_chat": "View in Chat",
     "warning_file_transfer": "You MUST send this image as a FILE. Sending it as a standard photo will corrupt the hidden data."
+  },
+  "tour": {
+    "btn": {
+      "start": "Start Tour"
+    },
+    "chat": {
+      "attach_desc": "Click here to attach and send images.",
+      "input_desc": "Type your regular messages here.",
+      "send_desc": "Click to send.\n\nTip: Long-press this button to send a custom \"Sealed Letter\" (Stealth Mode).",
+      "step1": "Message Input",
+      "step2": "Send Images",
+      "step3": "Send & Custom Stealth"
+    },
+    "click_tabs": "Finally, click Settings to see security options.",
+    "click_to_proceed": "Click on the Chats tab to proceed.",
+    "contacts": {
+      "desc": "Click here to scan a friend's QR code.",
+      "desc1": "Click on the Keys tab to proceed.",
+      "paste_btn_desc": "Paste a copied code here to add a contact.",
+      "paste_desc": "Now, click the Chats tab to see manual options.",
+      "step1": "Step 1: Go to Contacts",
+      "step2": "Scan QR",
+      "step3": "Paste Option",
+      "step4": "Manual Paste"
+    },
+    "done": "Got it!",
+    "finish": "All Set!",
+    "finish_btn": "Finish",
+    "help": {
+      "desc": "Click the Help icon anytime to replay guides."
+    },
+    "identity": {
+      "desc": "This is your digital card. Click it to copy your ID.",
+      "step1": "Step 1: Go to Identity",
+      "step2": "Your Sealed Identity"
+    },
+    "messaging": {
+      "desc": "Click this button to draft a new \"Sealed Letter\".",
+      "step1": "Step 1: Go to Chats",
+      "step2": "Start Writing"
+    },
+    "next": "Next",
+    "prev": "Back",
+    "step": {
+      "chats": "Messaging",
+      "keys": "Create Identity",
+      "settings": "Settings"
+    },
+    "welcome": {
+      "desc": "Your secure, offline, \"Sealed Letter\" messenger. click \"Next\" to start.",
+      "title": "Welcome to Nahan"
+    }
   },
   "welcome": {
     "features": {

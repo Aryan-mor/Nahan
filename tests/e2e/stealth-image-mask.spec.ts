@@ -31,7 +31,7 @@ test.describe.serial('Stealth Image Mask (Multi-User)', () => {
              await pageA.getByText(userA.name).click();
              await expect(pageA.getByTestId('chat-view-container')).toBeVisible();
 
-             await pageA.getByTestId('chat-input').fill(secretMsg);
+             await pageA.getByTestId('chat-input-field').fill(secretMsg);
         });
 
         // =========================================================================

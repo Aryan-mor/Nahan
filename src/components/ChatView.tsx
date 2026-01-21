@@ -9,10 +9,11 @@ import {
     DropdownTrigger,
 } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ChevronDown, Edit2, MoreVertical, Share2, Shield, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Edit2, HelpCircle, MoreVertical, Share2, Shield, Trash2 } from 'lucide-react';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useHelpStore } from '../store/useHelpStore';
 import { useAppStore } from '../stores/appStore';
 import { useSteganographyStore } from '../stores/steganographyStore';
 import { useUIStore } from '../stores/uiStore';
@@ -53,6 +54,7 @@ function ChatViewComponent() {
   const setScrollPosition = useUIStore(state => state.setScrollPosition);
 
   const { t, i18n } = useTranslation();
+  const startHelpTopic = useHelpStore((state) => state.startHelpTopic);
   const isRTL = i18n.language === 'fa';
 
   const {
@@ -223,7 +225,17 @@ function ChatViewComponent() {
           </div>
         </div>
 
-        <Dropdown>
+        <div className="flex items-center gap-1">
+          <Button
+            isIconOnly
+            variant="light"
+            className="text-industrial-400"
+            onPress={() => startHelpTopic('chat_help')}
+            title={t('common.help', 'Help')}
+          >
+            <HelpCircle className="w-5 h-5" />
+          </Button>
+          <Dropdown>
           <DropdownTrigger>
             <Button isIconOnly variant="light" className="text-industrial-400">
               <MoreVertical className="w-5 h-5" />
@@ -272,6 +284,7 @@ function ChatViewComponent() {
            </DropdownMenu>
         </Dropdown>
       </div>
+    </div>
 
       <ContactActionModals modals={modals} />
 

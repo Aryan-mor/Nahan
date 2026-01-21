@@ -20,7 +20,7 @@ export class ContactPage {
     }
 
     // Navigate via proper Desktop Tab (Viewport enforced in test config)
-    const tab = this.page.getByTestId('nav-keys-tab');
+    const tab = this.page.getByTestId('nav-keys');
     await expect(tab).toBeVisible({ timeout: 15000 });
     await tab.click();
 
@@ -33,11 +33,11 @@ export class ContactPage {
     await expect(copyBtn).toBeVisible();
     await this.page.waitForTimeout(500); // Wait for animations
     await copyBtn.click({ force });
-    
+
     // Check if toast appears
     const successToast = this.page.getByText('Identity copied to clipboard');
     const errorToast = this.page.getByText('Failed to copy identity');
-    
+
     try {
         await expect(successToast.or(errorToast)).toBeVisible({ timeout: 5000 });
     } catch (e) {
@@ -49,11 +49,11 @@ export class ContactPage {
         }
         throw e;
     }
-    
+
     if (await errorToast.isVisible()) {
         throw new Error('Failed to copy identity to clipboard');
     }
-    
+
     return await this.page.evaluate(() => navigator.clipboard.readText());
   }
 
@@ -88,10 +88,9 @@ export class ContactPage {
       await expect(this.page.getByTestId('chat-view-container')).toBeHidden();
     }
 
-    // Try to click the chats tab (handling potential mobile/desktop visibility if needed,
-    // but trusting the existing selector if it was just an overlay issue)
-    const chatsTab = this.page.getByTestId('nav-chats-tab');
-    const mobileChatsTab = this.page.getByTestId('nav-mobile-chats-tab');
+    // Try to click the chats tab (handling potential mobile/desktop visibility)
+    const chatsTab = this.page.getByTestId('nav-chats');
+    const mobileChatsTab = this.page.getByTestId('nav-mobile-chats');
 
     if (await chatsTab.isVisible()) {
       await chatsTab.click();

@@ -33,7 +33,7 @@ test.describe.serial('Broadcast Messaging (Multi-User)', () => {
         await test.step('User A: Send Broadcast', async () => {
              // Navigate to Chat List if not already there
              if (!await pageA.getByTestId('chat-list-container').isVisible()) {
-                 await pageA.getByTestId('nav-chats-tab').click();
+                 await pageA.getByTestId('nav-chats').click();
              }
 
              // Click "Broadcast Channel"
@@ -46,7 +46,7 @@ test.describe.serial('Broadcast Messaging (Multi-User)', () => {
              await expect(pageA.getByTestId('chat-input-manual-paste-btn')).toBeHidden();
 
              // Send Message
-             await pageA.getByTestId('chat-input').fill(broadcastMsg);
+             await pageA.getByTestId('chat-input-field').fill(broadcastMsg);
              await pageA.getByTestId('chat-send-btn').click();
 
              // Verify Bubble

@@ -37,7 +37,7 @@ test.describe.serial('P2P Messaging (Multi-User)', () => {
         // 2 & 3. UserA sends message and verify clipboard/bubble
         let encryptedMsgAtoB = '';
         await test.step('User A: Send Message', async () => {
-            await pageA.getByTestId('chat-input').fill(msgAtoB);
+            await pageA.getByTestId('chat-input-field').fill(msgAtoB);
             await pageA.getByTestId('chat-send-btn').click();
 
             // Verify Bubble
@@ -87,7 +87,7 @@ test.describe.serial('P2P Messaging (Multi-User)', () => {
         // 7 & 8. UserB sends response -> Copy Block
         let encryptedMsgBtoA = '';
         await test.step('User B: Send Response & Copy', async () => {
-             await pageB.getByTestId('chat-input').fill(msgBtoA);
+             await pageB.getByTestId('chat-input-field').fill(msgBtoA);
              await pageB.getByTestId('chat-send-btn').click();
 
 

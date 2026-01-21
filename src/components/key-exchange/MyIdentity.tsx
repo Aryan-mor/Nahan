@@ -105,7 +105,7 @@ export function MyIdentity() {
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-4" data-testid="identity-card">
         <h3 className="text-lg font-semibold text-industrial-100">{t('my_identity.title')}</h3>
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Button

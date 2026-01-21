@@ -1,4 +1,4 @@
- 
+
 import { expect, test } from '@playwright/test';
 import { P2PUser, setupConnectedUsers } from '../utils/p2p-setup';
 
@@ -27,7 +27,7 @@ test.describe.serial('Message Deletion Protocol', () => {
 
     // 2. Send a unique message
     const secretContent = `DeleteMe_${Date.now()}`;
-    await page.getByTestId('chat-input').fill(secretContent);
+    await page.getByTestId('chat-input-field').fill(secretContent);
     await page.getByTestId('chat-send-btn').click();
 
     // 3. Verify message exists in UI
