@@ -4,7 +4,6 @@ import 'driver.js/dist/driver.css';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHelpStore } from '../../store/useHelpStore';
-import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as logger from '../../utils/logger';
 import { getTourSteps } from './tourConfig';
@@ -18,8 +17,7 @@ import { getTourSteps } from './tourConfig';
 
 export const TourGuide = () => {
   const { t } = useTranslation();
-  const { hasSeenOnboarding, setHasSeenOnboarding, activeHelpTopic, endHelpTopic } = useHelpStore();
-  const { identity } = useAppStore();
+  const { activeHelpTopic, endHelpTopic } = useHelpStore();
   const { isLocked } = useUIStore();
 
   const driverObj = useRef<ReturnType<typeof driver> | null>(null);
@@ -31,17 +29,12 @@ export const TourGuide = () => {
   }, [t]);
 
   useEffect(() => {
-    // Check if we should start a tour
-    // Case 1: Onboarding (Automatic) -> !hasSeen && !locked && identity
-    // Case 2: Specific Topic (Manual) -> activeHelpTopic && !locked
+    // Only start tour when manually triggered via Help Modal
+    // No automatic onboarding tour on first use
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isAutomated = navigator.webdriver || window.navigator.userAgent.includes('Headless') || (window as any).__NAHAN_IS_AUTOMATED__;
-
-    const shouldStartOnboarding = !hasSeenOnboarding && !!identity && !isLocked && !isAutomated;
     const shouldStartTopic = !!activeHelpTopic && !isLocked;
 
-    if (!shouldStartOnboarding && !shouldStartTopic) {
+    if (!shouldStartTopic) {
         // If we are not supposed to be running, ensure driver is destroyed
         if (driverObj.current) {
             driverObj.current.destroy();
@@ -56,7 +49,7 @@ export const TourGuide = () => {
     driverObj.current = driver({
       showProgress: steps.length > 1,
       animate: true,
-      allowClose: !!activeHelpTopic,
+      allowClose: true,
       // CRITICAL: Allow user to click the elements!
       disableActiveInteraction: false,
 
@@ -64,18 +57,12 @@ export const TourGuide = () => {
       nextBtnText: t('tour.next', 'Next'),
       prevBtnText: t('tour.prev', 'Back'),
       onDestroyed: () => {
-        if (shouldStartOnboarding) {
-            setHasSeenOnboarding(true);
-        }
-        if (shouldStartTopic) {
-            endHelpTopic();
-        }
+        endHelpTopic();
         logger.info('[Tour] Completed');
       },
       popoverClass: 'nahan-driver-popover theme-dark bg-industrial-900 text-industrial-100 border border-industrial-700 shadow-xl rounded-xl',
       steps: steps
     });
-    // ...
 
 
     // Start the tour
@@ -88,7 +75,7 @@ export const TourGuide = () => {
         driverObj.current?.destroy();
     };
 
-  }, [hasSeenOnboarding, identity, isLocked, activeHelpTopic, t, setHasSeenOnboarding, endHelpTopic, getSteps]);
+  }, [isLocked, activeHelpTopic, t, endHelpTopic, getSteps]);
 
   // CSS for driver.js overrides to match Nahan theme
   useEffect(() => {
