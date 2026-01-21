@@ -186,7 +186,7 @@ export const ContactActionModals: React.FC<ContactActionModalsProps> = ({ modals
                 <ModalContent>
                     {() => (
                         <>
-                            <ModalHeader className="text-industrial-100">
+                            <ModalHeader className="text-industrial-100" data-testid="share-contacts-header">
                                 {t('chat.list.share_contacts_title', 'Share Contacts')}
                             </ModalHeader>
                             <ModalBody>

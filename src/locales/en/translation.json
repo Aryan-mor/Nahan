@@ -131,6 +131,8 @@
         "desc": "This message is unsigned or from an unknown key. Who sent it?",
         "title": "Select Sender"
       },
+      "share_contacts_title": "Share Contacts",
+      "share_include_identity": "Would you like to include your own identity in this shared list? This allows the recipient to add you back immediately.",
       "start_chat": "Start a new chat",
       "title": "Chats"
     },
@@ -192,6 +194,7 @@
     "image_preview": "Image Preview",
     "learn_more": "Learn More",
     "maybeLater": "Maybe Later",
+    "no": "No, just contacts",
     "options": "",
     "processing": "Processing",
     "ready": "Ready",
@@ -203,7 +206,8 @@
     "send": "Send Now",
     "send_success": "Sent",
     "share": "Share",
-    "view": "View"
+    "view": "View",
+    "yes": "Yes, include me"
   },
   "contact_import": {
     "toast": {
@@ -216,18 +220,22 @@
   },
   "detection": {
     "add_chat": "Add & Start Chat",
-    "add_selected": "Add {{count}} Contact(s)",
+    "add_selected_one": "",
+    "add_selected_other": "",
     "contact_found": "A new contact <b>{{name}}</b> was detected in your clipboard. Would you like to add them and start a chat?",
     "dismiss": "Dismiss",
     "duplicate_info": "You have already received and stored this message.",
     "duplicate_message": "Message Already Exists",
     "message_info": "The message was detected from your clipboard and imported successfully.",
-    "multi_added": "{{count}} contact(s) added successfully",
+    "multi_added_one": "",
+    "multi_added_other": "",
     "multi_added_partial": "Added {{added}} contact(s), {{skipped}} already existed",
-    "multi_all_exist": "All {{count}} contact(s) already exist",
+    "multi_all_exist_one": "",
+    "multi_all_exist_other": "",
     "multi_contacts": "Multiple Contacts Found",
     "multi_error": "Failed to add contacts",
-    "multi_found": "{{count}} contacts were detected. Select which ones to add:",
+    "multi_found_one": "",
+    "multi_found_other": "",
     "multi_select_hint": "Select the contacts you want to add",
     "new_contact": "New Contact Detected",
     "new_message": "New Message Detected",
@@ -375,8 +383,10 @@
       "copy": "Failed to copy to clipboard",
       "generate": "Failed to generate QR code"
     },
-    "multi_contacts": "{{count}} Contacts",
-    "multi_share_title": "NAHAN - {{count}} Contacts",
+    "multi_contacts_one": "",
+    "multi_contacts_other": "",
+    "multi_share_title_one": "",
+    "multi_share_title_other": "",
     "multi_subtitle": "Scan or share to add these contacts",
     "multi_title": "Share Contacts",
     "save": "Save",

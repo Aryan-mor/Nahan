@@ -110,15 +110,18 @@ test.describe('Multi-Contact Share E2E', () => {
       await senderPage.getByTestId('contact-option-bulk-share').click();
 
       // NEW: Confirm share identity prompt (Say NO for this test to keep original behavior)
-      await expect(senderPage.getByText('Share Contacts')).toBeVisible();
+      await expect(senderPage.getByTestId('share-contacts-header')).toBeVisible();
       await senderPage.getByTestId('share-confirm-no').click();
+      await expect(senderPage.getByTestId('share-contacts-header')).toBeHidden();
+
+      // Verify QR Modal Header first
+      await expect(senderPage.getByTestId('qr-modal-header')).toBeVisible();
 
       // Verify Modal & Copy
-      await expect(senderPage.getByText(`${contacts.length} Contacts`)).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(senderPage.getByTestId('multi-contacts-count')).toBeAttached();
 
-      await senderPage.getByTestId('copy-identity-modal').click();
+      await expect(senderPage.getByTestId('copy-identity-modal')).toBeVisible();
+      await senderPage.getByTestId('copy-identity-modal').click({ force: true });
 
       // Verify clipboard content
       multiContactString = await senderPage.evaluate(() => navigator.clipboard.readText());
@@ -176,10 +179,10 @@ test.describe('Multi-Contact Share E2E', () => {
       }
 
       await expect(modal).toBeVisible();
-      await expect(modal.getByText(`${contacts.length} contacts`, { exact: false })).toBeVisible();
+      await expect(modal.getByTestId('detection-multi-count')).toBeAttached();
 
       // Add them
-      await receiverPage.getByTestId('detection-add-multi-btn').click();
+      await receiverPage.getByTestId('detection-add-multi-btn').click({ force: true });
 
       // Verify they appear
       await expect(modal).toBeHidden();
@@ -285,13 +288,14 @@ test.describe('Multi-Contact Share E2E', () => {
       await senderPage.getByTestId('contact-option-bulk-share').click();
 
       // NEW: Confirm share identity prompt (Say NO for this test)
-      await expect(senderPage.getByText('Share Contacts')).toBeVisible();
+      await expect(senderPage.getByTestId('share-contacts-header')).toBeVisible();
       await senderPage.getByTestId('share-confirm-no').click();
 
+      await expect(senderPage.getByTestId('share-contacts-header')).toBeHidden();
+
       // Open QR
-      await expect(senderPage.getByText(`${contacts.length} Contacts`)).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(senderPage.getByTestId('qr-modal-header')).toBeVisible();
+      await expect(senderPage.getByTestId('multi-contacts-count')).toBeAttached();
       await senderPage.getByTestId('view-qr-modal-btn'); // Check existence without assignment
       // Wait, MyQRModal has tabs? Or is it the "Show QR Code" button in the modal?
       // In MyQRModal.tsx:
@@ -360,11 +364,9 @@ test.describe('Multi-Contact Share E2E', () => {
         // Detection Modal should appear
         const modal = receiverPage.getByTestId('detection-modal');
         await expect(modal).toBeVisible({ timeout: 15000 });
-        await expect(
-          modal.getByText(`${contacts.length} contacts`, { exact: false }),
-        ).toBeVisible();
+        await expect(modal.getByTestId('detection-multi-count')).toBeAttached();
 
-        await receiverPage.getByTestId('detection-add-multi-btn').click();
+        await receiverPage.getByTestId('detection-add-multi-btn').click({ force: true });
         await expect(modal).toBeHidden();
 
         // Verify

@@ -237,7 +237,7 @@ export function DetectionModal({
                 {type === 'multi_id' ? (
                   // Multi-contact detection UI
                   <>
-                    <p className="text-sm text-industrial-300">
+                    <p className="text-sm text-industrial-300" data-testid="detection-multi-count">
                       {t('detection.multi_found', { count: contacts.length })}
                     </p>
                     <div className="max-h-64 overflow-y-auto space-y-2">
