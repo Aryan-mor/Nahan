@@ -179,7 +179,7 @@ export function MyQRModal({ isOpen, onOpenChange, contact, contacts = [] }: MyQR
       <ModalContent>
         {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1">
+            <ModalHeader className="flex flex-col gap-1" data-testid="qr-modal-header">
               {getModalTitle()}
               <span className="text-sm font-normal text-industrial-400">
                 {isMultiMode
@@ -208,7 +208,7 @@ export function MyQRModal({ isOpen, onOpenChange, contact, contacts = [] }: MyQR
                 <div className="w-full space-y-3">
                   <div className="flex items-center justify-center gap-2 text-industrial-300">
                     <Users className="w-5 h-5" />
-                    <span className="text-lg font-semibold">
+                    <span className="text-lg font-semibold" data-testid="multi-contacts-count">
                       {t('my_qr.multi_contacts', { count: contacts.length })}
                     </span>
                   </div>

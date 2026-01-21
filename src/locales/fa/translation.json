@@ -1,17 +1,17 @@
 {
   "add_contact": {
     "buttons": {
-      "manual": "",
-      "scan_qr": "",
-      "upload_qr": ""
+      "manual": "ورود دستی",
+      "scan_qr": "اسکن QR",
+      "upload_qr": "آپلود QR"
     },
-    "title": "",
+    "title": "افزودن مخاطب",
     "toast": {
-      "image_decoded_no_text": "",
-      "invalid_format": "",
-      "no_qr_found": "",
-      "process_fail": "",
-      "scan_success": ""
+      "image_decoded_no_text": "تصویر رمزگشایی شد اما متنی یافت نشد",
+      "invalid_format": "فرمت نامعتبر",
+      "no_qr_found": "کد QR یافت نشد",
+      "process_fail": "خطا در پردازش",
+      "scan_success": "اسکن موفق"
     }
   },
   "app": {
@@ -57,7 +57,7 @@
       "subtitle": "گام نهایی برای امن\u200cسازی ارتباطات شما",
       "title": "ایجاد هویت"
     },
-    "required": "",
+    "required": "الزامی",
     "warning": {
       "checkbox": "متوجه هستم که پین من قابل بازیابی نیست",
       "continue": "ادامه",
@@ -68,15 +68,15 @@
     "welcome": "به نهان خوش آمدید!"
   },
   "biometric": {
-    "decline_tip": "You can always enable biometrics in Settings",
-    "disabled": "Biometric unlock disabled",
-    "enable_failed": "Failed to enable biometrics",
-    "enabled": "Biometric unlock enabled",
+    "decline_tip": "می‌توانید هر زمان بیومتریک را در تنظیمات فعال کنید",
+    "disabled": "قفل بیومتریک غیرفعال شد",
+    "enable_failed": "خطا در فعال‌سازی بیومتریک",
+    "enabled": "قفل بیومتریک فعال شد",
     "prompt": {
-      "description": "Use your fingerprint or face ID to unlock Nahan securely and quickly next time.",
-      "title": "Enable Biometric Unlock?"
+      "description": "از اثر انگشت یا تشخیص چهره برای باز کردن سریع و امن نهان استفاده کنید.",
+      "title": "فعال‌سازی قفل بیومتریک؟"
     },
-    "unlock": "Biometric Unlock"
+    "unlock": "قفل بیومتریک"
   },
   "broadcast_channel": "کانال پخش همگانی",
   "chat": {
@@ -94,27 +94,27 @@
       "send_success_clipboard": "پیام ارسال و در کلیپ\u200cبورد کپی شد"
     },
     "list": {
-      "actions_prompt": "Choose an action",
+      "actions_prompt": "یک عملیات انتخاب کنید",
       "add_contact": "افزودن مخاطب",
       "add_new_contact": "افزودن مخاطب جدید",
       "cancel": "لغو",
-      "clipboard_empty": "Clipboard empty or format not supported",
-      "confirm_bulk_contact": "Are you sure you want to delete selected contacts?",
-      "confirm_bulk_history": "Are you sure you want to delete history for selected contacts?",
-      "confirm_contact": "Are you sure you want to delete this contact?",
-      "confirm_history": "Are you sure you want to delete message history for this contact?",
-      "contact_deleted": "",
+      "clipboard_empty": "کلیپ‌بورد خالی است یا فرمت پشتیبانی نمی‌شود",
+      "confirm_bulk_contact": "آیا مطمئن هستید که می‌خواهید مخاطبین انتخاب شده را حذف کنید؟",
+      "confirm_bulk_history": "آیا مطمئن هستید که می‌خواهید تاریخچه مخاطبین انتخاب شده را حذف کنید؟",
+      "confirm_contact": "آیا مطمئن هستید که می‌خواهید این مخاطب را حذف کنید؟",
+      "confirm_history": "آیا مطمئن هستید که می‌خواهید تاریخچه پیام این مخاطب را حذف کنید؟",
+      "contact_deleted": "مخاطب حذف شد",
       "contact_key_detected": "کلید مخاطب شناسایی شد",
-      "delete_contact": "Delete Contact",
-      "delete_contact_desc": "Also removes form list",
-      "delete_contact_warning": "This will also delete the chat history permanently this action cannot be undone.",
-      "delete_history": "Delete History",
-      "delete_history_note": "Start fresh. Contact will remain in your list.",
-      "enter_new_name": "Enter new name",
-      "history_cleared": "",
-      "image": "Image",
+      "delete_contact": "حذف مخاطب",
+      "delete_contact_desc": "همچنین از لیست حذف می‌شود",
+      "delete_contact_warning": "این عملیات تاریخچه گفتگو را نیز برای همیشه حذف می‌کند و قابل بازگشت نیست.",
+      "delete_history": "حذف تاریخچه",
+      "delete_history_note": "شروع تازه. مخاطب در لیست شما می‌ماند.",
+      "enter_new_name": "نام جدید را وارد کنید",
+      "history_cleared": "تاریخچه پاک شد",
+      "image": "تصویر",
       "import_error": "خطا در وارد کردن پیام",
-      "import_title": "",
+      "import_title": "وارد کردن پیام",
       "new_chat": {
         "title": "گفتگوی جدید"
       },
@@ -124,13 +124,15 @@
       "paste_encrypted": "چسباندن پیام رمزنگاری شده",
       "process_error": "خطا در پردازش ورودی",
       "recent_conversations": "گفتگوهای اخیر",
-      "renamed": "",
+      "renamed": "نام مخاطب تغییر کرد",
       "search_contacts_placeholder": "جستجوی مخاطبین...",
       "search_placeholder": "جستجوی گفتگوها...",
       "select_sender": {
         "desc": "این پیام امضا نشده است یا از یک کلید ناشناس است. چه کسی آن را ارسال کرده است؟",
         "title": "انتخاب فرستنده"
       },
+      "share_contacts_title": "اشتراک‌گذاری مخاطبین",
+      "share_include_identity": "آیا می‌خواهید هویت خود را نیز در این لیست اشتراکی بگنجانید؟ این به گیرنده امکان می‌دهد شما را فوراً اضافه کند.",
       "start_chat": "شروع گفتگوی جدید",
       "title": "گفتگوها"
     },
@@ -154,11 +156,11 @@
   },
   "clipboard": {
     "permission": {
-      "denied_desc": "It looks like clipboard access was blocked. Browser security blocks access after a denial.",
-      "denied_title": "Permission Denied",
+      "denied_desc": "به نظر می‌رسد دسترسی به کلیپ‌بورد مسدود شده است. امنیت مرورگر پس از رد دسترسی را مسدود می‌کند.",
+      "denied_title": "مجوز رد شد",
       "grant": "اعطای مجوز",
-      "granted": "Clipboard permission granted",
-      "how_to_enable": "How to enable:",
+      "granted": "مجوز کلیپ‌بورد داده شد",
+      "how_to_enable": "نحوه فعال‌سازی:",
       "not_now": "الان نه",
       "privacy_desc": "این برنامه ۱۰۰٪ آفلاین است. تمام رمزگذاری و رمزگشایی به صورت محلی در دستگاه شما انجام می\u200cشود. هیچ داده\u200cای هرگز از دستگاه شما خارج نمی\u200cشود. ما فقط زمانی که به این تب برمی\u200cگردید کلیپ\u200cبورد را بررسی می\u200cکنیم و فقط پیام\u200cهای مخاطبانی که قبلاً اضافه کرده\u200cاید را پردازش می\u200cکنیم.",
       "privacy_points": {
@@ -170,57 +172,71 @@
       "privacy_title": "تضمین حریم خصوصی",
       "reason_desc": "برای تشخیص خودکار پیام\u200cهای رمزگذاری شده از مخاطبین شما هنگام کپی کردن آنها. وقتی به نهان برمی\u200cگردید، بررسی می\u200cکنیم که آیا کلیپ\u200cبورد شما حاوی پیامی از لیست مخاطبین شماست و پیشنهاد وارد کردن خودکار آن را می\u200cدهیم.",
       "reason_title": "چرا به این نیاز داریم؟",
-      "step_1": "Click the lock or settings icon in your address bar",
-      "step_2": "Find \"Clipboard\" or \"Permissions\"",
-      "step_3": "Change setting to \"Allow\" or \"Ask\"",
-      "step_4": "Refresh the page",
+      "step_1": "روی آیکون قفل یا تنظیمات در نوار آدرس کلیک کنید",
+      "step_2": "گزینه 'کلیپ‌بورد' یا 'مجوزها' را پیدا کنید",
+      "step_3": "تنظیم را به 'مجاز' یا 'سؤال' تغییر دهید",
+      "step_4": "صفحه را بازخوانی کنید",
       "title": "فعال\u200cسازی تشخیص کلیپ\u200cبورد"
     }
   },
   "common": {
     "cancel": "لغو",
     "close": "بستن",
-    "copy": "Copy",
-    "copy_failed": "Failed to copy",
-    "copy_identity": "Copy Identity",
-    "copy_success": "Copied to clipboard",
-    "delete": "",
-    "download": "Download",
+    "copy": "کپی",
+    "copy_failed": "خطا در کپی",
+    "copy_identity": "کپی هویت",
+    "copy_success": "در کلیپ‌بورد کپی شد",
+    "delete": "حذف",
+    "download": "دانلود",
     "download_image": "دانلود تصویر",
-    "download_success": "Saved to gallery",
-    "enable": "Enable",
+    "download_success": "در گالری ذخیره شد",
+    "enable": "فعال‌سازی",
     "image_preview": "پیش\u200cنمایش تصویر",
-    "learn_more": "Learn More",
-    "maybeLater": "Maybe Later",
-    "options": "",
-    "processing": "Processing",
-    "ready": "Ready",
-    "regenerate": "Regenerate / Choose Different Image",
-    "rename": "Rename Contact",
-    "save": "",
-    "select": "Select",
-    "selected": "selected",
+    "learn_more": "اطلاعات بیشتر",
+    "maybeLater": "شاید بعداً",
+    "no": "نه، فقط مخاطبین",
+    "options": "گزینه‌ها",
+    "processing": "در حال پردازش",
+    "ready": "آماده",
+    "regenerate": "تولید مجدد / انتخاب تصویر دیگر",
+    "rename": "تغییر نام مخاطب",
+    "save": "ذخیره",
+    "select": "انتخاب",
+    "selected": "انتخاب شده",
     "send": "ارسال کن",
-    "send_success": "Sent",
-    "share": "Share",
-    "view": "View"
+    "send_success": "ارسال شد",
+    "share": "اشتراک‌گذاری",
+    "view": "مشاهده",
+    "yes": "بله، من را اضافه کن"
   },
   "contact_import": {
     "toast": {
-      "decode_fail": "",
-      "enter_decode": "",
-      "handler_missing": "",
-      "invalid_contact_key": "",
-      "unknown_sender": ""
+      "decode_fail": "خطا در رمزگشایی",
+      "enter_decode": "لطفاً متنی برای رمزگشایی وارد کنید",
+      "handler_missing": "کنترل‌کننده موجود نیست",
+      "invalid_contact_key": "کلید مخاطب نامعتبر",
+      "unknown_sender": "فرستنده ناشناس"
     }
   },
   "detection": {
     "add_chat": "افزودن و شروع گفتگو",
+    "add_selected_one": "افزودن {{count}} مخاطب",
+    "add_selected_other": "افزودن {{count}} مخاطب",
     "contact_found": "مخاطب جدید <b>{{name}}</b> در کلیپ\u200cبورد شما شناسایی شد. آیا می\u200cخواهید او را اضافه کرده و گفتگو را شروع کنید؟",
     "dismiss": "رد کردن",
-    "duplicate_info": "",
-    "duplicate_message": "",
+    "duplicate_info": "این پیام قبلاً وارد شده است.",
+    "duplicate_message": "پیام تکراری",
     "message_info": "پیام از کلیپ\u200cبورد شما شناسایی و با موفقیت وارد شد.",
+    "multi_added_one": "{{count}} مخاطب اضافه شد",
+    "multi_added_other": "{{count}} مخاطب اضافه شدند",
+    "multi_added_partial": "برخی مخاطبین اضافه شدند",
+    "multi_all_exist_one": "مخاطب قبلاً وجود دارد",
+    "multi_all_exist_other": "همه مخاطبین قبلاً وجود دارند",
+    "multi_contacts": "چندین مخاطب یافت شد",
+    "multi_error": "خطا در افزودن مخاطبین",
+    "multi_found_one": "{{count}} مخاطب یافت شد",
+    "multi_found_other": "{{count}} مخاطب یافت شدند",
+    "multi_select_hint": "مخاطبینی که می‌خواهید اضافه کنید را انتخاب کنید",
     "new_contact": "مخاطب جدید شناسایی شد",
     "new_message": "پیام جدید شناسایی شد",
     "steganography_info": "اطلاعات مخاطب با استفاده از پنهان\u200cنگاری مخفی شده بود. هیچ کلید عمومی متن ساده\u200cای فاش نشد.",
@@ -230,36 +246,36 @@
     "message": "خالی"
   },
   "errors": {
-    "blobCreationFailed": "Failed to create image blob",
-    "canvasInitFailed": "Failed to initialize canvas",
-    "capacityExceeded": "Image capacity exceeded. Needed: {{needed}}, Available: {{available}}",
-    "compressionFailed": "Image compression failed",
-    "imageLoadFailed": "Failed to load image",
-    "incompletePayload": "Failed to extract complete payload"
+    "blobCreationFailed": "خطا در ایجاد blob تصویر",
+    "canvasInitFailed": "خطا در راه‌اندازی canvas",
+    "capacityExceeded": "ظرفیت تصویر تمام شد. مورد نیاز: {{needed}}، موجود: {{available}}",
+    "compressionFailed": "خطا در فشرده‌سازی تصویر",
+    "imageLoadFailed": "خطا در بارگذاری تصویر",
+    "incompletePayload": "خطا در استخراج کامل داده"
   },
   "identity_onboarding": {
-    "create_button": "",
-    "create_description": "",
+    "create_button": "ایجاد هویت",
+    "create_description": "برای شروع پیام‌رسانی هویت خود را ایجاد کنید",
     "modal": {
-      "cancel": "",
-      "create": "",
-      "display_name": "",
-      "display_name_placeholder": "",
-      "passphrase": "",
-      "passphrase_placeholder": "",
-      "title": ""
+      "cancel": "لغو",
+      "create": "ایجاد",
+      "display_name": "نام نمایشی",
+      "display_name_placeholder": "نام خود را وارد کنید",
+      "passphrase": "عبارت عبور",
+      "passphrase_placeholder": "یک عبارت عبور امن وارد کنید",
+      "title": "ایجاد هویت جدید"
     },
-    "no_identity": "",
+    "no_identity": "هنوز هویتی ایجاد نکرده‌اید",
     "toast": {
-      "create_passphrase": "",
-      "fail": "",
-      "fill_name": "",
-      "missing_key": "",
-      "success": ""
+      "create_passphrase": "لطفاً یک عبارت عبور وارد کنید",
+      "fail": "خطا در ایجاد هویت",
+      "fill_name": "لطفاً نام نمایشی را وارد کنید",
+      "missing_key": "کلید یافت نشد",
+      "success": "هویت با موفقیت ایجاد شد"
     }
   },
   "language_selector": {
-    "persian_prompt": "Please choose your preferred language",
+    "persian_prompt": "لطفاً زبان مورد نظر خود را انتخاب کنید",
     "subtitle": "لطفاً زبان مورد نظر خود را انتخاب کنید",
     "title": "انتخاب زبان"
   },
@@ -285,9 +301,9 @@
       "too_long": "محتوا نمی\u200cتواند بیشتر از ۵۰۰۰ کاراکتر باشد.",
       "too_short": "محتوا باید حداقل ۱۰ کاراکتر باشد."
     },
-    "import_decode": "Import & Decode",
+    "import_decode": "وارد کردن و رمزگشایی",
     "placeholder": "محتوای خود را اینجا جایگذاری یا تایپ کنید...",
-    "title_import": "Import from Text"
+    "title_import": "وارد کردن از متن"
   },
   "message_editor": {
     "copy_action": "کپی",
@@ -347,26 +363,32 @@
     "verified_sender": "فرستنده تایید شده"
   },
   "my_identity": {
-    "share_id": "",
-    "share_title": "",
-    "title": "",
+    "share_id": "اشتراک‌گذاری هویت",
+    "share_title": "اشتراک‌گذاری هویت من",
+    "title": "هویت من",
     "toast": {
-      "qr_copy_fail": "",
-      "qr_copy_success": "",
-      "qr_gen_fail": "",
-      "share_fail": "",
-      "stealth_copy_fail": "",
-      "stealth_copy_success": ""
+      "qr_copy_fail": "خطا در کپی کد QR",
+      "qr_copy_success": "کد QR کپی شد",
+      "qr_gen_fail": "خطا در تولید کد QR",
+      "share_fail": "خطا در اشتراک‌گذاری",
+      "stealth_copy_fail": "خطا در کپی هویت مخفی",
+      "stealth_copy_success": "هویت مخفی کپی شد"
     },
-    "view_qr": ""
+    "view_qr": "مشاهده کد QR"
   },
   "my_qr": {
-    "contact_title": "Contact Identity",
+    "contact_title": "هویت مخاطب",
     "copied": "کپی شد",
     "error": {
       "copy": "خطا در کپی به کلیپ\u200cبورد",
       "generate": "خطا در تولید کد QR"
     },
+    "multi_contacts_one": "{{count}} مخاطب",
+    "multi_contacts_other": "{{count}} مخاطب",
+    "multi_share_title_one": "اشتراک‌گذاری {{count}} مخاطب",
+    "multi_share_title_other": "اشتراک‌گذاری {{count}} مخاطب",
+    "multi_subtitle": "برای افزودن این مخاطبین اسکن یا اشتراک‌گذاری کنید",
+    "multi_title": "اشتراک‌گذاری مخاطبین",
     "save": "ذخیره",
     "share": "اشتراک\u200cگذاری",
     "share_text": "برای افزودن {{name}} در نهان اسکن کنید",
@@ -431,8 +453,8 @@
     }
   },
   "qr_scanner": {
-    "instruction": "",
-    "title": ""
+    "instruction": "کد QR را در کادر قرار دهید",
+    "title": "اسکنر کد QR"
   },
   "settings": {
     "clear": {
@@ -441,10 +463,10 @@
       "title": "پاک کردن تمام داده\u200cها"
     },
     "clear_messages": {
-      "cancel": "",
-      "confirm": "",
-      "title": "",
-      "warning": ""
+      "cancel": "لغو",
+      "confirm": "تایید",
+      "title": "پاک کردن پیام‌ها",
+      "warning": "آیا مطمئن هستید؟ این عملیات قابل بازگشت نیست."
     },
     "data": {
       "contacts": "مخاطبین",
@@ -455,8 +477,8 @@
     },
     "debug": {
       "hud": {
-        "subtitle": "Show debug metrics overlay (Requires Reload)",
-        "title": "Enable Performance HUD"
+        "subtitle": "نمایش معیارهای اشکال‌زدایی (نیاز به بازخوانی)",
+        "title": "فعال‌سازی نمایشگر عملکرد"
       }
     },
     "errors": {
@@ -484,9 +506,9 @@
     "general": {
       "camouflage": "زبان پیش\u200cفرض مخفی\u200cسازی",
       "clipboard": {
-        "grant_button": "Allow Access",
-        "permission_needed": "Permission required for auto-detection",
-        "permission_title": "Clipboard Access",
+        "grant_button": "اجازه دسترسی",
+        "permission_needed": "مجوز برای تشخیص خودکار لازم است",
+        "permission_title": "دسترسی به کلیپ‌بورد",
         "subtitle": "پاکسازی خودکار داده\u200cهای حساس",
         "timeout": "پاکسازی بعد از (ثانیه)",
         "title": "پاکسازی خودکار کلیپ\u200cبورد"
@@ -504,11 +526,11 @@
       "fa": "فارسی"
     },
     "logout": {
-      "cancel": "Cancel",
-      "confirm": "Logout",
-      "error": "Logout failed",
-      "title": "Logout",
-      "warning": "You will be logged out."
+      "cancel": "لغو",
+      "confirm": "خروج",
+      "error": "خروج ناموفق بود",
+      "title": "خروج از حساب",
+      "warning": "شما از حساب خارج خواهید شد."
     },
     "offline_sharing": {
       "description": "شما می\u200cتوانید این فایل برنامه را مستقیماً از طریق پیام\u200cرسان\u200cهای محلی با دیگران به اشتراک بگذارید. پس از باز کردن آن، آن\u200cها می\u200cتوانند از برنامه برای تبادل پیام\u200cهای رمزگذاری شده با شما بدون نیاز به دسترسی به اینترنت جهانی استفاده کنند. این امر تضمین می\u200cکند که ارتباطات شما خصوصی و در دسترس باقی می\u200cماند حتی در شرایط محدودیت شبکه.",
@@ -530,7 +552,7 @@
         "subtitle": "نمایش تنظیمات امنیتی اضافی",
         "title": "گزینه\u200cهای پیشرفته",
         "warning": "این گزینه\u200cها برای کاربران حرفه\u200cای است. با احتیاط استفاده کنید.",
-        "warning_text": "These actions are destructive or for debugging only."
+        "warning_text": "این عملیات‌ها مخرب هستند یا فقط برای اشکال‌زدایی."
       },
       "biometrics": {
         "subtitle": "استفاده از اثر انگشت یا تشخیص چهره",
@@ -580,20 +602,20 @@
       "invalid_header": "پیام مخفی یافت نشد. ممکن است تصویر فشرده شده باشد یا حاوی داده مخفی نباشد.",
       "invalid_payload": "داده نامعتبر تشخیص داده شد. ممکن است تصویر خراب شده باشد.",
       "process_failed": "خطا در پردازش تصویر. ممکن است تصویر برای داده\u200cها خیلی کوچک باشد.",
-      "verification_failed": "Warning: Integrity check failed. Image may be corrupted."
+      "verification_failed": "هشدار: بررسی یکپارچگی ناموفق بود. ممکن است تصویر خراب شده باشد."
     },
     "generate_mask": "ایجاد ماسک",
     "image_mode_title": "تصویر مخفی",
     "image_placeholder": "یک ماسک گرادیان منحصر به فرد برای مخفی کردن داده\u200cهای خود ایجاد کنید.",
     "info": {
-      "no_message": "Note: No secret message is being hidden. Image will be sent as-is."
+      "no_message": "توجه: هیچ پیام مخفی در حال مخفی شدن نیست. تصویر بدون تغییر ارسال می‌شود."
     },
     "security_score": "امتیاز امنیت",
     "send": "ارسال پیام مخفی",
     "send_error": "خطا در ارسال تصویر مخفی",
     "send_now": "ارسال اکنون",
     "send_success": "تصویر مخفی با موفقیت ارسال شد",
-    "send_success_copy": "Sent & Copied to clipboard",
+    "send_success_copy": "ارسال و در کلیپ‌بورد کپی شد",
     "tab": {
       "image": "مخفی در تصویر",
       "text": "مخفی در متن"
@@ -606,30 +628,30 @@
     }
   },
   "steganography": {
-    "clip_tooltip": "Hide data in image",
-    "copy_failed": "Failed to copy image",
-    "copy_image": "Copy Image",
-    "decode_error": "Failed to decode image",
-    "decode_image": "Decode Stego Image",
-    "decode_subtitle": "Content extracted from the image",
-    "decode_success": "Decoded successfully",
-    "decode_title": "Hidden Message",
-    "decoding": "Extracting hidden message...",
-    "download_image": "Download as File",
-    "download_success": "Image saved. Send it as a FILE!",
-    "encode_error": "Failed to encode image",
-    "encoding": "ENCODING...",
-    "encrypted_image_ready": "Encrypted Image Ready",
-    "hidden_message": "Hidden Message",
-    "image_copied": "Image copied to clipboard",
-    "message_saved": "Message saved to chat",
-    "preview_subtitle": "Your message is hidden inside this image",
-    "preview_title": "Encrypted Image Ready",
-    "unknown_sender": "Decoded from unknown sender",
-    "view_carrier": "View Encoded Carrier",
-    "view_image": "View Image",
-    "view_in_chat": "View in Chat",
-    "warning_file_transfer": "You MUST send this image as a FILE. Sending it as a standard photo will corrupt the hidden data."
+    "clip_tooltip": "مخفی کردن داده در تصویر",
+    "copy_failed": "خطا در کپی تصویر",
+    "copy_image": "کپی تصویر",
+    "decode_error": "خطا در رمزگشایی تصویر",
+    "decode_image": "رمزگشایی تصویر مخفی",
+    "decode_subtitle": "محتوای استخراج شده از تصویر",
+    "decode_success": "با موفقیت رمزگشایی شد",
+    "decode_title": "پیام مخفی",
+    "decoding": "در حال استخراج پیام مخفی...",
+    "download_image": "دانلود به عنوان فایل",
+    "download_success": "تصویر ذخیره شد. آن را به عنوان فایل ارسال کنید!",
+    "encode_error": "خطا در رمزگذاری تصویر",
+    "encoding": "در حال رمزگذاری...",
+    "encrypted_image_ready": "تصویر رمزگذاری شده آماده است",
+    "hidden_message": "پیام مخفی",
+    "image_copied": "تصویر در کلیپ‌بورد کپی شد",
+    "message_saved": "پیام در گفتگو ذخیره شد",
+    "preview_subtitle": "پیام شما درون این تصویر مخفی شده است",
+    "preview_title": "تصویر رمزگذاری شده آماده است",
+    "unknown_sender": "رمزگشایی شده از فرستنده ناشناس",
+    "view_carrier": "مشاهده تصویر رمزگذاری شده",
+    "view_image": "مشاهده تصویر",
+    "view_in_chat": "مشاهده در گفتگو",
+    "warning_file_transfer": "شما باید این تصویر را به عنوان فایل ارسال کنید. ارسال به عنوان عکس معمولی داده‌های مخفی را خراب می‌کند."
   },
   "welcome": {
     "features": {
@@ -642,7 +664,7 @@
         "title": "کاملاً آفلاین"
       }
     },
-    "logo_alt": "",
+    "logo_alt": "لوگوی نهان",
     "start": "شروع کنید",
     "subtitle": "امن. خصوصی. آفلاین.",
     "title": "به نهان خوش آمدید"
