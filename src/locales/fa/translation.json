@@ -256,17 +256,17 @@
   },
   "help": {
     "concept": {
-      "desc1": "Think of Nahan not as a chat app, but as a digital envelope.",
-      "desc2": "When you write a message, you are sealing it in an envelope that only the recipient can open. We do not have a postman. You are the courier.",
-      "desc3": "You must physically transport this sealed envelope (the encrypted text) to your recipient using any existing channel: Email, SMS, WhatsApp, or even a printed QR code.",
-      "title": "The Sealed Letter Metaphor"
+      "desc1": "نهان را نه به عنوان یک برنامه پیام‌رسان، بلکه به عنوان یک پاکت‌نامه دیجیتال در نظر بگیرید.",
+      "desc2": "وقتی پیامی می‌نویسید، آن را در پاکتی مهروموم می‌کنید که فقط گیرنده می‌تواند آن را باز کند. ما نامه‌رسان نداریم؛ خودتان نامه‌رسان هستید.",
+      "desc3": "شما باید این پاکت مهروموم شده (متن رمزگذاری شده) را از طریق هر کانال موجود مانند ایمیل، پیامک، واتس‌اپ یا حتی کد QR چاپ شده به گیرنده برسانید.",
+      "title": "استعاره نامه مهروموم شده"
     },
-    "restart_tour": "Restart Full Tour",
-    "title": "Nahan Field Guide",
+    "restart_tour": "شروع مجدد راهنمای کامل",
+    "title": "راهنمای میدانی نهان",
     "topic": {
-      "contacts": "How to Add Contacts",
-      "identity": "Identity & Keys",
-      "messaging": "Sending & Receiving"
+      "contacts": "نحوه افزودن مخاطبین",
+      "identity": "شناسه و کلیدها",
+      "messaging": "ارسال و دریافت پیام"
     }
   },
   "identity_onboarding": {
@@ -671,54 +671,54 @@
   },
   "tour": {
     "btn": {
-      "start": "Start Tour"
+      "start": "شروع راهنما"
     },
     "chat": {
-      "attach_desc": "Click here to attach and send images.",
-      "input_desc": "Type your regular messages here.",
-      "send_desc": "Click to send.\n\nTip: Long-press this button to send a custom \"Sealed Letter\" (Stealth Mode).",
-      "step1": "Message Input",
-      "step2": "Send Images",
-      "step3": "Send & Custom Stealth"
+      "attach_desc": "برای پیوست کردن و ارسال تصاویر اینجا کلیک کنید.",
+      "input_desc": "پیام‌های معمولی خود را اینجا بنویسید.",
+      "send_desc": "برای ارسال کلیک کنید.\n\nنکته: برای ارسال یک «نامه مهروموم شده» سفارشی (حالت مخفی)، این دکمه را نگه دارید.",
+      "step1": "ورود پیام",
+      "step2": "ارسال تصاویر",
+      "step3": "ارسال و حالت مخفی سفارشی"
     },
-    "click_tabs": "Finally, click Settings to see security options.",
-    "click_to_proceed": "Click on the Chats tab to proceed.",
+    "click_tabs": "در نهایت، برای مشاهده گزینه‌های امنیتی بر روی تنظیمات کلیک کنید.",
+    "click_to_proceed": "برای ادامه، بر روی برگه گفتگوها کلیک کنید.",
     "contacts": {
-      "desc": "Click here to scan a friend's QR code.",
-      "desc1": "Click on the Keys tab to proceed.",
-      "paste_btn_desc": "Paste a copied code here to add a contact.",
-      "paste_desc": "Now, click the Chats tab to see manual options.",
-      "step1": "Step 1: Go to Contacts",
-      "step2": "Scan QR",
-      "step3": "Paste Option",
-      "step4": "Manual Paste"
+      "desc": "برای اسکن کد QR دوستان خود اینجا کلیک کنید.",
+      "desc1": "برای ادامه، بر روی برگه کلیدها کلیک کنید.",
+      "paste_btn_desc": "برای افزودن مخاطب، کد کپی شده را اینجا جایگذاری کنید.",
+      "paste_desc": "حالا برای مشاهده گزینه‌های دستی، بر روی برگه گفتگوها کلیک کنید.",
+      "step1": "مرحله ۱: رفتن به مخاطبین",
+      "step2": "اسکن کد QR",
+      "step3": "گزینه جایگذاری",
+      "step4": "جایگذاری دستی"
     },
-    "done": "Got it!",
-    "finish": "All Set!",
-    "finish_btn": "Finish",
+    "done": "فهمیدم!",
+    "finish": "همه چیز آماده است!",
+    "finish_btn": "پایان",
     "help": {
-      "desc": "Click the Help icon anytime to replay guides."
+      "desc": "برای تماشای مجدد راهنما، هر زمان که خواستید بر روی آیکون راهنما کلیک کنید."
     },
     "identity": {
-      "desc": "This is your digital card. Click it to copy your ID.",
-      "step1": "Step 1: Go to Identity",
-      "step2": "Your Sealed Identity"
+      "desc": "این کارت دیجیتال شماست. برای کپی کردن شناسه خود بر روی آن کلیک کنید.",
+      "step1": "مرحله ۱: رفتن به شناسه",
+      "step2": "شناسه مهروموم شده شما"
     },
     "messaging": {
-      "desc": "Click this button to draft a new \"Sealed Letter\".",
-      "step1": "Step 1: Go to Chats",
-      "step2": "Start Writing"
+      "desc": "برای نوشتن یک «نامه مهروموم شده» جدید بر روی این دکمه کلیک کنید.",
+      "step1": "مرحله ۱: رفتن به گفتگوها",
+      "step2": "شروع نوشتن"
     },
-    "next": "Next",
-    "prev": "Back",
+    "next": "بعدی",
+    "prev": "قبلی",
     "step": {
-      "chats": "Messaging",
-      "keys": "Create Identity",
-      "settings": "Settings"
+      "chats": "پیام‌رسانی",
+      "keys": "ایجاد شناسه",
+      "settings": "تنظیمات"
     },
     "welcome": {
-      "desc": "Your secure, offline, \"Sealed Letter\" messenger. click \"Next\" to start.",
-      "title": "Welcome to Nahan"
+      "desc": "پیام‌رسان امن، آفلاین و «نامه‌های مهروموم شده» شما. برای شروع بر روی «بعدی» کلیک کنید.",
+      "title": "به نهان خوش آمدید"
     }
   },
   "welcome": {
