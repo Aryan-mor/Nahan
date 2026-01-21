@@ -11,6 +11,11 @@ export class AuthPage {
    * Navigate to root
    */
   async goto() {
+    // Inject flag to disable TourGuide
+    await this.page.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
+    });
     await this.page.goto('/');
     await expect(this.page.locator('body')).toBeVisible();
   }
@@ -117,11 +122,10 @@ export class AuthPage {
    */
   async verifyDashboard() {
     // Check for either Desktop OR Mobile Chats tab
-    // We use a Promise.race or check visibility of either
-    await expect(
-      this.page
-        .locator('[data-testid="nav-chats-tab"], [data-testid="nav-mobile-chats-tab"]')
-        .first(),
-    ).toBeVisible({ timeout: 90000 });
+    // IDs: 'nav-chats' (Desktop) or 'nav-mobile-chats' (Mobile)
+    const desktop = this.page.getByTestId('nav-chats');
+    const mobile = this.page.getByTestId('nav-mobile-chats');
+
+    await expect(desktop.or(mobile).first()).toBeVisible({ timeout: 90000 });
   }
 }

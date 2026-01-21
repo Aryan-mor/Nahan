@@ -51,6 +51,10 @@ test.describe('Contact Addition E2E', () => {
 
     // --- Step 1: Generate QR as Sender ---
     const senderContext = await browser.newContext();
+    await senderContext.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
+    });
     const senderPage = await senderContext.newPage();
     const senderAuth = new AuthPage(senderPage);
     new ContactPage(senderPage);
@@ -86,6 +90,10 @@ test.describe('Contact Addition E2E', () => {
 
     // --- Step 2: Upload QR as Receiver ---
     const receiverContext = await browser.newContext();
+    await receiverContext.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
+    });
     const receiverPage = await receiverContext.newPage();
     const receiverAuth = new AuthPage(receiverPage);
     const receiverContact = new ContactPage(receiverPage);

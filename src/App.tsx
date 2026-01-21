@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import {
     Download,
     FileUser,
+    HelpCircle,
     Lock,
     MessageSquare,
     QrCode,
@@ -21,6 +22,8 @@ import { ChatList } from './components/ChatList';
 import { ChatView } from './components/ChatView';
 import { ClipboardPermissionPrompt } from './components/ClipboardPermissionPrompt';
 import { DetectionModal } from './components/DetectionModal';
+import { HelpModal } from './components/help/HelpModal';
+import { TourGuide } from './components/help/TourGuide';
 import { KeyExchange } from './components/KeyExchange';
 import { LanguageSelector } from './components/LanguageSelector';
 import { LockScreen } from './components/LockScreen';
@@ -41,6 +44,7 @@ import {
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { usePWA } from './hooks/usePWA';
 import { formatNahanIdentity } from './services/stealthId';
+import { useHelpStore } from './store/useHelpStore';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
 import * as logger from './utils/logger';
@@ -104,6 +108,7 @@ export default function App() {
   const isStandalone = useUIStore((state) => state.isStandalone);
   const deferredPrompt = useUIStore((state) => state.deferredPrompt);
   const setInstallPromptVisible = useUIStore((state) => state.setInstallPromptVisible);
+  const { openHelpModal } = useHelpStore();
 
   // [PERF] Selector stability telemetry - track which selectors are changing
   console.log(
@@ -801,6 +806,19 @@ export default function App() {
                 </Button>
               )}
 
+              <Button
+                isIconOnly
+                variant="light"
+                className="text-industrial-400 hover:text-industrial-100"
+                onPress={openHelpModal}
+                data-testid="header-help-icon"
+                title={t('help.title', 'Help & Tour')}
+              >
+                <HelpCircle className="w-5 h-5" />
+              </Button>
+
+
+
               {identity && (
                 <div className="flex items-center gap-2">
                   <Button
@@ -847,7 +865,7 @@ export default function App() {
                 return (
                   <button
                     key={tab.id}
-                    data-testid={`nav-${tab.id}-tab`}
+                    data-testid={`nav-${tab.id}`}
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-start transition-colors ${
                       activeTab === tab.id
@@ -914,7 +932,11 @@ export default function App() {
           </main>
         </div>
 
-        {/* Mobile Bottom Navigation */}
+        {/* Global Help Components */}
+        <TourGuide />
+        <HelpModal />
+
+        {/* Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-industrial-900 border-t border-industrial-800 z-40 safe-area-pb">
           <div className="flex justify-around items-center h-16 px-2">
             {tabs.map((tab) => {
@@ -923,7 +945,7 @@ export default function App() {
               return (
                 <button
                   key={tab.id}
-                  data-testid={`nav-mobile-${tab.id}-tab`}
+                  data-testid={`nav-mobile-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex flex-col items-center justify-center w-full h-full gap-1 ${
                     isActive

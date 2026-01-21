@@ -37,7 +37,7 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
   test('should setup self-destruct PIN successfully', async ({ page }) => {
     // Navigate to Settings
-    const settingsTab = page.locator('[data-testid="nav-settings-tab"], [data-testid="nav-mobile-settings-tab"]').first();
+    const settingsTab = page.locator('[data-testid="nav-settings"]').first();
     await settingsTab.click();
     await page.waitForTimeout(500);
 
@@ -81,7 +81,7 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
   test('should validate PIN requirements', async ({ page }) => {
     // Navigate to Settings and open setup
-    const settingsTab = page.locator('[data-testid="nav-settings-tab"], [data-testid="nav-mobile-settings-tab"]').first();
+    const settingsTab = page.locator('[data-testid="nav-settings"]').first();
     await settingsTab.click();
     await page.waitForTimeout(500);
 
@@ -118,7 +118,7 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
   test('should trigger data wipe when emergency PIN is entered on lock screen', async ({ page }) => {
     // Setup emergency PIN first
-    const settingsTab = page.locator('[data-testid="nav-settings-tab"], [data-testid="nav-mobile-settings-tab"]').first();
+    const settingsTab = page.locator('[data-testid="nav-settings"]').first();
     await settingsTab.click();
     await page.waitForTimeout(500);
 
@@ -185,7 +185,7 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
   test('should persist emergency PIN across lock/unlock cycles', async ({ page }) => {
     // Setup emergency PIN
-    const settingsTab = page.locator('[data-testid="nav-settings-tab"], [data-testid="nav-mobile-settings-tab"]').first();
+    const settingsTab = page.locator('[data-testid="nav-settings"]').first();
     await settingsTab.click();
     await page.waitForTimeout(500);
 
@@ -226,7 +226,7 @@ test.describe('Self-Destruct PIN (Emergency Data Wipe)', () => {
 
   test('should remove emergency PIN successfully', async ({ page }) => {
     // Setup emergency PIN
-    const settingsTab = page.locator('[data-testid="nav-settings-tab"], [data-testid="nav-mobile-settings-tab"]').first();
+    const settingsTab = page.locator('[data-testid="nav-settings"]').first();
     await settingsTab.click();
     await page.waitForTimeout(500);
 

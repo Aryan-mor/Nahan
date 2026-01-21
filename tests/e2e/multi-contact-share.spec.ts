@@ -9,6 +9,10 @@ test.describe('Multi-Contact Share E2E', () => {
   test.beforeEach(async ({ browser }) => {
     try {
       const context = await browser.newContext({ permissions: ['clipboard-write'] });
+      await context.addInitScript(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__NAHAN_IS_AUTOMATED__ = true;
+      });
       const page = await context.newPage();
       // Ensure we have a valid DOM for clipboard access
       await page.goto('data:text/html,<body></body>');
@@ -37,6 +41,10 @@ test.describe('Multi-Contact Share E2E', () => {
     for (const contact of contacts) {
       const context = await browser.newContext({
         permissions: ['clipboard-read', 'clipboard-write'],
+      });
+      await context.addInitScript(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__NAHAN_IS_AUTOMATED__ = true;
       });
       const page = await context.newPage();
 
@@ -70,6 +78,10 @@ test.describe('Multi-Contact Share E2E', () => {
       viewport: { width: 1280, height: 720 },
       permissions: ['clipboard-read', 'clipboard-write'],
     });
+    await senderContext.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
+    });
     const senderPage = await senderContext.newPage();
 
     // Disable prompts for Sender
@@ -97,7 +109,7 @@ test.describe('Multi-Contact Share E2E', () => {
       }
 
       // Return to chat list
-      await senderPage.getByTestId('nav-chats-tab').click();
+      await senderPage.getByTestId('nav-chats').click();
 
       // Enter Selection Mode via long press simulation
       // We need to wait for list to be interactive
@@ -136,6 +148,10 @@ test.describe('Multi-Contact Share E2E', () => {
     const receiverContext = await browser.newContext({
       viewport: { width: 1280, height: 720 },
       permissions: ['clipboard-read', 'clipboard-write'],
+    });
+    await receiverContext.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
     });
     const receiverPage = await receiverContext.newPage();
 
@@ -188,7 +204,7 @@ test.describe('Multi-Contact Share E2E', () => {
       await expect(modal).toBeHidden();
 
       // Verify they appear in Chat List
-      await receiverPage.getByTestId('nav-chats-tab').click();
+      await receiverPage.getByTestId('nav-chats').click();
       for (const contact of contacts) {
         // Use the same verification logic as sender
         await receiverContacts.verifyContactAdded(contact.name);
@@ -202,6 +218,10 @@ test.describe('Multi-Contact Share E2E', () => {
     for (const contact of contacts) {
       const context = await browser.newContext({
         permissions: ['clipboard-read', 'clipboard-write'],
+      });
+      await context.addInitScript(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__NAHAN_IS_AUTOMATED__ = true;
       });
       const page = await context.newPage();
 
@@ -251,6 +271,10 @@ test.describe('Multi-Contact Share E2E', () => {
     const senderContext = await browser.newContext({
       permissions: ['clipboard-read', 'clipboard-write'],
     });
+    await senderContext.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
+    });
     const senderPage = await senderContext.newPage();
 
     // Disable prompts
@@ -276,7 +300,7 @@ test.describe('Multi-Contact Share E2E', () => {
         await senderContacts.verifyContactAdded(contact.name);
       }
 
-      await senderPage.getByTestId('nav-chats-tab').click();
+      await senderPage.getByTestId('nav-chats').click();
       await senderPage.waitForTimeout(1000);
 
       // Enter selection mode
@@ -330,6 +354,10 @@ test.describe('Multi-Contact Share E2E', () => {
     const receiverContext = await browser.newContext({
       permissions: ['clipboard-read', 'clipboard-write'],
     });
+    await receiverContext.addInitScript(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__NAHAN_IS_AUTOMATED__ = true;
+    });
     const receiverPage = await receiverContext.newPage();
 
     // Disable prompts for QR Receiver
@@ -370,7 +398,7 @@ test.describe('Multi-Contact Share E2E', () => {
         await expect(modal).toBeHidden();
 
         // Verify
-        await receiverPage.getByTestId('nav-chats-tab').click();
+        await receiverPage.getByTestId('nav-chats').click();
         for (const contact of contacts) {
           await receiverContacts.verifyContactAdded(contact.name);
         }

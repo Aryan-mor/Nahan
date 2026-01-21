@@ -33,12 +33,20 @@ export async function setupConnectedUsers(browser: Browser): Promise<P2PSetupRes
   const contextA = await browser.newContext({
     permissions: [], // Start clean
   });
+  await contextA.addInitScript(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__NAHAN_IS_AUTOMATED__ = true;
+  });
   const pageA = await contextA.newPage();
 
   // User B: Write OK, Read DENIED.
   // We explicitly grant write, but leave read denied/prompt.
   const contextB = await browser.newContext({
     permissions: ['clipboard-write'],
+  });
+  await contextB.addInitScript(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__NAHAN_IS_AUTOMATED__ = true;
   });
   const pageB = await contextB.newPage();
 
@@ -81,7 +89,7 @@ export async function setupConnectedUsers(browser: Browser): Promise<P2PSetupRes
   // =========================================================================
   await test.step('Setup: User A Grants Clipboard Permission', async () => {
     // Navigate to Settings
-    await pageA.getByTestId('nav-settings-tab').click();
+    await pageA.getByTestId('nav-settings').click();
 
     // Click "Allow Access" to open modal
     // Note: Component uses text "Allow Access" (key: settings.general.clipboard.grant_button)
@@ -115,7 +123,7 @@ export async function setupConnectedUsers(browser: Browser): Promise<P2PSetupRes
     }
 
     // Return to Chat List
-    await pageA.getByTestId('nav-chats-tab').click({ force: true });
+    await pageA.getByTestId('nav-chats').click({ force: true });
   });
 
   // =========================================================================
@@ -123,7 +131,7 @@ export async function setupConnectedUsers(browser: Browser): Promise<P2PSetupRes
   // =========================================================================
   await test.step('Setup: User B Skips Clipboard Permission', async () => {
     // Navigate to Settings
-    await pageB.getByTestId('nav-settings-tab').click();
+    await pageB.getByTestId('nav-settings').click();
 
     // Click "Allow Access"
     await pageB.getByRole('button', { name: /Allow Access/i }).click();
@@ -139,7 +147,7 @@ export async function setupConnectedUsers(browser: Browser): Promise<P2PSetupRes
     await expect(pageB.getByRole('button', { name: /Allow Access/i })).toBeVisible();
 
     // Return to Chat List
-    await pageB.getByTestId('nav-chats-tab').click();
+    await pageB.getByTestId('nav-chats').click();
   });
 
   // =========================================================================
