@@ -34,7 +34,7 @@ test.describe.serial('Stealth Custom Cover (Multi-User)', () => {
              await pageA.getByText(userB.name).click();
              await expect(pageA.getByTestId('chat-view-container')).toBeVisible();
 
-             await pageA.getByTestId('chat-input').fill(secretMsg);
+             await pageA.getByTestId('chat-input-field').fill(secretMsg);
         });
 
         // =========================================================================

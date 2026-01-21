@@ -352,6 +352,7 @@ export function ChatInput() {
             variant="light"
             className="rounded-full w-8 h-8 min-w-8 mb-1 text-industrial-400"
             onPress={() => fileInputRef.current?.click()}
+            data-testid="chat-input-attach"
           >
             <Paperclip className="w-5 h-5" />
           </Button>
@@ -359,7 +360,7 @@ export function ChatInput() {
 
         <div className="flex-1 relative">
           <Textarea
-            data-testid="chat-input"
+            data-testid="chat-input-field"
             ref={textareaRef}
             value={messageInput}
             onValueChange={setMessageInput}

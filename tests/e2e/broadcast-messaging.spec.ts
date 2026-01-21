@@ -46,7 +46,7 @@ test.describe.serial('Broadcast Messaging (Multi-User)', () => {
              await expect(pageA.getByTestId('chat-input-manual-paste-btn')).toBeHidden();
 
              // Send Message
-             await pageA.getByTestId('chat-input').fill(broadcastMsg);
+             await pageA.getByTestId('chat-input-field').fill(broadcastMsg);
              await pageA.getByTestId('chat-send-btn').click();
 
              // Verify Bubble

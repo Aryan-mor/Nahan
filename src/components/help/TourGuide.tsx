@@ -1,12 +1,13 @@
 /* eslint-disable max-lines-per-function */
-import { driver } from 'driver.js';
+import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHelpStore } from '../../store/useHelpStore';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as logger from '../../utils/logger';
+import { getTourSteps } from './tourConfig';
 
 // We need to inject the icon HTML string since driver.js takes string content
 // But we want to use lucide icons. We can render them to static markup first?
@@ -17,97 +18,77 @@ import * as logger from '../../utils/logger';
 
 export const TourGuide = () => {
   const { t } = useTranslation();
-  const { hasSeenOnboarding, setHasSeenOnboarding } = useHelpStore();
+  const { hasSeenOnboarding, setHasSeenOnboarding, activeHelpTopic, endHelpTopic } = useHelpStore();
   const { identity } = useAppStore();
   const { isLocked } = useUIStore();
 
   const driverObj = useRef<ReturnType<typeof driver> | null>(null);
 
+  // Define steps for each topic
+
+  const getSteps = useCallback((topic: string | null): DriveStep[] => {
+      return getTourSteps(topic || 'onboarding', t, driverObj);
+  }, [t]);
+
   useEffect(() => {
-    // Only start tour if:
-    // 1. Not seen onboarding yet (or explicitly reset)
-    // 2. User has created an identity (logged in)
-    // 3. App is NOT locked
-    // 4. Not running in automated test environment
+    // Check if we should start a tour
+    // Case 1: Onboarding (Automatic) -> !hasSeen && !locked && identity
+    // Case 2: Specific Topic (Manual) -> activeHelpTopic && !locked
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const isAutomated = navigator.webdriver || window.navigator.userAgent.includes('Headless') || (window as any).__NAHAN_IS_AUTOMATED__;
 
-    if (hasSeenOnboarding || !identity || isLocked || isAutomated) {
-      return;
+    const shouldStartOnboarding = !hasSeenOnboarding && !!identity && !isLocked && !isAutomated;
+    const shouldStartTopic = !!activeHelpTopic && !isLocked;
+
+    if (!shouldStartOnboarding && !shouldStartTopic) {
+        // If we are not supposed to be running, ensure driver is destroyed
+        if (driverObj.current) {
+            driverObj.current.destroy();
+            driverObj.current = null;
+        }
+        return;
     }
 
-    // Initialize driver
+    const steps = getSteps(activeHelpTopic);
+
+    // Initialize driver with INTERACTION ENABLED
     driverObj.current = driver({
-      showProgress: true,
+      showProgress: steps.length > 1,
       animate: true,
-      allowClose: false, // Force user to click "Done" or "Skip"
+      allowClose: !!activeHelpTopic,
+      // CRITICAL: Allow user to click the elements!
+      disableActiveInteraction: false,
+
       doneBtnText: t('tour.done', 'Got it!'),
       nextBtnText: t('tour.next', 'Next'),
       prevBtnText: t('tour.prev', 'Back'),
       onDestroyed: () => {
-        // Mark as seen when tour is finished or skipped
-        setHasSeenOnboarding(true);
-        logger.info('[Tour] Completed or Skipped');
+        if (shouldStartOnboarding) {
+            setHasSeenOnboarding(true);
+        }
+        if (shouldStartTopic) {
+            endHelpTopic();
+        }
+        logger.info('[Tour] Completed');
       },
       popoverClass: 'nahan-driver-popover theme-dark bg-industrial-900 text-industrial-100 border border-industrial-700 shadow-xl rounded-xl',
-      steps: [
-        {
-          element: 'header',
-          popover: {
-            title: t('tour.welcome.title', 'Welcome to Nahan'),
-            description: t('tour.welcome.desc', 'Your secure, offline, "Sealed Letter" messenger. No servers. No cloud. Just you and your recipient.'),
-            side: 'bottom',
-            align: 'start',
-          },
-        },
-        {
-          element: '[data-testid="nav-keys"]', // We need to ensure these IDs exist in App.tsx navigation
-          popover: {
-            title: t('tour.keys.title', 'Manage Identities'),
-            description: t('tour.keys.desc', 'Create your identity here. Share your "Sealed Identity" card physically to connect with others.'),
-            side: 'top',
-          },
-        },
-        {
-          element: '[data-testid="nav-chats"]',
-          popover: {
-            title: t('tour.chats.title', 'Encrypted Chats'),
-            description: t('tour.chats.desc', 'Write messages here. They are saved as encrypted files on your device.'),
-            side: 'top',
-          },
-        },
-         {
-          element: '[data-testid="nav-settings"]',
-          popover: {
-            title: t('tour.settings.title', 'Settings & Tools'),
-            description: t('tour.settings.desc', 'Configure security, biometrics, and backup your data.'),
-            side: 'top',
-          },
-        },
-        {
-            element: '[data-testid="header-help-icon"]', // This will be the new icon we add
-            popover: {
-                title: t('tour.help.title', 'Need Help?'),
-                description: t('tour.help.desc', 'Click here anytime to review the concept or restart this tour.'),
-                side: 'bottom',
-                align: 'end'
-            }
-        }
-      ]
+      steps: steps
     });
+    // ...
+
 
     // Start the tour
-    // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
         driverObj.current?.drive();
-    }, 1000);
+    }, 500);
 
     return () => {
         clearTimeout(timer);
         driverObj.current?.destroy();
     };
 
-  }, [hasSeenOnboarding, identity, isLocked, t, setHasSeenOnboarding]);
+  }, [hasSeenOnboarding, identity, isLocked, activeHelpTopic, t, setHasSeenOnboarding, endHelpTopic, getSteps]);
 
   // CSS for driver.js overrides to match Nahan theme
   useEffect(() => {

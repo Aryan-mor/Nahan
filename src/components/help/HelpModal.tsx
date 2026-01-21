@@ -1,25 +1,21 @@
 /* eslint-disable max-lines-per-function */
 import {
-    Button,
-    Modal,
-    ModalBody,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
+  Button,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
 } from '@heroui/react';
-import { BookOpen, Map, RefreshCw, X } from 'lucide-react';
+import { BookOpen, Map, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useHelpStore } from '../../store/useHelpStore';
 
 export const HelpModal = () => {
-  const { isHelpModalOpen, closeHelpModal, setHasSeenOnboarding } = useHelpStore();
+  const { isHelpModalOpen, closeHelpModal, startHelpTopic } = useHelpStore();
   const { t } = useTranslation();
 
-  const handleRestartTour = () => {
-    closeHelpModal();
-    setHasSeenOnboarding(false);
-    // The TourGuide component will pick up the change in state and auto-start
-  };
+
 
   return (
     <Modal
@@ -66,43 +62,46 @@ export const HelpModal = () => {
                   </p>
                 </div>
               </section>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-industrial-800/30 border border-industrial-700/50 hover:bg-industrial-800/50 transition-colors">
-                  <h4 className="font-semibold text-industrial-200 mb-2">
-                    1. {t('help.step1.title', 'Share Identity')}
-                  </h4>
-                  <p className="text-sm text-industrial-400">
-                    {t('help.step1.desc', 'Exchange keys physically or via trusted channels to establish a secure link.')}
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg bg-industrial-800/30 border border-industrial-700/50 hover:bg-industrial-800/50 transition-colors">
-                  <h4 className="font-semibold text-industrial-200 mb-2">
-                    2. {t('help.step2.title', 'The Loop')}
-                  </h4>
-                  <p className="text-sm text-industrial-400">
-                    {t('help.step2.desc', 'Encrypt, Copy, Send via External App. Receive, Copy, Decrypt in Nahan.')}
-                  </p>
-                </div>
-              </div>
             </ModalBody>
-            <ModalFooter className="border-t border-industrial-800">
+            <ModalFooter className="flex-col gap-3 border-t border-industrial-800 bg-industrial-950/30">
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button
+                    variant="flat"
+                    onPress={() => startHelpTopic('identity')}
+                    className="bg-industrial-800 text-industrial-200"
+                  >
+                    1. {t('help.topic.identity', 'Identity & Keys')}
+                  </Button>
+                  <Button
+                    variant="flat"
+                    onPress={() => startHelpTopic('contacts')}
+                    className="bg-industrial-800 text-industrial-200"
+                  >
+                    2. {t('help.topic.contacts', 'How to Add Contacts')}
+                  </Button>
+                  <Button
+                    variant="flat"
+                    onPress={() => startHelpTopic('messaging')}
+                    className="bg-industrial-800 text-industrial-200"
+                  >
+                    3. {t('help.topic.messaging', 'Sending & Receiving')}
+                  </Button>
+                  <Button
+                    variant="flat"
+                    onPress={() => startHelpTopic('onboarding')}
+                    startContent={<RefreshCw className="w-4 h-4" />}
+                    className="bg-industrial-700 text-industrial-100"
+                  >
+                    {t('help.restart_tour', 'Restart Full Tour')}
+                  </Button>
+              </div>
               <Button
+                fullWidth
                 variant="light"
                 onPress={onClose}
-                startContent={<X className="w-4 h-4" />}
                 className="text-industrial-400 hover:text-industrial-200"
               >
-                {t('common.close', 'Close')}
-              </Button>
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={handleRestartTour}
-                startContent={<RefreshCw className="w-4 h-4" />}
-                className="bg-industrial-700 text-industrial-100 hover:bg-industrial-600"
-              >
-                {t('help.restart_tour', 'Restart Interactive Tour')}
+                {t('common.close', 'Close Guide')}
               </Button>
             </ModalFooter>
           </>
