@@ -1,4 +1,6 @@
 import { StegoFactory } from '../factory';
+import { NH01Provider } from './nh01';
+import { NH02Provider } from './nh02';
 import { NH07Provider } from './nh07';
 
 export { NH01Provider } from './nh01';
@@ -12,13 +14,12 @@ export { NH07Provider } from './nh07';
 export function registerAllProviders(): void {
   const factory = StegoFactory.getInstance();
 
-  // Register NH07 (Base122/Image) - Fully implemented
+  factory.registerProvider(new NH01Provider());
+  factory.registerProvider(new NH02Provider());
   factory.registerProvider(new NH07Provider());
 
-  // Register placeholders for NH01-NH06
+  // Register placeholders for NH03-NH06
   // Placeholder providers disabled until implemented
-  // factory.registerProvider(new NH01Provider());
-  // factory.registerProvider(new NH02Provider());
   // factory.registerProvider(new NH03Provider());
   // factory.registerProvider(new NH04Provider());
   // factory.registerProvider(new NH05Provider());

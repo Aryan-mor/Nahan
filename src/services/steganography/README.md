@@ -53,3 +53,18 @@ import { steganographyService } from '@/services/steganography';
 
 const result = await steganographyService.encode(file, privateKey, passphrase);
 ```
+
+## iOS Compatibility & Text Rendering
+
+For mobile platforms, especially iOS, text rendering engines can display "tofu" (empty boxes) or large gaps if invisible characters are injected incorrectly.
+
+### NH02 (Zero Width Binary) Strategy
+
+NH02 uses specific optimizations to ensure invisibility on iOS Safari and Chrome:
+- **Character Set**: Uses ZWNJ (`U+200C`) and ZWJ (`U+200D`).
+- **Word-Boundary Injection**: Characters are ONLY injected between words (after spaces).
+- **Ligature Safety**: No characters are injected *within* words, preventing the breaking of cursive scripts like Persian or Arabic.
+
+**Injection Pattern:**
+- Correct: `Word` + ` ` + `[ZWNJ][ZWJ]` + `Word`
+- Incorrect: `W` + `[ZWNJ]` + `o` + `[ZWJ]` + `rd` (Breaks ligatures and rendering)
