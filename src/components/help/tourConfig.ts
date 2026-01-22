@@ -24,10 +24,16 @@ const setupAdvanceOnClick = (driverObj: React.MutableRefObject<Driver | undefine
   element.addEventListener('click', clickHandler, { once: true });
 };
 
+
+// Helper to get correct tab selector based on platform
+const getTabSelector = (tabId: string, isMobile: boolean) => {
+    return isMobile ? `[data-testid="nav-mobile-${tabId}"]` : `[data-testid="nav-${tabId}"]`;
+};
+
 // Sub-helpers for each topic
-const getIdentitySteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>): DriveStep[] => [
+const getIdentitySteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>, isMobile: boolean): DriveStep[] => [
     {
-        element: '[data-testid="nav-keys"]',
+        element: getTabSelector('keys', isMobile),
         popover: {
             title: t('tour.identity.step1', 'Step 1: Go to Identity'),
             description: t('tour.click_to_proceed', 'Click on the Keys tab to proceed.'),
@@ -48,9 +54,9 @@ const getIdentitySteps = (t: TFunction, driverObj: React.MutableRefObject<Driver
     }
 ];
 
-const getContactsSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>): DriveStep[] => [
+const getContactsSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>, isMobile: boolean): DriveStep[] => [
     {
-        element: '[data-testid="nav-keys"]',
+        element: getTabSelector('keys', isMobile),
         popover: {
             title: t('tour.contacts.step1', 'Step 1: Go to Contacts'),
             description: t('tour.contacts.desc1', 'Click on the Keys tab to proceed.'),
@@ -64,12 +70,12 @@ const getContactsSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver
         popover: {
             title: t('tour.contacts.step2', 'Scan QR'),
             description: t('tour.contacts.desc', 'Click here to scan a friend\'s QR code.'),
-            side: 'left',
+            side: isMobile ? 'top' : 'left',
             showButtons: ['next', 'previous'],
         },
     },
     {
-        element: '[data-testid="nav-chats"]',
+        element: getTabSelector('chats', isMobile),
         popover: {
             title: t('tour.contacts.step3', 'Paste Option'),
             description: t('tour.contacts.paste_desc', 'Now, click the Chats tab to see manual options.'),
@@ -89,7 +95,7 @@ const getContactsSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver
     }
 ];
 
-const getChatHelpSteps = (t: TFunction): DriveStep[] => [
+const getChatHelpSteps = (t: TFunction, isMobile: boolean): DriveStep[] => [
     {
         element: '[data-testid="chat-input-field"]',
         popover: {
@@ -113,15 +119,15 @@ const getChatHelpSteps = (t: TFunction): DriveStep[] => [
         popover: {
             title: t('tour.chat.step3', 'Send & Custom Stealth'),
             description: t('tour.chat.send_desc', 'Click to send.\n\nTip: Long-press this button to send a custom "Sealed Letter" (Stealth Mode).'),
-            side: 'left',
+            side: isMobile ? 'top' : 'left',
             showButtons: ['next', 'previous'],
         }
     }
 ];
 
-const getMessagingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>): DriveStep[] => [
+const getMessagingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>, isMobile: boolean): DriveStep[] => [
     {
-        element: '[data-testid="nav-chats"]',
+        element: getTabSelector('chats', isMobile),
         popover: {
             title: t('tour.messaging.step1', 'Step 1: Go to Chats'),
             description: t('tour.click_to_proceed', 'Click on the Chats tab to proceed.'),
@@ -165,10 +171,10 @@ const getFinishStep = (t: TFunction): DriveStep => ({
     }
 });
 
-const getOnboardingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>): DriveStep[] => [
+const getOnboardingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driver | undefined>, isMobile: boolean): DriveStep[] => [
     getWelcomeStep(t),
     {
-      element: '[data-testid="nav-keys"]',
+      element: getTabSelector('keys', isMobile),
       popover: {
         title: t('tour.step.keys', 'Create Identity'),
         description: t('tour.click_tabs', 'Click the Keys tab to manage your identity.'),
@@ -178,7 +184,7 @@ const getOnboardingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driv
       onHighlightStarted: (el) => setupAdvanceOnClick(driverObj, el),
     },
     {
-      element: '[data-testid="nav-chats"]',
+      element: getTabSelector('chats', isMobile),
       popover: {
         title: t('tour.step.chats', 'Messaging'),
         description: t('tour.click_tabs', 'Now, click the Chats tab.'),
@@ -188,7 +194,7 @@ const getOnboardingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driv
       onHighlightStarted: (el) => setupAdvanceOnClick(driverObj, el),
     },
      {
-      element: '[data-testid="nav-settings"]',
+      element: getTabSelector('settings', isMobile),
       popover: {
         title: t('tour.step.settings', 'Settings'),
         description: t('tour.click_tabs', 'Finally, click Settings to see security options.'),
@@ -203,13 +209,14 @@ const getOnboardingSteps = (t: TFunction, driverObj: React.MutableRefObject<Driv
 export const getTourSteps = (
   topic: string,
   t: TFunction,
-  driverObj: React.MutableRefObject<Driver | undefined>
+  driverObj: React.MutableRefObject<Driver | undefined>,
+  isMobile: boolean = false
 ): DriveStep[] => {
     switch (topic) {
-        case 'identity': return getIdentitySteps(t, driverObj);
-        case 'contacts': return getContactsSteps(t, driverObj);
-        case 'chat_help': return getChatHelpSteps(t);
-        case 'messaging': return getMessagingSteps(t, driverObj);
-        default: return getOnboardingSteps(t, driverObj);
+        case 'identity': return getIdentitySteps(t, driverObj, isMobile);
+        case 'contacts': return getContactsSteps(t, driverObj, isMobile);
+        case 'chat_help': return getChatHelpSteps(t, isMobile);
+        case 'messaging': return getMessagingSteps(t, driverObj, isMobile);
+        default: return getOnboardingSteps(t, driverObj, isMobile);
     }
 };

@@ -22,11 +22,14 @@ export const TourGuide = () => {
 
   const driverObj = useRef<ReturnType<typeof driver> | null>(null);
 
+  // Detect mobile view (matches md breakpoint in Tailwind)
+  const isMobile = window.innerWidth < 768;
+
   // Define steps for each topic
 
   const getSteps = useCallback((topic: string | null): DriveStep[] => {
-      return getTourSteps(topic || 'onboarding', t, driverObj);
-  }, [t]);
+      return getTourSteps(topic || 'onboarding', t, driverObj, isMobile);
+  }, [t, isMobile]);
 
   useEffect(() => {
     // Only start tour when manually triggered via Help Modal
