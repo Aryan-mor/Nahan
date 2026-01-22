@@ -8,7 +8,11 @@ import { CryptoService } from '../crypto';
 
 import { decodeBase122, encodeBase122 } from './base122';
 import { generateMeshGradient, optimizeImage } from './imageUtils';
+import { registerAllProviders } from './providers';
 import { embedPayload, extractPayload } from './steganography';
+
+// Initialize provider registry
+registerAllProviders();
 
 const cryptoService = CryptoService.getInstance();
 
@@ -17,6 +21,18 @@ export interface StegoProcessResult {
   data?: Blob | string; // Blob for encode, string (url) for decode
   error?: string;
 }
+
+/**
+ * ARCHITECTURE NOTE:
+ * - ImageSteganographyService: Legacy image-based steganography (NH07)
+ * - StegoFactory + StegoProvider: New multi-algorithm architecture (NH01-NH07)
+ *
+ * For new implementations, use StegoFactory.getInstance().getProvider(algorithmId)
+ * Legacy code continues to use ImageSteganographyService.getInstance()
+ */
+export * from './factory';
+export * from './types';
+export { embedMagicHeader, extractMagicHeader } from './utils/magicHeader';
 
 export class ImageSteganographyService {
   private static instance: ImageSteganographyService;
@@ -110,6 +126,7 @@ export class ImageSteganographyService {
         passphrase,
         recipientPublicKey
       );
+
       logger.debug('Steganography Encode: Payload encrypted', { length: encryptedPayload.length });
 
       const base122Payload = encodeBase122(encryptedPayload);
