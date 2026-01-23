@@ -32,31 +32,10 @@ export class NH01Provider extends BaseStegoProvider {
     if (!coverText) throw new Error("Cover text is required for NH01");
 
     const payloadWithHeader = this.embedWithMagicHeader(payload);
-
-    // Create length prefix (4 bytes)
-    const lengthBuffer = new Uint8Array(4);
-    new DataView(lengthBuffer.buffer).setUint32(0, payloadWithHeader.length, false); // Big Endian
-
-    // Combine length + payload
-    const dataToEncode = new Uint8Array(lengthBuffer.length + payloadWithHeader.length);
-    dataToEncode.set(lengthBuffer);
-    dataToEncode.set(payloadWithHeader, 4);
-
+    const dataToEncode = this.prepareDataWithLength(payloadWithHeader);
     const bits = bytesToBits(dataToEncode);
 
-    // Pad bits to be divisible by 7
-    while (bits.length % 7 !== 0) {
-      bits.push(0);
-    }
-
-    const tags: string[] = [];
-    for (let i = 0; i < bits.length; i += 7) {
-      let value = 0;
-      for (let j = 0; j < 7; j++) {
-        value = (value << 1) | bits[i + j];
-      }
-      tags.push(String.fromCodePoint(0xE0000 + value));
-    }
+    const tags = this.bitsToTags(bits);
 
     let result = '';
     const visibleChars = [...coverText]; // Handle surrogate pairs
@@ -110,5 +89,26 @@ export class NH01Provider extends BaseStegoProvider {
 
     const payloadWithHeader = rawBytes.subarray(4, 4 + length);
     return this.extractWithMagicHeader(payloadWithHeader);
+  }
+
+  private prepareDataWithLength(payload: Uint8Array): Uint8Array {
+    const lengthBuffer = new Uint8Array(4);
+    new DataView(lengthBuffer.buffer).setUint32(0, payload.length, false);
+    const combined = new Uint8Array(4 + payload.length);
+    combined.set(lengthBuffer);
+    combined.set(payload, 4);
+    return combined;
+  }
+
+  private bitsToTags(bits: number[]): string[] {
+    const paddedBits = [...bits];
+    while (paddedBits.length % 7 !== 0) paddedBits.push(0);
+    const tags: string[] = [];
+    for (let i = 0; i < paddedBits.length; i += 7) {
+      let value = 0;
+      for (let j = 0; j < 7; j++) value = (value << 1) | paddedBits[i + j];
+      tags.push(String.fromCodePoint(0xE0000 + value));
+    }
+    return tags;
   }
 }

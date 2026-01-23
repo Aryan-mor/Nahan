@@ -1,8 +1,13 @@
-
-// Base122 Encoding/Decoding
-// Simplified implementation focusing on safety for messaging platforms.
-// Maps 7 bits to safe UTF-8 characters.
-// "Safe" characters are 1 byte. "Unsafe" characters are escaped to 2 bytes.
+/**
+ * Base122 Encoding/Decoding
+ * 
+ * NOTE: This module is now wrapped by NH07Provider.
+ * Direct usage is discouraged. Please use StegoFactory.getProvider(AlgorithmType.NH07) instead.
+ * 
+ * Simplified implementation focusing on safety for messaging platforms.
+ * Maps 7 bits to safe UTF-8 characters.
+ * "Safe" characters are 1 byte. "Unsafe" characters are escaped to 2 bytes.
+ */
 
 const ILLEGAL_SET = new Set([
   0x00, // Null

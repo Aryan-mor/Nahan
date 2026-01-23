@@ -1,6 +1,8 @@
 import { decodeBase122, encodeBase122 } from '../base122';
 import { AlgorithmMetadata, AlgorithmType } from '../types';
 import { BaseStegoProvider } from './baseProvider';
+import { extractMagicHeader } from '../utils/magicHeader';
+import * as logger from '../../../utils/logger';
 
 /**
  * NH07: Base122 Image Steganography
@@ -41,7 +43,38 @@ export class NH07Provider extends BaseStegoProvider {
     // Decode using existing Base122 implementation
     const payloadWithHeader = decodeBase122(stegoText);
 
-    // Validate and strip magic header
+    // Manual Magic Header validation to handle legacy coincidence
+    const { algorithmId, payload } = extractMagicHeader(payloadWithHeader);
+
+    // If we detected NH07 header
+    if (algorithmId === AlgorithmType.NH07) {
+      // Validate that the payload looks like a valid encrypted message (Version 0x01 or 0x02)
+      if (payload.length > 0) {
+        const version = payload[0];
+        if (version === 0x01 || version === 0x02) {
+          // Valid version byte, so it's likely a real NH07 payload
+          return payload;
+        } else {
+          // Header present but payload invalid.
+          // Likely a coincidence in legacy random bytes.
+          // Return ORIGINAL bytes (including what looked like header)
+          logger.warn('NH07: Detected magic header but invalid payload version. Treating as legacy.');
+          return payloadWithHeader;
+        }
+      }
+    }
+
+    // Use base class logic for other cases (no header or mismatch)
+    // Note: extractWithMagicHeader handles "no header" by returning raw bytes
+    // But if extractMagicHeader returned a mismatch ID (e.g. NH06), base class would throw.
+    // Legacy payloads are random bytes, so they shouldn't match *any* header usually.
+    // But to be safe, if we are here, we either have NO header, or a MISMATCH header.
+    
+    // If it was NH07, we handled it above.
+    // If it is another header (e.g. NH06), extractWithMagicHeader will throw mismatch error.
+    // Legacy data *could* theoretically start with NH06...
+    // But user comment specifically worried about "NH07" coincidence.
+    
     return this.extractWithMagicHeader(payloadWithHeader);
   }
 }

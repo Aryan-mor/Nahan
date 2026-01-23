@@ -1,5 +1,6 @@
 import { AlgorithmMetadata, AlgorithmType, StegoProvider } from '../types';
 import { embedMagicHeader, extractMagicHeader } from '../utils/magicHeader';
+import * as logger from '../../../utils/logger';
 
 export abstract class BaseStegoProvider implements StegoProvider {
   /**
@@ -23,6 +24,7 @@ export abstract class BaseStegoProvider implements StegoProvider {
     // If no header found, return the payload as-is (legacy support or raw data)
     // Strict validation requires header, but for robustness we allow fallback if header is missing
     if (!algorithmId) {
+      logger.debug('No magic header found, treating as legacy payload');
       return actualPayload;
     }
 
