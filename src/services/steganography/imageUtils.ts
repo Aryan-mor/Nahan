@@ -1,5 +1,6 @@
 import i18next from 'i18next';
 
+
 function scaleDimensions(width: number, height: number, maxSize: number) {
   if (width <= maxSize && height <= maxSize) return { width, height };
   if (width > height) {
@@ -104,3 +105,50 @@ export const generateMeshGradient = (width: number, height: number): HTMLCanvasE
 export const blobToUrl = (blob: Blob): string => {
   return URL.createObjectURL(blob);
 };
+
+export const loadCarrierCanvas = async (carrierFile: File): Promise<HTMLCanvasElement> => {
+  const img = new Image();
+  const url = URL.createObjectURL(carrierFile);
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+    img.src = url;
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error(i18next.t('errors.canvasInitFailed', 'Failed to initialize canvas'));
+
+  ctx.drawImage(img, 0, 0);
+  URL.revokeObjectURL(url);
+  return canvas;
+};
+
+export const isImagePayload = (bytes: Uint8Array): boolean => {
+  if (bytes.length < 12) return false;
+
+  // PNG: 89 50 4E 47
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return true;
+
+  // JPEG: FF D8
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return true;
+
+  // WebP: RIFF .... WEBP
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  )
+    return true;
+
+  return false;
+};
+

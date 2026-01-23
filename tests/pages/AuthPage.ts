@@ -48,6 +48,7 @@ export class AuthPage {
 
     await expect(warningCheckbox).toBeVisible();
     await warningCheckbox.click();
+    await expect(warningCheckbox).toBeChecked(); // Ensure state is updated
 
     await expect(warningContinue).toBeEnabled(); // Wait for state update
     await warningContinue.click();

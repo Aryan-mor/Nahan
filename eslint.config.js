@@ -1,9 +1,9 @@
 import js from '@eslint/js';
-import globals from 'globals';
+import i18next from 'eslint-plugin-i18next';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import i18next from 'eslint-plugin-i18next';
 
 export default tseslint.config(
   { ignores: ['dist', 'build', 'dev-dist', '.husky', 'coverage', '**/*.d.ts'] },
@@ -22,13 +22,13 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...i18next.configs.recommended.rules,
-      
+
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
-      
-      '@typescript-eslint/no-unused-vars': ['error', { 
+
+      '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_'
@@ -42,8 +42,8 @@ export default tseslint.config(
         {
           markupOnly: true,
           ignoreAttribute: [
-            'style', 'className', 'path', 'type', 'key', 'id', 'width', 'height', 
-            'viewBox', 'd', 'fill', 'stroke', 'strokeWidth', 'strokeLinecap', 
+            'style', 'className', 'path', 'type', 'key', 'id', 'width', 'height',
+            'viewBox', 'd', 'fill', 'stroke', 'strokeWidth', 'strokeLinecap',
             'strokeLinejoin', 'target', 'rel', 'as', 'dir', 'lang'
           ],
           validateTemplate: true,
@@ -55,10 +55,16 @@ export default tseslint.config(
     },
   },
   {
-    files: ['tests/**/*.{ts,tsx}'],
+    files: [
+      '**/__tests__/**/*.{ts,tsx}',
+      '**/*.{test,spec}.{ts,tsx}',
+      'tests/**/*.{ts,tsx}'
+    ],
     rules: {
       'max-lines': 'off',
       'max-lines-per-function': 'off',
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
 );

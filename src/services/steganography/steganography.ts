@@ -1,3 +1,13 @@
+/**
+ * LSB-2 Steganography (Core Logic)
+ * 
+ * This module handles the low-level pixel manipulation (embedding/extracting bits).
+ * It is algorithm-agnostic and treats the payload as a raw string (usually Base122).
+ * 
+ * Note: The payload string may or may not contain a Magic Header, depending on the
+ * Provider used (e.g. NH07). This layer does not care about the payload content.
+ */
+
 /* eslint-disable max-lines-per-function */
 import i18next from 'i18next';
 import * as logger from '../../utils/logger';
