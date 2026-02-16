@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: true,
+  fullyParallel: false, // Run tests serially to ensure proper cleanup
   forbidOnly: !!process.env.CI,
   timeout: 180000,
   retries: process.env.CI ? 2 : 0,
